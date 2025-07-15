@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pydantic
+email-validator
+alembic
+sqlalchemy
+bcrypt
