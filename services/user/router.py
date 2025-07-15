@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from db.database import get_db
-from services.user import crud, schemas
+from services.user import repository, schemas
 from services.user.schemas import UserCreate, UserResponse
 from services.user.errors import UserAlreadyExistsError, UserNotFoundError
 
@@ -14,7 +14,7 @@ def get_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     Récupère la liste des utilisateurs avec pagination.
     """
     try:
-        users = crud.get_users(db, skip=skip, limit=limit)
+        users = repository.get_users(db, skip=skip, limit=limit)
         return users
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -25,8 +25,7 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     Récupère un utilisateur par son ID.
     """
     try:
-        print('coucou', user_id)
-        user = crud.get_user(db, user_id=user_id)
+        user = repository.get_user(db, user_id=user_id)
         return user
     except UserNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -39,7 +38,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     Crée un nouvel utilisateur.
     """
     try:
-        new_user = crud.create_user(db, user=user)
+        new_user = repository.create_user(db, user=user)
         return new_user
     except UserAlreadyExistsError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -52,7 +51,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     Supprime un utilisateur par son ID.
     """
     try:
-        result = crud.delete_user(db, user_id=user_id)
+        result = repository.delete_user(db, user_id=user_id)
         return {"message": "Utilisateur supprimé avec succès"}
     except UserNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

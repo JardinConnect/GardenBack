@@ -15,7 +15,6 @@ PROJECT_ROOT = os.path.dirname(BASE_DIR)
 DATABASE_PATH = os.path.join(PROJECT_ROOT, DATABASE_FILE_NAME)
 
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
-print(DATABASE_URL)
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

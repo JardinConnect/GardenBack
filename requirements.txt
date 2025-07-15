@@ -5,3 +5,6 @@ email-validator
 alembic
 sqlalchemy
 bcrypt
+python-jose[cryptography]
+python-multipart
+passlib

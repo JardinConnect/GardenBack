@@ -32,7 +32,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # Register routers (todo: delete prefix when implemented)
 app.include_router(alert_router, prefix="/alert", tags=["Alert"])
 app.include_router(gateway_router, prefix="/gateway", tags=["API Gateway"])
-app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+app.include_router(auth_router, tags=["Authentication"])
 app.include_router(data_router, prefix="/data", tags=["Data"])
 app.include_router(lora_router, prefix="/lora", tags=["Lora GPIO"])
 app.include_router(mqtt_router, prefix="/mqtt", tags=["MQTT"])

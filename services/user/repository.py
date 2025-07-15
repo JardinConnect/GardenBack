@@ -2,6 +2,9 @@ from services.user.errors import UserAlreadyExistsError, UserNotFoundError
 from db.models import User
 from sqlalchemy.orm import Session
 from services.user.schemas import UserCreate
+from services.auth.utils.security import get_password_hash
+
+
 
 
 def get_user(db: Session, user_id: int):
@@ -23,13 +26,14 @@ def create_user(db: Session, user: UserCreate):
     db_user = User(
         username=user.username,
         email=user.email,
-        password=user.password,
+        password=get_password_hash(user.password),
         role=user.role,
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
+
 
 
 def delete_user(db: Session, user_id: int):

@@ -9,7 +9,6 @@ PROJECT_ROOT = os.path.dirname(BASE_DIR)
 DATABASE_PATH = os.path.join(PROJECT_ROOT, DATABASE_FILE_NAME)
 
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
-print(DATABASE_URL)
 
 #TODO: À voir si on utilise le versionning de l'API
 class Settings:
