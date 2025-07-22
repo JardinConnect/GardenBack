@@ -1,6 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, Float, ForeignKey, func
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import declarative_base, relationship # relationship est déjà là, juste pour montrer le regroupement
 from datetime import datetime
 
 Base = declarative_base()
@@ -12,13 +11,14 @@ class User(Base):
     username = Column(String, unique=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)
-    role = Column(String, default="user")
+    isAdmin = Column(Boolean, default=False) # Changed "False" to False (boolean type)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relations
     refresh_tokens = relationship("RefreshToken", back_populates="user")
     user_spaces = relationship("UserSpace", back_populates="user")
+
 
 class Space(Base):
     """
@@ -41,7 +41,7 @@ class Space(Base):
 
     # Relations
     users = relationship("UserSpace", back_populates="space")
-    arduino_nodes = relationship("ArduinoNode", back_populates="space")
+    nodes = relationship("Node", back_populates="space")
 
 class UserSpace(Base):
     """
@@ -51,30 +51,47 @@ class UserSpace(Base):
     __tablename__ = 'user_spaces'
 
     id = Column(Integer, primary_key=True, index=True)
-    role = Column(String)
     permissions = Column(String)
 
     user_id = Column(Integer, ForeignKey('users.id'), index=True)
     space_id = Column(Integer, ForeignKey('spaces.id'), index=True)
+    role_id = Column(Integer, ForeignKey('roles.id'), index=True)
 
     # Relations
     user = relationship("User", back_populates="user_spaces")
     space = relationship("Space", back_populates="users")
+    role = relationship("Role", back_populates="user_spaces")
 
-class ArduinoNode(Base):
+
+class Role(Base):
     """
-    Modèle pour la table 'arduino_nodes'.
-    Représente un nœud Arduino physique.
+    Modèle les différents rôles utilisateurs.
+    Le rôle sert à donner un droit d'édition d'un Espace à un Utilisateur
     """
-    __tablename__ = 'arduino_nodes'
+    __tablename__ = "roles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relations
+    user_spaces = relationship("UserSpace", back_populates="role")
+
+class Node(Base):
+    """
+    Modèle pour la table 'nodes'.
+    Représente un nœud Arduino (ou autre) physique.
+    """
+    __tablename__ = 'nodes'
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
     description = Column(Text)
     firmware_version = Column(String)
     location = Column(String)
-    api_key = Column(String, unique=True, nullable=False, index=True) 
-    status = Column(String)   
+    api_key = Column(String, unique=True, nullable=False, index=True)
+    status = Column(String)
     last_connection = Column(DateTime)
     battery_level = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -82,8 +99,8 @@ class ArduinoNode(Base):
 
     # Relations
     space_id = Column(Integer, ForeignKey('spaces.id'), index=True)
-    space = relationship("Space", back_populates="arduino_nodes")
-    sensors = relationship("Sensor", back_populates="arduino_node")
+    space = relationship("Space", back_populates="nodes")
+    sensors = relationship("Sensor", back_populates="node")
 
 class Sensor(Base):
     """
@@ -95,19 +112,19 @@ class Sensor(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
     type = Column(String)
-    model = Column(String) 
-    position_on_node = Column(String) 
+    model = Column(String)
+    position_on_node = Column(String)
     is_active = Column(Boolean, default=True)
-    min_value = Column(Float) 
-    max_value = Column(Float) 
-    calibration_offset = Column(Float) 
+    min_value = Column(Float)
+    max_value = Column(Float)
+    calibration_offset = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relations
-    arduino_node_id = Column(Integer, ForeignKey('arduino_nodes.id'), index=True)
-    arduino_node = relationship("ArduinoNode", back_populates="sensors")
-    data_readings = relationship("SensorData", back_populates="sensor") 
+    node_id = Column(Integer, ForeignKey('nodes.id'), index=True)
+    node = relationship("Node", back_populates="sensors")
+    data_readings = relationship("SensorData", back_populates="sensor")
     alerts = relationship("Alert", back_populates="sensor")
 
 class SensorData(Base):
@@ -118,9 +135,9 @@ class SensorData(Base):
     __tablename__ = 'sensor_data'
 
     id = Column(Integer, primary_key=True, index=True)
-    value = Column(Float, nullable=False) 
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False) 
-    unit_of_measure = Column(String) 
+    value = Column(Float, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    unit_of_measure = Column(String)
 
     # Relations
     sensor_id = Column(Integer, ForeignKey('sensors.id'), index=True)
@@ -136,15 +153,15 @@ class Alert(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     condition = Column(String, nullable=False) # Ex: ">", "<", "=="
-    threshold = Column(Float, nullable=False) 
-    is_active = Column(Boolean, default=True) 
+    threshold = Column(Float, nullable=False)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relations
     sensor_id = Column(Integer, ForeignKey('sensors.id'), index=True)
     sensor = relationship("Sensor", back_populates="alerts")
-    history = relationship("AlertHistory", back_populates="alert") 
+    history = relationship("AlertHistory", back_populates="alert")
 
 class AlertHistory(Base):
     """
@@ -154,9 +171,9 @@ class AlertHistory(Base):
     __tablename__ = 'alert_history'
 
     id = Column(Integer, primary_key=True, index=True)
-    triggered_at = Column(DateTime, nullable=False) 
-    resolved_at = Column(DateTime, nullable=True) 
-    status = Column(String, nullable=False) 
+    triggered_at = Column(DateTime, nullable=False)
+    resolved_at = Column(DateTime, nullable=True)
+    status = Column(String, nullable=False)
     message = Column(Text)
 
     # Relations

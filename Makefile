@@ -19,13 +19,15 @@ ALEMBIC_CMD_PREFIX := $(PYTHON_BIN) -m alembic
 SEED_SCRIPT := db/seed.py
 DATABASE_FILE := database.db # <-- CHANGÉ ICI : Nom du fichier de base de données SQLite (doit correspondre à alembic.ini)
 
-# --- Variables Alembic ---
-MIGRATE_MESSAGE ?= "Auto-generated migration" # Message par défaut si non spécifié
+# Configuration des tests
+TEST_DIR := tests
+PYTEST_CMD := $(PYTHON_BIN) -m pytest
 
 # --- Cibles Phony (toujours exécutées, même si un fichier du même nom existe) ou pour des actions non-fichier
 .PHONY: all help install clean uninstall freeze \
         run reset-db rebuild seed \
-        generate-migration upgrade downgrade history
+        generate-migration upgrade downgrade history \
+        test test-coverage
 
 # --- Commande par défaut (affiche l'aide si rien n'est spécifié) ---
 all: help
@@ -43,6 +45,10 @@ help:
 	@echo "  $(PURPLE)make rebuild$(NO_COLOR)     - Supprime la base de données et applique toutes les migrations."
 	@echo "  $(PURPLE)make seed$(NO_COLOR)        - Exécute le script de remplissage de la base de données (assure les migrations appliquées)."
 	@echo ""
+	@echo "$(BLUE)Commandes de Test :$(NO_COLOR)"
+	@echo "  $(GREEN)make test$(NO_COLOR)          - Exécute tous les tests du projet."
+	@echo "  $(GREEN)make test-coverage$(NO_COLOR) - Exécute les tests avec rapport de couverture de code."
+	@echo ""
 	@echo "$(BLUE)Commandes Alembic (Migrations de Base de Données) :$(NO_COLOR)"
 	@echo "  $(CYAN)make generate-migration [MESSAGE=\"titre de la migration\"]$(NO_COLOR)  - Génère un nouveau script de migration."
 	@echo "  $(GREEN)make upgrade$(NO_COLOR)       - Applique toutes les migrations en attente (vers 'head')."
@@ -54,6 +60,7 @@ help:
 	@echo "  make generate-migration MESSAGE=\"Add users and spaces tables\""
 	@echo "  make upgrade"
 	@echo "  make seed"
+	@echo "  make test"
 	@echo "  make run"
 
 # --- Cible pour installer les dépendances ---
@@ -117,13 +124,42 @@ seed: upgrade
 	$(PYTHON_BIN) $(SEED_SCRIPT)
 	@echo "✅ $(GREEN)Base de données remplie avec des données initiales/de test.$(NO_COLOR)"
 
+# --- Commandes de Test ---
+
+# Exécute tous les tests du projet
+test:
+	@echo "🧪 $(GREEN)Exécution de tous les tests...$(NO_COLOR)"
+	@if [ -d "$(TEST_DIR)" ]; then \
+		PYTHONPATH=. $(PYTEST_CMD) $(TEST_DIR) -q; \
+	else \
+		PYTHONPATH=. $(PYTEST_CMD) . -q --ignore=$(VENV_DIR); \
+	fi
+	@echo "✅ $(GREEN)Tests terminés.$(NO_COLOR)"
+
+
+# Exécute les tests avec rapport de couverture de code
+# Note: Nécessite pytest-cov (ajouter à requirements.txt si souhaité)
+test-coverage:
+	@echo "📊 $(GREEN)Exécution des tests avec couverture de code...$(NO_COLOR)"
+	@if command -v $(PYTHON_BIN) -c "import pytest_cov" 2>/dev/null; then \
+		if [ -d "$(TEST_DIR)" ]; then \
+			$(PYTEST_CMD) $(TEST_DIR) --cov=. --cov-report=html --cov-report=term; \
+		else \
+			$(PYTEST_CMD) . --cov=. --cov-report=html --cov-report=term --ignore=$(VENV_DIR); \
+		fi; \
+		echo "📈 $(CYAN)Rapport de couverture généré dans htmlcov/index.html$(NO_COLOR)"; \
+	else \
+		echo "⚠️  $(YELLOW)pytest-cov n'est pas installé. Exécution des tests sans couverture...$(NO_COLOR)"; \
+		make test; \
+		echo "💡 $(CYAN)Pour activer la couverture, ajoutez 'pytest-cov' à $(REQUIREMENTS_FILE)$(NO_COLOR)"; \
+	fi
 
 #! --- Commandes Alembic ---
 # Génère un nouveau script de migration
 # Utilisation : make generate-migration MESSAGE="Ajouter la table des utilisateurs"
 generate-migration:
 	@echo "🔧 $(CYAN)Génération d'une migration Alembic...$(NO_COLOR)"
-	@$(SHELL) -c '$(ALEMBIC_CMD_PREFIX) revision --autogenerate -m "$(MIGRATE_MESSAGE)"'
+	@$(SHELL) -c '$(PYTHON_BIN) -m alembic revision --autogenerate -m "$(MESSAGE)"'
 	@echo "✅ $(GREEN)Migration générée. Vérifiez le nouveau fichier dans alembic/versions/.$(NO_COLOR)"
 
 # Applique toutes les migrations en attente jusqu'à la dernière version (head)

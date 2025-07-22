@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine, inspect 
 from sqlalchemy.orm import sessionmaker
-from models import Base, User, Space, UserSpace, ArduinoNode, Sensor, SensorData, Alert, AlertHistory, RefreshToken
+from models import Base, User, Space, Role, UserSpace, Node, Sensor, SensorData, Alert, AlertHistory, RefreshToken
 import bcrypt
 import random
 
@@ -40,6 +40,9 @@ def seed():
             print("DEBUG: Les migrations n'ont peut-être pas été appliquées correctement à cette base de données.")
             return
 
+        # Seed des rôles
+        seed_roles(db) 
+
         # Seed des utilisateurs
         seed_users(db)
         
@@ -50,7 +53,7 @@ def seed():
         seed_user_spaces(db)
         
         # Seed des nœuds Arduino
-        seed_arduino_nodes(db)
+        seed_nodes(db)
         
         # Seed des capteurs
         seed_sensors(db)
@@ -78,11 +81,11 @@ def seed():
 def seed_users(db):
     """Seed des utilisateurs"""
     users_data = [
-        {"username": "sam", "email": "sam@garden.com", "password": "garden1", "role": "user"},
-        {"username": "admin", "email": "admin@garden.com", "password": "admin123", "role": "admin"},
-        {"username": "marie", "email": "marie@garden.com", "password": "marie123", "role": "user"},
-        {"username": "john", "email": "john@garden.com", "password": "john123", "role": "user"},
-        {"username": "tech", "email": "tech@garden.com", "password": "tech123", "role": "admin"},
+        {"username": "sam", "email": "sam@garden.com", "password": "garden1", "isAdmin": False},
+        {"username": "admin", "email": "admin@garden.com", "password": "admin123", "isAdmin": True},
+        {"username": "marie", "email": "marie@garden.com", "password": "marie123", "isAdmin": False},
+        {"username": "john", "email": "john@garden.com", "password": "john123", "isAdmin": False},
+        {"username": "tech", "email": "tech@garden.com", "password": "tech123", "isAdmin": True},
     ]
     
     for user_data in users_data:
@@ -93,7 +96,7 @@ def seed_users(db):
                 username=user_data["username"],
                 email=user_data["email"],
                 password=bcrypt.hashpw(password, bcrypt.gensalt()).decode('utf-8'),
-                role=user_data["role"]
+                isAdmin=user_data["isAdmin"]
             )
             db.add(user)
             print(f"✅ Utilisateur {user_data['username']} ajouté.")
@@ -101,6 +104,26 @@ def seed_users(db):
             print(f"⚠️  L'utilisateur {user_data['username']} existe déjà.")
     
     db.commit()
+
+def seed_roles(db):
+    """Seed des rôles"""
+    roles_data = [
+        {"name": "manager"},
+        {"name": "user"},
+        {"name": "technician"},
+        {"name": "admin_space"}, # Example, if an admin role exists for spaces
+    ]
+
+    for role_data in roles_data:
+        existing = db.query(Role).filter_by(name=role_data["name"]).first()
+        if not existing:
+            role = Role(name=role_data["name"])
+            db.add(role)
+            print(f"✅ Rôle {role_data['name']} ajouté.")
+        else:
+            print(f"⚠️  Le rôle {role_data['name']} existe déjà.")
+    db.commit()
+
 
 def seed_spaces(db):
     """Seed des espaces"""
@@ -127,39 +150,44 @@ def seed_user_spaces(db):
     """Seed des associations utilisateur-espace"""
     users = db.query(User).all()
     spaces = db.query(Space).all()
-    
-    if not users or not spaces:
-        print("⚠️  Impossible de créer les associations utilisateur-espace : utilisateurs ou espaces manquants.")
+    roles = db.query(Role).all() # Fetch all roles
+
+    if not users or not spaces or not roles:
+        print("⚠️  Impossible de créer les associations utilisateur-espace : utilisateurs, espaces ou rôles manquants.")
         return
-    
+
     # Associer quelques utilisateurs à des espaces
     associations = [
-        {"username": "sam", "space_name": "Jardin Principal", "role": "manager", "permissions": "read,write,admin"},
-        {"username": "sam", "space_name": "Serre 1", "role": "manager", "permissions": "read,write,admin"},
-        {"username": "marie", "space_name": "Serre 2", "role": "user", "permissions": "read,write"},
-        {"username": "john", "space_name": "Zone Compost", "role": "user", "permissions": "read"},
-        {"username": "tech", "space_name": "Réservoir d'eau", "role": "technician", "permissions": "read,write,maintain"},
+        {"username": "sam", "space_name": "Jardin Principal", "role_name": "manager", "permissions": "read,write,admin"},
+        {"username": "sam", "space_name": "Serre 1", "role_name": "manager", "permissions": "read,write,admin"},
+        {"username": "marie", "space_name": "Serre 2", "role_name": "user", "permissions": "read,write"},
+        {"username": "john", "space_name": "Zone Compost", "role_name": "user", "permissions": "read"},
+        {"username": "tech", "space_name": "Réservoir d'eau", "role_name": "technician", "permissions": "read,write,maintain"},
     ]
-    
+
     for assoc in associations:
         user = db.query(User).filter_by(username=assoc["username"]).first()
         space = db.query(Space).filter_by(name=assoc["space_name"]).first()
-        
-        if user and space:
+        role = db.query(Role).filter_by(name=assoc["role_name"]).first() # Get the Role object
+
+        if user and space and role: # Ensure all exist
             existing = db.query(UserSpace).filter_by(user_id=user.id, space_id=space.id).first()
             if not existing:
                 user_space = UserSpace(
                     user_id=user.id,
                     space_id=space.id,
-                    role=assoc["role"],
+                    role_id=role.id, # <-- Assign the role_id
                     permissions=assoc["permissions"]
                 )
                 db.add(user_space)
-                print(f"✅ Association {assoc['username']} -> {assoc['space_name']} ajoutée.")
-    
+                print(f"✅ Association {assoc['username']} -> {assoc['space_name']} avec rôle '{assoc['role_name']}' ajoutée.")
+            else:
+                print(f"⚠️  L'association {assoc['username']} -> {assoc['space_name']} existe déjà.")
+        else:
+            print(f"❌ Impossible d'ajouter l'association {assoc['username']} -> {assoc['space_name']}. User, Space ou Role introuvable.")
     db.commit()
 
-def seed_arduino_nodes(db):
+def seed_nodes(db):
     """Seed des nœuds Arduino"""
     spaces = db.query(Space).all()
     
@@ -175,9 +203,9 @@ def seed_arduino_nodes(db):
     ]
     
     for i, node_data in enumerate(nodes_data):
-        existing = db.query(ArduinoNode).filter_by(name=node_data["name"]).first()
+        existing = db.query(Node).filter_by(name=node_data["name"]).first()
         if not existing:
-            node = ArduinoNode(
+            node = Node(
                 name=node_data["name"],
                 description=node_data["description"],
                 firmware_version=node_data["firmware_version"],
@@ -197,7 +225,7 @@ def seed_arduino_nodes(db):
 
 def seed_sensors(db):
     """Seed des capteurs"""
-    nodes = db.query(ArduinoNode).all()
+    nodes = db.query(Node).all()
     
     if not nodes:
         print("⚠️  Impossible de créer les capteurs : nœuds Arduino manquants.")
@@ -227,7 +255,7 @@ def seed_sensors(db):
                     min_value=sensor_data["min_value"],
                     max_value=sensor_data["max_value"],
                     calibration_offset=random.uniform(-2, 2),
-                    arduino_node_id=node.id
+                    node_id=node.id
                 )
                 db.add(sensor)
                 print(f"✅ Capteur {sensor_name} ajouté.")

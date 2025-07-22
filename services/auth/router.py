@@ -1,25 +1,39 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
-from services.auth import auth
+
 from db.database import get_db
-from datetime import timedelta
-from services.user.schemas import UserResponse
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+from .auth import sign_jwt
 
-@router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = auth.authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(status_code=400, detail="Identifiants invalides")
-    access_token = auth.create_access_token(
-        data={"sub": str(user.id)},
-        expires_delta=timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+from services.user import repository
+from services.user.errors import UserAlreadyExistsError
+from ..user.schemas import UserSchema, UserLoginSchema
 
-@router.get("/users/me", response_model=UserResponse)
-def get_current_user_route(current_user=Depends(auth.get_current_user)):
-    return current_user
+router = APIRouter()
 
+users = []
+
+@router.post("/signup", status_code=201)
+async def create_user(
+    user: UserSchema = Body(...),
+    db: Session = Depends(get_db)
+):
+    try:
+        new_user = repository.create_user(db, user)
+    except UserAlreadyExistsError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    return sign_jwt(user.email)
+
+@router.post("/login", status_code=201)
+async def login(
+    user: UserLoginSchema,
+    db: Session = Depends(get_db)
+): 
+    if repository.check_user(db, user):
+        return sign_jwt(user.email)
+    return {
+        "error": "Wrong login details !"
+    }

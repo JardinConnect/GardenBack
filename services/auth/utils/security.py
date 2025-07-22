@@ -1,5 +1,7 @@
 from passlib.context import CryptContext
 
+from services.user.schemas import UserLoginSchema, UserSchema
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def get_password_hash(password: str) -> str:

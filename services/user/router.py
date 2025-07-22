@@ -1,14 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
+
+# db
 from db.database import get_db
-from services.user import repository, schemas
-from services.user.schemas import UserCreate, UserResponse
+# auth
+from services.auth.bearer import JWTBearer
+# user
+from services.user import repository
+from services.user.schemas import UserResponse, UserSchema
 from services.user.errors import UserAlreadyExistsError, UserNotFoundError
 
 router = APIRouter()
 
-@router.get("/users/", response_model=List[UserResponse])
+@router.get("/users/", dependencies=[Depends(JWTBearer())], response_model=List[UserResponse])
 def get_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     """
     Récupère la liste des utilisateurs avec pagination.
@@ -19,7 +24,7 @@ def get_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/users/{user_id}", response_model=UserResponse)
+@router.get("/users/{user_id}", dependencies=[Depends(JWTBearer())], response_model=UserResponse)
 def get_user(user_id: int, db: Session = Depends(get_db)):
     """
     Récupère un utilisateur par son ID.
@@ -32,8 +37,8 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/users/", response_model=UserResponse)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
+@router.post("/users/", dependencies=[Depends(JWTBearer())], response_model=UserResponse)
+def create_user(user: UserSchema, db: Session = Depends(get_db)):
     """
     Crée un nouvel utilisateur.
     """
@@ -45,7 +50,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/users/{user_id}")
+@router.delete("/users/{user_id}", dependencies=[Depends(JWTBearer())])
 def delete_user(user_id: int, db: Session = Depends(get_db)):
     """
     Supprime un utilisateur par son ID.

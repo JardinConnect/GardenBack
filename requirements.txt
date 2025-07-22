@@ -8,3 +8,7 @@ bcrypt
 python-jose[cryptography]
 python-multipart
 passlib
+PyJWT
+pytest
+pytest-mock
+python-decouple

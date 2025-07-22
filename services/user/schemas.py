@@ -1,36 +1,45 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from datetime import datetime
 from typing import Optional
 
+class UserSchema(BaseModel):
+    username: str = Field(...)
+    email: EmailStr = Field(...)
+    password: str = Field(...)
 
-class UserBase(BaseModel):
-    username: str
-    email: str
-    role: Optional[str] = "user"
+    model_config = ConfigDict(
+        json_schema_extra = {
+            "example": {
+                "username": "Sam Gardener",
+                "email": "sam@x.com",
+                "password": "weakpassword"
+            }
+        }
+    )
 
-class UserCreate(UserBase):
-    password: str
+class UserLoginSchema(BaseModel):
+    email: EmailStr = Field(...)
+    password: str = Field(...)
+
+    model_config = ConfigDict(
+        json_schema_extra = {
+            "example": {
+                "email": "sam@x.com",
+                "password": "weakpassword"
+            }
+        }
+    )
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
     email: Optional[str] = None
     role: Optional[str] = None
 
-class UserInDB(UserBase):
-    id: int
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    
-    model_config = ConfigDict(from_attributes=True)
-
-class User(UserInDB):
-    pass
-
 class UserResponse(BaseModel):
     id: int
     username: str
     email: str
-    role: str
+    isAdmin: bool
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
