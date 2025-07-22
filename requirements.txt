@@ -11,4 +11,5 @@ passlib
 PyJWT
 pytest
 pytest-mock
+pytest-cov
 python-decouple
