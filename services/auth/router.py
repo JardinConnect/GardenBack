@@ -19,7 +19,7 @@ async def create_user(
     db: Session = Depends(get_db)
 ):
     try:
-        new_user = repository.create_user(db, user)
+        repository.create_user(db, user)
     except UserAlreadyExistsError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

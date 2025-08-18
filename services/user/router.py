@@ -56,8 +56,8 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     Supprime un utilisateur par son ID.
     """
     try:
-        result = repository.delete_user(db, user_id=user_id)
-        return {"message": "Utilisateur supprimé avec succès"}
+        repository.delete_user(db, user_id=user_id)
+        return {"message": "Utilisateur {user_id} supprimé avec succès"}
     except UserNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

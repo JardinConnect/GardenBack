@@ -1,0 +1,33 @@
+name: Python Tests with Coverage
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: make install
+
+      - name: Run tests with coverage
+        run: make test-coverage
+
+      - name: Display coverage summary
+        run: |
+          if [ -f htmlcov/index.html ]; then
+            echo "📊 Coverage HTML report generated: htmlcov/index.html"
+          fi
+        shell: bash
