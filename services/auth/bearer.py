@@ -34,7 +34,8 @@ class JWTBearer(HTTPBearer):
 
         try:
             payload = decode_jwt(jwtoken)
-        except:
+        except Exception as e:
+            print("❌ Erreur de vérification du token JWT", e)
             payload = None
         if payload:
             isTokenValid = True

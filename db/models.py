@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, Float, ForeignKey, func
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, Float, ForeignKey
 from sqlalchemy.orm import declarative_base, relationship # relationship est déjà là, juste pour montrer le regroupement
 from datetime import datetime
 

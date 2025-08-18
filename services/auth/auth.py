@@ -4,7 +4,6 @@ from decouple import config
 
 
 import jwt
-from services.user.schemas import UserLoginSchema, UserSchema
 
 
 JWT_ALGORITHM = config("JWT_ALGORITHM")
@@ -29,5 +28,6 @@ def decode_jwt(token: str) -> Optional[dict]:
     try:
         decoded_token = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return decoded_token if decoded_token["expires"] >= time.time() else None
-    except:
+    except Exception as e:
+        print("❌ Erreur de décodage du token JWT", e)
         return {}

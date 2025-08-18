@@ -4,3 +4,6 @@ __pycache__
 *.sqlite3
 .pytest_cache
 .env
+.ruff_cache
+Lib
+htmlcov

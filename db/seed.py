@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine, inspect 
 from sqlalchemy.orm import sessionmaker
-from models import Base, User, Space, Role, UserSpace, Node, Sensor, SensorData, Alert, AlertHistory, RefreshToken
+from models import User, Space, Role, UserSpace, Node, Sensor, SensorData, Alert, AlertHistory, RefreshToken
 import bcrypt
 import random
 
