@@ -10,6 +10,9 @@ from services.lora_gpio.router import router as lora_router
 from services.mqtt.router import router as mqtt_router
 from services.user.router import router as user_router
 
+# Import du client MQTT
+from services.mqtt.client import connect_mqtt
+
 app = FastAPI(title="GardenConnect API", version="1.0.0")
 
 
@@ -29,7 +32,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
-# Register routers (todo: delete prefix when implemented)
+# Register routers
 app.include_router(alert_router, prefix="/alert", tags=["Alert"])
 app.include_router(gateway_router, prefix="/gateway", tags=["API Gateway"])
 app.include_router(auth_router, tags=["Authentication"])
@@ -38,3 +41,11 @@ app.include_router(lora_router, prefix="/lora", tags=["Lora GPIO"])
 app.include_router(mqtt_router, prefix="/mqtt", tags=["MQTT"])
 app.include_router(user_router, tags=["User"])
 
+
+@app.on_event("startup")
+def startup_event():
+    """
+    Actions à effectuer au démarrage de l'application.
+    """
+    print("[FASTAPI] Démarrage de l'application...")
+    connect_mqtt()  # Démarre le client MQTT en background

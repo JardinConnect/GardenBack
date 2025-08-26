@@ -1,11 +1,13 @@
 from fastapi import APIRouter
+from services.mqtt.client import publish_message
+from settings import settings
 
-router = APIRouter()
+router = APIRouter(prefix="/mqtt", tags=["MQTT"])
 
-@router.get("/")
-async def get_alerts():
-    return {"message": "Liste des alertes"}
-
-@router.post("/")
-async def create_alert(alert: dict):
-    return {"message": "Alerte créée", "data": alert} 
+@router.post("/publish/")
+def publish(topic: str = settings.MQTT_TOPIC, message: str = "Hello MQTT"):
+    """
+    Publie un message sur un topic MQTT.
+    """
+    publish_message(topic, message)
+    return {"status": "ok", "topic": topic, "message": message}

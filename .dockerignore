@@ -1,0 +1,63 @@
+# Environnement virtuel Python
+venv/
+.venv/
+env/
+.env/
+
+# Fichiers de cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Base de données (sera montée via volume)
+database.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Tests et couverture
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# IDE et éditeurs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+README.md
+*.md
+
+# Makefile (pas nécessaire dans le conteneur)
+Makefile
+
+# Répertoire de données (sera monté via volume)
+data/
+
+# Fichiers temporaires
+tmp/
+temp/

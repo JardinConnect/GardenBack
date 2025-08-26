@@ -1,0 +1,8 @@
+1756220161: mosquitto version 2.0.22 starting
+1756220161: Config loaded from /mosquitto/config/mosquitto.conf.
+1756220161: Opening ipv4 listen socket on port 1883.
+1756220161: Opening ipv6 listen socket on port 1883.
+1756220161: Opening websockets listen socket on port 9001.
+1756220161: mosquitto version 2.0.22 running
+1756220174: New connection from 172.19.0.3:52603 on port 1883.
+1756220174: New client connected from 172.19.0.3:52603 as auto-45AB8DB0-9AEA-60AD-F544-673772C9D0A6 (p2, c1, k60).

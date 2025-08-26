@@ -12,7 +12,7 @@ def check_user(db: Session, data: UserLoginSchema):
     user = db.query(User).filter(User.email == data.email).first()
 
     if not user: 
-        raise UserNotFoundError(data.email)
+        raise UserNotFoundError(404)
     
     if verify_password(data.password, user.password):
         return True
@@ -20,7 +20,7 @@ def check_user(db: Session, data: UserLoginSchema):
 def get_user(db: Session, user_id: int):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise UserNotFoundError(user_id)
+        raise UserNotFoundError(404)
     return user
 
 
