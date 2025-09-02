@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from services.alert.router import router as alert_router
 from services.api_gateway.router import router as gateway_router
@@ -14,6 +15,14 @@ from services.user.router import router as user_router
 from services.mqtt.client import connect_mqtt
 
 app = FastAPI(title="GardenConnect API", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 
 @app.exception_handler(HTTPException)
@@ -38,7 +47,7 @@ app.include_router(gateway_router, prefix="/gateway", tags=["API Gateway"])
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(data_router, prefix="/data", tags=["Data"])
 app.include_router(lora_router, prefix="/lora", tags=["Lora GPIO"])
-app.include_router(mqtt_router, prefix="/mqtt", tags=["MQTT"])
+app.include_router(mqtt_router, tags=["MQTT"])
 app.include_router(user_router, tags=["User"])
 
 

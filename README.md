@@ -20,8 +20,10 @@ Assurez-vous d'avoir les éléments suivants installés sur votre système :
 Pour configurer l'environnement de développement, suivez ces étapes :
 
 1.  `git clone git@github.com:JardinConnect/GardenBack.git`
+
+2.  `cp .env.example .env` et renseignez ce fichier d'environnement
     
-2.  `make install` Vous verrez des messages indiquant la création de l'environnement et l'installation des paquets.
+3.  `make install` Vous verrez des messages indiquant la création de l'environnement et l'installation des paquets.
     
 
 🚀 Exécution du Serveur

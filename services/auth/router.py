@@ -25,7 +25,7 @@ async def create_user(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-    return sign_jwt(user.email)
+    return sign_jwt(user.email, db)
 
 @router.post("/login", status_code=201)
 async def login(
@@ -33,7 +33,7 @@ async def login(
     db: Session = Depends(get_db)
 ): 
     if repository.check_user(db, user):
-        return sign_jwt(user.email)
+        return sign_jwt(user.email, db)
     return {
         "error": "Wrong login details !"
     }

@@ -24,6 +24,17 @@ def get_user(db: Session, user_id: int):
     return user
 
 
+def get_userByEmail(db: Session, user_email: str):
+    print(f"[DEBUG] Recherche utilisateur avec email: {user_email}")
+    user = db.query(User).filter(User.email == user_email).first()
+    print(f"[DEBUG] Utilisateur trouvé: {user is not None}")
+
+    if not user:
+        raise UserNotFoundError(404)
+    return user
+
+
+
 def get_users(db: Session, skip: int = 0, limit: int = 10):
     return db.query(User).offset(skip).limit(limit).all()
 

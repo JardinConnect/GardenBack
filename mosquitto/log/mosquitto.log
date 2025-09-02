@@ -6,3 +6,160 @@
 1756220161: mosquitto version 2.0.22 running
 1756220174: New connection from 172.19.0.3:52603 on port 1883.
 1756220174: New client connected from 172.19.0.3:52603 as auto-45AB8DB0-9AEA-60AD-F544-673772C9D0A6 (p2, c1, k60).
+1756220839: mosquitto version 2.0.22 starting
+1756220839: Config loaded from /mosquitto/config/mosquitto.conf.
+1756220839: Opening ipv4 listen socket on port 1883.
+1756220839: Opening ipv6 listen socket on port 1883.
+1756220839: Opening websockets listen socket on port 9001.
+1756220839: mosquitto version 2.0.22 running
+1756220839: New connection from 172.19.0.3:54181 on port 1883.
+1756220839: New client connected from 172.19.0.3:54181 as auto-72D522DA-ECC0-9259-609C-267D18F1AD2E (p2, c1, k60).
+1756221015: mosquitto version 2.0.22 starting
+1756221015: Config loaded from /mosquitto/config/mosquitto.conf.
+1756221015: Opening ipv4 listen socket on port 1883.
+1756221015: Opening ipv6 listen socket on port 1883.
+1756221015: Opening websockets listen socket on port 9001.
+1756221015: mosquitto version 2.0.22 running
+1756221016: New connection from 172.19.0.3:35371 on port 1883.
+1756221016: New client connected from 172.19.0.3:35371 as auto-5452B5CF-71DD-CFA8-F2C8-2061A471C8BB (p2, c1, k60).
+1756221190: Client auto-5452B5CF-71DD-CFA8-F2C8-2061A471C8BB closed its connection.
+1756221237: New connection from 172.19.0.3:58813 on port 1883.
+1756221237: New client connected from 172.19.0.3:58813 as auto-1C87AD44-4754-6020-814B-B7D8F21F5EBD (p2, c1, k60).
+1756221241: Client auto-1C87AD44-4754-6020-814B-B7D8F21F5EBD closed its connection.
+1756221241: New connection from 172.19.0.3:41875 on port 1883.
+1756221241: New client connected from 172.19.0.3:41875 as auto-0289DB88-9FFD-8E69-1B86-D351104B65BA (p2, c1, k60).
+1756221244: Client auto-0289DB88-9FFD-8E69-1B86-D351104B65BA closed its connection.
+1756221245: New connection from 172.19.0.3:55163 on port 1883.
+1756221245: New client connected from 172.19.0.3:55163 as auto-A9DF29A1-7BF4-69A2-8F94-855DC04C793E (p2, c1, k60).
+1756221276: Client auto-A9DF29A1-7BF4-69A2-8F94-855DC04C793E closed its connection.
+1756221276: New connection from 172.19.0.3:60403 on port 1883.
+1756221276: New client connected from 172.19.0.3:60403 as auto-DA9C0F70-12C2-AD14-9507-0007F44DDABD (p2, c1, k60).
+1756221278: Client auto-DA9C0F70-12C2-AD14-9507-0007F44DDABD closed its connection.
+1756221278: New connection from 172.19.0.3:51079 on port 1883.
+1756221278: New client connected from 172.19.0.3:51079 as auto-02034E90-CE7D-CC84-BA45-104AACE6A4BF (p2, c1, k60).
+1756221303: Client auto-02034E90-CE7D-CC84-BA45-104AACE6A4BF closed its connection.
+1756221303: New connection from 172.19.0.3:57621 on port 1883.
+1756221303: New client connected from 172.19.0.3:57621 as auto-E5667DC2-EC17-ADEF-E154-198A2ED4BC33 (p2, c1, k60).
+1756221309: Client auto-E5667DC2-EC17-ADEF-E154-198A2ED4BC33 closed its connection.
+1756221309: New connection from 172.19.0.3:47859 on port 1883.
+1756221309: New client connected from 172.19.0.3:47859 as auto-FB0B6539-4D5C-1640-8ADF-E42573D1DA53 (p2, c1, k60).
+1756221337: Client auto-FB0B6539-4D5C-1640-8ADF-E42573D1DA53 closed its connection.
+1756221379: New connection from 172.19.0.3:32769 on port 1883.
+1756221379: New client connected from 172.19.0.3:32769 as auto-C73FA703-0BFB-71EA-4E17-4FEE117F1683 (p2, c1, k60).
+1756221390: Client auto-C73FA703-0BFB-71EA-4E17-4FEE117F1683 closed its connection.
+1756221390: New connection from 172.19.0.3:36203 on port 1883.
+1756221390: New client connected from 172.19.0.3:36203 as auto-35804F08-378C-F484-B314-AB923C44F152 (p2, c1, k60).
+1756221395: Client auto-35804F08-378C-F484-B314-AB923C44F152 closed its connection.
+1756221395: New connection from 172.19.0.3:44829 on port 1883.
+1756221395: New client connected from 172.19.0.3:44829 as auto-4E53435D-2C17-5D45-5D80-044004128385 (p2, c1, k60).
+1756221399: Client auto-4E53435D-2C17-5D45-5D80-044004128385 closed its connection.
+1756221400: New connection from 172.19.0.3:41013 on port 1883.
+1756221400: New client connected from 172.19.0.3:41013 as auto-B9D248D3-D3F3-4ACD-B4FD-45267D389FD4 (p2, c1, k60).
+1756221403: Client auto-B9D248D3-D3F3-4ACD-B4FD-45267D389FD4 closed its connection.
+1756221403: New connection from 172.19.0.3:33023 on port 1883.
+1756221403: New client connected from 172.19.0.3:33023 as auto-3E2B8125-DD2D-48A7-6D7C-190401F3A2BB (p2, c1, k60).
+1756221429: Client auto-3E2B8125-DD2D-48A7-6D7C-190401F3A2BB closed its connection.
+1756221442: New connection from 172.19.0.3:39821 on port 1883.
+1756221442: New client connected from 172.19.0.3:39821 as auto-8519AD1E-D339-C3D8-88F6-791F1A6A1D42 (p2, c1, k60).
+1756221530: Client auto-8519AD1E-D339-C3D8-88F6-791F1A6A1D42 closed its connection.
+1756221530: New connection from 172.19.0.3:55409 on port 1883.
+1756221530: New client connected from 172.19.0.3:55409 as auto-D9249388-5B21-041C-383D-466754B5EBE5 (p2, c1, k60).
+1756221532: Client auto-D9249388-5B21-041C-383D-466754B5EBE5 closed its connection.
+1756221532: New connection from 172.19.0.3:46507 on port 1883.
+1756221532: New client connected from 172.19.0.3:46507 as auto-1CDEA276-028E-F0FD-1124-74E4F99547DA (p2, c1, k60).
+1756221536: mosquitto version 2.0.22 starting
+1756221536: Config loaded from /mosquitto/config/mosquitto.conf.
+1756221536: Opening ipv4 listen socket on port 1883.
+1756221536: Opening ipv6 listen socket on port 1883.
+1756221536: Opening websockets listen socket on port 9001.
+1756221536: mosquitto version 2.0.22 running
+1756221536: New connection from 172.19.0.3:46753 on port 1883.
+1756221536: New client connected from 172.19.0.3:46753 as auto-414F5DAA-C3C6-89F6-9ECD-029BB7EA5E2F (p2, c1, k60).
+1756221570: Client auto-414F5DAA-C3C6-89F6-9ECD-029BB7EA5E2F closed its connection.
+1756221570: New connection from 172.19.0.3:46699 on port 1883.
+1756221570: New client connected from 172.19.0.3:46699 as auto-50B540EB-5F41-C9CD-EE79-031273D29DB2 (p2, c1, k60).
+1756221574: Client auto-50B540EB-5F41-C9CD-EE79-031273D29DB2 closed its connection.
+1756221575: New connection from 172.19.0.3:45683 on port 1883.
+1756221575: New client connected from 172.19.0.3:45683 as auto-D0CC211C-C5B0-A2BF-F044-8336009183B8 (p2, c1, k60).
+1756221613: Client auto-D0CC211C-C5B0-A2BF-F044-8336009183B8 closed its connection.
+1756221614: New connection from 172.19.0.3:46651 on port 1883.
+1756221614: New client connected from 172.19.0.3:46651 as auto-7D5AF36B-897A-CC80-E1CB-ECBF5BC9FAD1 (p2, c1, k60).
+1756221617: Client auto-7D5AF36B-897A-CC80-E1CB-ECBF5BC9FAD1 closed its connection.
+1756221617: New connection from 172.19.0.3:43507 on port 1883.
+1756221617: New client connected from 172.19.0.3:43507 as auto-CD16245B-6E34-E9B3-D504-AA1877D5982D (p2, c1, k60).
+1756221620: Client auto-CD16245B-6E34-E9B3-D504-AA1877D5982D closed its connection.
+1756221620: New connection from 172.19.0.3:47745 on port 1883.
+1756221620: New client connected from 172.19.0.3:47745 as auto-1F4A2374-EFE9-81DA-CEB2-1496DB8FB252 (p2, c1, k60).
+1756221624: Client auto-1F4A2374-EFE9-81DA-CEB2-1496DB8FB252 closed its connection.
+1756221625: New connection from 172.19.0.3:48935 on port 1883.
+1756221625: New client connected from 172.19.0.3:48935 as auto-C4FB97B8-06F7-A4EB-A9B2-C53E4C0CA010 (p2, c1, k60).
+1756221633: Client auto-C4FB97B8-06F7-A4EB-A9B2-C53E4C0CA010 closed its connection.
+1756221633: New connection from 172.19.0.3:39259 on port 1883.
+1756221633: New client connected from 172.19.0.3:39259 as auto-B3019B46-D8CE-FA2E-777A-AA891CB3E1BB (p2, c1, k60).
+1756221634: Client auto-B3019B46-D8CE-FA2E-777A-AA891CB3E1BB closed its connection.
+1756221635: New connection from 172.19.0.3:46995 on port 1883.
+1756221635: New client connected from 172.19.0.3:46995 as auto-BC7D4520-9D81-9B18-4635-B8B681CF0A10 (p2, c1, k60).
+1756221638: Client auto-BC7D4520-9D81-9B18-4635-B8B681CF0A10 closed its connection.
+1756221638: New connection from 172.19.0.3:45787 on port 1883.
+1756221638: New client connected from 172.19.0.3:45787 as auto-A6568178-233F-426A-6176-EA8000B0980A (p2, c1, k60).
+1756221640: Client auto-A6568178-233F-426A-6176-EA8000B0980A closed its connection.
+1756221640: New connection from 172.19.0.3:51657 on port 1883.
+1756221640: New client connected from 172.19.0.3:51657 as auto-085A36AF-6B01-4AAB-7455-16C65DD89922 (p2, c1, k60).
+1756221644: Client auto-085A36AF-6B01-4AAB-7455-16C65DD89922 closed its connection.
+1756221645: New connection from 172.19.0.3:39435 on port 1883.
+1756221645: New client connected from 172.19.0.3:39435 as auto-B7CFDD8B-9E6E-0155-2113-DA490F3E0B12 (p2, c1, k60).
+1756221650: mosquitto version 2.0.22 starting
+1756221650: Config loaded from /mosquitto/config/mosquitto.conf.
+1756221650: Opening ipv4 listen socket on port 1883.
+1756221650: Opening ipv6 listen socket on port 1883.
+1756221650: Opening websockets listen socket on port 9001.
+1756221650: mosquitto version 2.0.22 running
+1756221650: New connection from 172.19.0.3:50781 on port 1883.
+1756221650: New client connected from 172.19.0.3:50781 as auto-8EA2A551-F0EB-780F-B41A-A69E5983E1ED (p2, c1, k60).
+1756221827: Client auto-8EA2A551-F0EB-780F-B41A-A69E5983E1ED closed its connection.
+1756221828: New connection from 172.19.0.3:41779 on port 1883.
+1756221828: New client connected from 172.19.0.3:41779 as auto-6B3624D6-3BCE-C893-04D9-60610ED01E35 (p2, c1, k60).
+1756221830: Client auto-6B3624D6-3BCE-C893-04D9-60610ED01E35 closed its connection.
+1756221831: New connection from 172.19.0.3:40151 on port 1883.
+1756221831: New client connected from 172.19.0.3:40151 as auto-3455DD90-6002-77BA-7367-01A4365D8885 (p2, c1, k60).
+1756221834: Client auto-3455DD90-6002-77BA-7367-01A4365D8885 closed its connection.
+1756221835: New connection from 172.19.0.3:54799 on port 1883.
+1756221835: New client connected from 172.19.0.3:54799 as auto-03B1C3A8-B0A6-92E3-B1E3-D23BE07E7C02 (p2, c1, k60).
+1756800382: mosquitto version 2.0.22 starting
+1756800382: Config loaded from /mosquitto/config/mosquitto.conf.
+1756800382: Opening ipv4 listen socket on port 1883.
+1756800382: Opening ipv6 listen socket on port 1883.
+1756800382: Opening websockets listen socket on port 9001.
+1756800382: mosquitto version 2.0.22 running
+1756800383: New connection from 172.19.0.3:44933 on port 1883.
+1756800383: New client connected from 172.19.0.3:44933 as auto-0599A021-4887-8EBD-5122-A7320A4BBEC0 (p2, c1, k60).
+1756800460: Client auto-0599A021-4887-8EBD-5122-A7320A4BBEC0 closed its connection.
+1756800461: New connection from 172.19.0.3:33069 on port 1883.
+1756800461: New client connected from 172.19.0.3:33069 as auto-099F3744-50B2-61E4-7663-60A14ED090F6 (p2, c1, k60).
+1756800463: Client auto-099F3744-50B2-61E4-7663-60A14ED090F6 closed its connection.
+1756800463: New connection from 172.19.0.3:36407 on port 1883.
+1756800463: New client connected from 172.19.0.3:36407 as auto-9BF061EB-517D-B881-4E63-4C40068C0351 (p2, c1, k60).
+1756800470: mosquitto version 2.0.22 starting
+1756800470: Config loaded from /mosquitto/config/mosquitto.conf.
+1756800470: Opening ipv4 listen socket on port 1883.
+1756800470: Opening ipv6 listen socket on port 1883.
+1756800470: Opening websockets listen socket on port 9001.
+1756800470: mosquitto version 2.0.22 running
+1756800470: New connection from 192.168.65.1:32619 on port 1883.
+1756800470: Client <unknown> closed its connection.
+1756800471: New connection from 172.19.0.3:50395 on port 1883.
+1756800471: New client connected from 172.19.0.3:50395 as auto-F503E308-4B86-D3C7-5019-36EC03675C43 (p2, c1, k60).
+1756800518: Client auto-F503E308-4B86-D3C7-5019-36EC03675C43 closed its connection.
+1756800518: New connection from 172.19.0.3:43851 on port 1883.
+1756800518: New client connected from 172.19.0.3:43851 as auto-62C02E10-CBF4-FD60-6319-ADEE9FECF2F0 (p2, c1, k60).
+1756800523: mosquitto version 2.0.22 starting
+1756800523: Config loaded from /mosquitto/config/mosquitto.conf.
+1756800523: Opening ipv4 listen socket on port 1883.
+1756800523: Opening ipv6 listen socket on port 1883.
+1756800523: Opening websockets listen socket on port 9001.
+1756800523: mosquitto version 2.0.22 running
+1756800524: New connection from 172.19.0.3:33635 on port 1883.
+1756800524: New client connected from 172.19.0.3:33635 as auto-83E52633-1661-808C-C177-08FBDDECD711 (p2, c1, k60).
+1756800579: Client auto-83E52633-1661-808C-C177-08FBDDECD711 closed its connection.
+1756800579: New connection from 172.19.0.3:34705 on port 1883.
+1756800579: New client connected from 172.19.0.3:34705 as auto-40CC1119-CEF6-5585-684E-A791F59C78EA (p2, c1, k60).
