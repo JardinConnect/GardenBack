@@ -1,18 +1,24 @@
 import os
 
-
-DATABASE_FILE_NAME = "database.db"
-# Construction du chemin absolu du fichier de base de données pour éviter les problèmes de répertoire de travail.
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(BASE_DIR)
-DATABASE_PATH = os.path.join(PROJECT_ROOT, DATABASE_FILE_NAME)
-
-DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
-
-#TODO: À voir si on utilise le versionning de l'API
-class Settings:
+class Settings():
+    # Infos API
     PROJECT_NAME: str = "Modular Monolith API"
     VERSION: str = "1.0.0"
 
-settings = Settings()
+    # Base de données
+    DATABASE_FILE_NAME: str = "database.db"
+    BASE_DIR: str = os.path.dirname(os.path.abspath(__file__))
+    PROJECT_ROOT: str = os.path.dirname(BASE_DIR)
+    DATABASE_PATH: str = os.path.join(PROJECT_ROOT, DATABASE_FILE_NAME)
+    DATABASE_URL: str = f"sqlite:///{DATABASE_PATH}"
 
+    # MQTT
+    MQTT_BROKER: str = "mosquitto"
+    MQTT_PORT: int = 1883
+    MQTT_KEEPALIVE: int = 60
+    MQTT_TOPIC: str = "test/topic"
+
+    class Config:
+        env_file = ".env" 
+
+settings = Settings()

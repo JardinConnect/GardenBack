@@ -20,8 +20,10 @@ Assurez-vous d'avoir les éléments suivants installés sur votre système :
 Pour configurer l'environnement de développement, suivez ces étapes :
 
 1.  `git clone git@github.com:JardinConnect/GardenBack.git`
+
+2.  `cp .env.example .env` et renseignez ce fichier d'environnement
     
-2.  `make install` Vous verrez des messages indiquant la création de l'environnement et l'installation des paquets.
+3.  `make install` Vous verrez des messages indiquant la création de l'environnement et l'installation des paquets.
     
 
 🚀 Exécution du Serveur
@@ -97,3 +99,29 @@ Si vous avez ajouté ou supprimé manuellement des paquets Python et que vous so
 
 Pour obtenir un aperçu de toutes les commandes make disponibles et leur description :
 `   make help   `
+
+🐳 Docker
+--------------
+
+Voici quelques commandes utiles pour la maintenance de votre environnement et de votre base de données.
+
+### Développement
+`docker-compose up --build`
+
+### Production  
+`docker-compose --profile production up -d fastapi-backend-prod`
+
+### Voir les logs
+`docker-compose logs -f`
+
+### Arrêter
+`docker-compose down`
+
+### Tests
+`docker-compose exec fastapi-backend python -m pytest`
+
+### Migrations
+`docker-compose exec fastapi-backend python -m alembic upgrade head`
+
+### Shell
+`docker-compose exec fastapi-backend bash`
