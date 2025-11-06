@@ -3,13 +3,14 @@ import uuid
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine, inspect 
 from sqlalchemy.orm import sessionmaker
-from models import User, Space, Role, UserSpace, Node, Sensor, SensorData, Alert, AlertHistory, RefreshToken
+# Importer les modèles qui existent VRAIMENT dans la migration
+from models import AnalyticType, User, Space, Role, UserSpace, Node, Analytic, Alert, AlertHistory, RefreshToken
 import bcrypt
 import random
 
 DATABASE_FILE_NAME = "database.db"
 
-# Construire le chemin absolu du fichier de base de données pour éviter les problèmes de répertoire de travail.
+# Construire le chemin absolu du fichier de base de données
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BASE_DIR)
 DATABASE_PATH = os.path.join(PROJECT_ROOT, DATABASE_FILE_NAME)
@@ -25,20 +26,18 @@ def seed():
     """
     print(f"DEBUG: Le script seed.py s'attend à trouver la base de données à : {DATABASE_PATH}")
 
-    # Vérifie si le fichier de base de données existe physiquement
     if not os.path.exists(DATABASE_PATH):
         print(f"DEBUG: ERREUR - Le fichier de base de données n'existe PAS à : {DATABASE_PATH}")
-        print("DEBUG: Cela signifie que 'make rebuild' n'a pas créé le fichier ou l'a créé ailleurs.")
         return
 
     db = SessionLocal()
     try:
-        # Utilise l'inspecteur SQLAlchemy pour vérifier si la table 'users' existe dans la DB ouverte
         inspector = inspect(engine)
         if not inspector.has_table("users"):
             print(f"DEBUG: ERREUR - La table 'users' n'existe PAS dans la base de données à : {DATABASE_PATH}")
-            print("DEBUG: Les migrations n'ont peut-être pas été appliquées correctement à cette base de données.")
             return
+            
+        print("--- Démarrage du Seeding ---")
 
         # Seed des rôles
         seed_roles(db) 
@@ -52,16 +51,13 @@ def seed():
         # Seed des associations utilisateur-espace
         seed_user_spaces(db)
         
-        # Seed des nœuds Arduino
+        # Seed des nœuds (Nodes) - Modifié pour correspondre au schéma
         seed_nodes(db)
         
-        # Seed des capteurs
-        seed_sensors(db)
+        # Seed des données analytiques - Remplace seed_sensor_data
+        seed_analytic(db)
         
-        # Seed des données de capteurs
-        seed_sensor_data(db)
-        
-        # Seed des alertes
+        # Seed des alertes - Modifié pour correspondre au schéma
         seed_alerts(db)
         
         # Seed de l'historique des alertes
@@ -70,22 +66,24 @@ def seed():
         # Seed des tokens de rafraîchissement
         seed_refresh_tokens(db)
         
-        print("✅ Seeding terminé avec succès!")
+        print("\n✅ Seeding terminé avec succès!")
         
     except Exception as e:
         db.rollback()
         print(f"❌ Erreur lors du seeding : {e}")
+        # Ligne utile pour le débogage, imprime la trace de l'erreur
+        import traceback
+        traceback.print_exc()
     finally:
         db.close()
 
 def seed_users(db):
-    """Seed des utilisateurs"""
+    """Seed des utilisateurs (Compatible)"""
+    print("Seeding Utilisateurs...")
     users_data = [
         {"username": "sam", "email": "sam@garden.com", "password": "garden1", "isAdmin": False},
         {"username": "admin", "email": "admin@garden.com", "password": "admin123", "isAdmin": True},
         {"username": "marie", "email": "marie@garden.com", "password": "marie123", "isAdmin": False},
-        {"username": "john", "email": "john@garden.com", "password": "john123", "isAdmin": False},
-        {"username": "tech", "email": "tech@garden.com", "password": "tech123", "isAdmin": True},
     ]
     
     for user_data in users_data:
@@ -96,278 +94,231 @@ def seed_users(db):
                 username=user_data["username"],
                 email=user_data["email"],
                 password=bcrypt.hashpw(password, bcrypt.gensalt()).decode('utf-8'),
-                isAdmin=user_data["isAdmin"]
+                isAdmin=user_data["isAdmin"],
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
             )
             db.add(user)
-            print(f"✅ Utilisateur {user_data['username']} ajouté.")
-        else:
-            print(f"⚠️  L'utilisateur {user_data['username']} existe déjà.")
+            print(f"  > Utilisateur {user_data['username']} ajouté.")
     
     db.commit()
 
 def seed_roles(db):
-    """Seed des rôles"""
+    """Seed des rôles (Compatible)"""
+    print("Seeding Rôles...")
     roles_data = [
         {"name": "manager"},
         {"name": "user"},
         {"name": "technician"},
-        {"name": "admin_space"}, # Example, if an admin role exists for spaces
     ]
 
     for role_data in roles_data:
         existing = db.query(Role).filter_by(name=role_data["name"]).first()
         if not existing:
-            role = Role(name=role_data["name"])
+            role = Role(
+                name=role_data["name"],
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
             db.add(role)
-            print(f"✅ Rôle {role_data['name']} ajouté.")
-        else:
-            print(f"⚠️  Le rôle {role_data['name']} existe déjà.")
+            print(f"  > Rôle {role_data['name']} ajouté.")
     db.commit()
 
 
 def seed_spaces(db):
-    """Seed des espaces"""
+    """Seed des espaces (Compatible)"""
+    print("Seeding Espaces...")
     spaces_data = [
         {"name": "Jardin Principal", "description": "Espace principal du jardin", "type": "outdoor", "location": "Entrée"},
         {"name": "Serre 1", "description": "Première serre pour les légumes", "type": "greenhouse", "location": "Nord"},
         {"name": "Serre 2", "description": "Seconde serre pour les fleurs", "type": "greenhouse", "location": "Sud"},
         {"name": "Zone Compost", "description": "Zone de compostage", "type": "compost", "location": "Arrière"},
-        {"name": "Réservoir d'eau", "description": "Réservoir principal d'eau", "type": "water", "location": "Centre"},
     ]
     
     for space_data in spaces_data:
         existing = db.query(Space).filter_by(name=space_data["name"]).first()
         if not existing:
-            space = Space(**space_data)
+            space = Space(
+                **space_data,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
             db.add(space)
-            print(f"✅ Espace {space_data['name']} ajouté.")
-        else:
-            print(f"⚠️  L'espace {space_data['name']} existe déjà.")
+            print(f"  > Espace {space_data['name']} ajouté.")
     
     db.commit()
 
 def seed_user_spaces(db):
-    """Seed des associations utilisateur-espace"""
-    users = db.query(User).all()
-    spaces = db.query(Space).all()
-    roles = db.query(Role).all() # Fetch all roles
+    """Seed des associations utilisateur-espace (Compatible)"""
+    print("Seeding Associations User-Space...")
+    users = {u.username: u.id for u in db.query(User.id, User.username).all()}
+    spaces = {s.name: s.id for s in db.query(Space.id, Space.name).all()}
+    roles = {r.name: r.id for r in db.query(Role.id, Role.name).all()}
 
     if not users or not spaces or not roles:
-        print("⚠️  Impossible de créer les associations utilisateur-espace : utilisateurs, espaces ou rôles manquants.")
+        print("  > ⚠️  Impossible de créer les associations : utilisateurs, espaces ou rôles manquants.")
         return
 
-    # Associer quelques utilisateurs à des espaces
     associations = [
         {"username": "sam", "space_name": "Jardin Principal", "role_name": "manager", "permissions": "read,write,admin"},
         {"username": "sam", "space_name": "Serre 1", "role_name": "manager", "permissions": "read,write,admin"},
         {"username": "marie", "space_name": "Serre 2", "role_name": "user", "permissions": "read,write"},
-        {"username": "john", "space_name": "Zone Compost", "role_name": "user", "permissions": "read"},
-        {"username": "tech", "space_name": "Réservoir d'eau", "role_name": "technician", "permissions": "read,write,maintain"},
     ]
 
     for assoc in associations:
-        user = db.query(User).filter_by(username=assoc["username"]).first()
-        space = db.query(Space).filter_by(name=assoc["space_name"]).first()
-        role = db.query(Role).filter_by(name=assoc["role_name"]).first() # Get the Role object
+        user_id = users.get(assoc["username"])
+        space_id = spaces.get(assoc["space_name"])
+        role_id = roles.get(assoc["role_name"])
 
-        if user and space and role: # Ensure all exist
-            existing = db.query(UserSpace).filter_by(user_id=user.id, space_id=space.id).first()
+        if user_id and space_id and role_id:
+            existing = db.query(UserSpace).filter_by(user_id=user_id, space_id=space_id).first()
             if not existing:
                 user_space = UserSpace(
-                    user_id=user.id,
-                    space_id=space.id,
-                    role_id=role.id, # <-- Assign the role_id
+                    user_id=user_id,
+                    space_id=space_id,
+                    role_id=role_id,
                     permissions=assoc["permissions"]
                 )
                 db.add(user_space)
-                print(f"✅ Association {assoc['username']} -> {assoc['space_name']} avec rôle '{assoc['role_name']}' ajoutée.")
-            else:
-                print(f"⚠️  L'association {assoc['username']} -> {assoc['space_name']} existe déjà.")
-        else:
-            print(f"❌ Impossible d'ajouter l'association {assoc['username']} -> {assoc['space_name']}. User, Space ou Role introuvable.")
+                print(f"  > Association {assoc['username']} -> {assoc['space_name']} ajoutée.")
     db.commit()
 
 def seed_nodes(db):
-    """Seed des nœuds Arduino"""
-    spaces = db.query(Space).all()
+    """Seed des nœuds (Nodes) - Adapté au schéma de la migration"""
+    print("Seeding Nœuds...")
+    spaces = {s.name: s.id for s in db.query(Space.id, Space.name).all()}
     
     if not spaces:
-        print("⚠️  Impossible de créer les nœuds Arduino : espaces manquants.")
+        print("  > ⚠️  Impossible de créer les nœuds : espaces manquants.")
         return
     
     nodes_data = [
-        {"name": "Arduino-Garden-01", "description": "Nœud principal du jardin", "firmware_version": "1.2.3", "location": "Entrée", "status": "online", "battery_level": 85.5},
-        {"name": "Arduino-Greenhouse-01", "description": "Nœud de la serre 1", "firmware_version": "1.2.3", "location": "Serre Nord", "status": "online", "battery_level": 92.1},
-        {"name": "Arduino-Greenhouse-02", "description": "Nœud de la serre 2", "firmware_version": "1.2.2", "location": "Serre Sud", "status": "offline", "battery_level": 45.3},
-        {"name": "Arduino-Water-01", "description": "Nœud du réservoir d'eau", "firmware_version": "1.2.3", "location": "Réservoir", "status": "online", "battery_level": 78.9},
+        {"uid": "AA:BB:CC:DD:EE:01", "status": "online", "RSSI": -55, "space_name": "Jardin Principal"},
+        {"uid": "AA:BB:CC:DD:EE:02", "status": "online", "RSSI": -62, "space_name": "Serre 1"},
+        {"uid": "AA:BB:CC:DD:EE:03", "status": "offline", "RSSI": -90, "space_name": "Serre 2"},
+        {"uid": "AA:BB:CC:DD:EE:04", "status": "online", "RSSI": -71, "space_name": "Zone Compost"},
     ]
     
-    for i, node_data in enumerate(nodes_data):
-        existing = db.query(Node).filter_by(name=node_data["name"]).first()
+    for node_data in nodes_data:
+        existing = db.query(Node).filter_by(uid=node_data["uid"]).first()
         if not existing:
+            space_id = spaces.get(node_data["space_name"])
+            if not space_id:
+                print(f"  > ⚠️  Espace '{node_data['space_name']}' non trouvé. Nœud {node_data['uid']} non créé.")
+                continue
+                
             node = Node(
-                name=node_data["name"],
-                description=node_data["description"],
-                firmware_version=node_data["firmware_version"],
-                location=node_data["location"],
-                api_key=str(uuid.uuid4()),
+                uid=node_data["uid"],
                 status=node_data["status"],
-                last_connection=datetime.utcnow() - timedelta(minutes=random.randint(1, 60)),
-                battery_level=node_data["battery_level"],
-                space_id=spaces[i % len(spaces)].id
+                RSSI=node_data["RSSI"],
+                space_id=space_id,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
             )
             db.add(node)
-            print(f"✅ Nœud Arduino {node_data['name']} ajouté.")
-        else:
-            print(f"⚠️  Le nœud Arduino {node_data['name']} existe déjà.")
+            print(f"  > Nœud {node_data['uid']} ajouté à l'espace {node_data['space_name']}.")
     
     db.commit()
 
-def seed_sensors(db):
-    """Seed des capteurs"""
+def seed_analytic(db):
+    """Seed des données analytiques - Adapté au schéma de la migration"""
+    print("Seeding Données (Analytic)...")
     nodes = db.query(Node).all()
     
     if not nodes:
-        print("⚠️  Impossible de créer les capteurs : nœuds Arduino manquants.")
+        print("  > ⚠️  Impossible de créer des données analytiques : nœuds manquants.")
         return
     
-    sensor_types = [
-        {"name": "Température", "type": "temperature", "model": "DHT22", "min_value": -40, "max_value": 80, "unit": "°C"},
-        {"name": "Humidité", "type": "humidity", "model": "DHT22", "min_value": 0, "max_value": 100, "unit": "%"},
-        {"name": "Luminosité", "type": "light", "model": "BH1750", "min_value": 0, "max_value": 65535, "unit": "lux"},
-        {"name": "Humidité du sol", "type": "soil_moisture", "model": "FC-28", "min_value": 0, "max_value": 1023, "unit": "raw"},
+    # Un "sensor_code" est un identifiant (float) pour un capteur sur un nœud.
+    # Ex: 1.0 = Temp. Air, 2.0 = Hum. Air, 3.0 = Hum. Sol
+    sensor_definitions = [
+        {"code": 1.0, "type": AnalyticType.AIR_TEMPERATURE, "min": 15, "max": 30},
+        {"code": 2.0, "type": AnalyticType.AIR_HUMIDITY, "min": 40, "max": 70},
+        {"code": 3.0, "type": AnalyticType.SOIL_HUMIDITY, "min": 200, "max": 800},
+        {"code": 4.0, "type": AnalyticType.LIGHT, "min": 1000, "max": 40000},
     ]
     
+    data_to_add = []
+    
     for node in nodes:
-        # Ajouter 2-3 capteurs par nœud
-        for i in range(random.randint(2, 3)):
-            sensor_data = random.choice(sensor_types)
-            sensor_name = f"{sensor_data['name']} - {node.name}"
-            
-            existing = db.query(Sensor).filter_by(name=sensor_name).first()
-            if not existing:
-                sensor = Sensor(
-                    name=sensor_name,
-                    type=sensor_data["type"],
-                    model=sensor_data["model"],
-                    position_on_node=f"Port {i+1}",
-                    is_active=True,
-                    min_value=sensor_data["min_value"],
-                    max_value=sensor_data["max_value"],
-                    calibration_offset=random.uniform(-2, 2),
-                    node_id=node.id
-                )
-                db.add(sensor)
-                print(f"✅ Capteur {sensor_name} ajouté.")
+        # Faisons comme si chaque nœud avait 2-3 capteurs
+        node_sensors = random.sample(sensor_definitions, random.randint(2, 3))
+        
+        for sensor in node_sensors:
+            for day in range(3):  # 3 jours de données
+                for hour in range(0, 24, 6):  # Toutes les 6 heures
+                    occured_at = datetime.utcnow() - timedelta(days=day, hours=hour, minutes=random.randint(0,59))
+                    value = random.uniform(sensor["min"], sensor["max"])
+                    
+                    data = Analytic(
+                        node_id=node.id,
+                        sensor_code=sensor["code"],
+                        analytic_type=sensor["type"],
+                        value=round(value, 2),
+                        occured_at=occured_at
+                    )
+                    data_to_add.append(data)
     
+    db.bulk_save_objects(data_to_add)
     db.commit()
-
-def seed_sensor_data(db):
-    """Seed des données de capteurs"""
-    sensors = db.query(Sensor).all()
-    
-    if not sensors:
-        print("⚠️  Impossible de créer les données de capteurs : capteurs manquants.")
-        return
-    
-    # Générer des données pour les 7 derniers jours
-    for sensor in sensors:
-        for day in range(7):
-            for hour in range(0, 24, 2):  # Toutes les 2 heures
-                timestamp = datetime.utcnow() - timedelta(days=day, hours=hour)
-                
-                # Générer des valeurs réalistes selon le type de capteur
-                if sensor.type == "temperature":
-                    value = random.uniform(15, 35)
-                elif sensor.type == "humidity":
-                    value = random.uniform(30, 80)
-                elif sensor.type == "light":
-                    value = random.uniform(100, 50000)
-                elif sensor.type == "soil_moisture":
-                    value = random.uniform(200, 800)
-                else:
-                    value = random.uniform(0, 100)
-                
-                data = SensorData(
-                    sensor_id=sensor.id,
-                    value=value,
-                    timestamp=timestamp,
-                    unit_of_measure=get_unit_for_sensor_type(sensor.type)
-                )
-                db.add(data)
-    
-    db.commit()
-    print("✅ Données de capteurs générées pour les 7 derniers jours.")
-
-def get_unit_for_sensor_type(sensor_type):
-    """Retourne l'unité de mesure pour un type de capteur donné"""
-    units = {
-        "temperature": "°C",
-        "humidity": "%",
-        "light": "lux",
-        "soil_moisture": "raw"
-    }
-    return units.get(sensor_type, "unit")
+    print(f"  > {len(data_to_add)} points de données (Analytic) générés.")
 
 def seed_alerts(db):
-    """Seed des alertes"""
-    sensors = db.query(Sensor).all()
+    """Seed des alertes - Adapté au schéma de la migration"""
+    print("Seeding Alertes...")
     
-    if not sensors:
-        print("⚠️  Impossible de créer les alertes : capteurs manquants.")
+    # On crée des alertes basées sur les paires (node_id, sensor_code) qui existent
+    analytics_to_alert_on = db.query(Analytic.node_id, Analytic.sensor_code)\
+                              .distinct()\
+                              .all()
+    
+    if not analytics_to_alert_on:
+        print("  > ⚠️  Impossible de créer des alertes : aucune donnée analytique à surveiller.")
         return
+
+    alert_templates = [
+        {"name": "Température élevée", "condition": ">", "threshold": 28.0, "code_match": 1.0},
+        {"name": "Sol trop sec", "condition": "<", "threshold": 300.0, "code_match": 3.0},
+        {"name": "Humidité basse", "condition": "<", "threshold": 45.0, "code_match": 2.0},
+    ]
     
-    # Créer des alertes pour certains capteurs
-    for sensor in sensors:
-        if sensor.type == "temperature":
-            # Alerte température trop élevée
-            alert = Alert(
-                name=f"Température élevée - {sensor.name}",
-                condition=">",
-                threshold=30.0,
-                is_active=True,
-                sensor_id=sensor.id
-            )
-            db.add(alert)
-            
-        elif sensor.type == "humidity":
-            # Alerte humidité trop faible
-            alert = Alert(
-                name=f"Humidité faible - {sensor.name}",
-                condition="<",
-                threshold=40.0,
-                is_active=True,
-                sensor_id=sensor.id
-            )
-            db.add(alert)
-            
-        elif sensor.type == "soil_moisture":
-            # Alerte sol trop sec
-            alert = Alert(
-                name=f"Sol sec - {sensor.name}",
-                condition="<",
-                threshold=300.0,
-                is_active=True,
-                sensor_id=sensor.id
-            )
-            db.add(alert)
+    for node_id, sensor_code in analytics_to_alert_on:
+        for template in alert_templates:
+            # Si le sensor_code correspond au type d'alerte
+            if sensor_code == template["code_match"]:
+                alert_name = f"{template['name']} - Nœud {node_id} / Capteur {sensor_code}"
+                
+                existing = db.query(Alert).filter_by(name=alert_name).first()
+                if not existing:
+                    alert = Alert(
+                        name=alert_name,
+                        condition=template["condition"],
+                        threshold=template["threshold"],
+                        is_active=True,
+                        sensor_code=sensor_code,
+                        node_id=node_id,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                    db.add(alert)
+                    print(f"  > Alerte '{alert_name}' créée.")
     
     db.commit()
-    print("✅ Alertes créées pour les capteurs.")
 
 def seed_alert_history(db):
-    """Seed de l'historique des alertes"""
+    """Seed de l'historique des alertes (Compatible)"""
+    print("Seeding Historique des Alertes...")
     alerts = db.query(Alert).all()
     
     if not alerts:
-        print("⚠️  Impossible de créer l'historique des alertes : alertes manquantes.")
+        print("  > ⚠️  Impossible de créer l'historique : alertes manquantes.")
         return
     
-    # Créer quelques déclenchements d'alertes dans l'historique
+    history_to_add = []
+    
     for alert in alerts:
-        # Créer 1-3 déclenchements d'alerte dans les 7 derniers jours
         for _ in range(random.randint(1, 3)):
-            triggered_at = datetime.utcnow() - timedelta(days=random.randint(0, 7), hours=random.randint(0, 23))
+            triggered_at = datetime.utcnow() - timedelta(days=random.randint(0, 3), hours=random.randint(0, 23))
             resolved_at = triggered_at + timedelta(minutes=random.randint(30, 240)) if random.choice([True, False]) else None
             
             history = AlertHistory(
@@ -375,32 +326,34 @@ def seed_alert_history(db):
                 triggered_at=triggered_at,
                 resolved_at=resolved_at,
                 status="resolved" if resolved_at else "active",
-                message=f"Alerte déclenchée : {alert.name}"
+                message=f"Alerte déclenchée : {alert.name} (valeur X)"
             )
-            db.add(history)
-    
+            history_to_add.append(history)
+            
+    db.bulk_save_objects(history_to_add)
     db.commit()
-    print("✅ Historique des alertes créé.")
+    print(f"  > {len(history_to_add)} entrées d'historique d'alertes créées.")
 
 def seed_refresh_tokens(db):
-    """Seed des tokens de rafraîchissement"""
+    """Seed des tokens de rafraîchissement (Compatible)"""
+    print("Seeding Tokens de Rafraîchissement...")
     users = db.query(User).all()
     
     if not users:
-        print("⚠️  Impossible de créer les tokens de rafraîchissement : utilisateurs manquants.")
+        print("  > ⚠️  Impossible de créer les tokens : utilisateurs manquants.")
         return
     
-    # Créer des tokens pour certains utilisateurs
-    for user in users[:3]:  # Seulement pour les 3 premiers utilisateurs
+    for user in users:
         token = RefreshToken(
             token=str(uuid.uuid4()),
             user_id=user.id,
-            expires_at=datetime.utcnow() + timedelta(days=30)
+            expires_at=datetime.utcnow() + timedelta(days=30),
+            created_at=datetime.utcnow()
         )
         db.add(token)
     
     db.commit()
-    print("✅ Tokens de rafraîchissement créés.")
+    print(f"  > {len(users)} tokens de rafraîchissement créés.")
 
 if __name__ == "__main__":
     seed()

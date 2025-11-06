@@ -1,9 +1,17 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, Float, ForeignKey
-from sqlalchemy.orm import declarative_base, relationship # relationship est déjà là, juste pour montrer le regroupement
+from enum import Enum
+from sqlalchemy import (
+    Column, Integer, String, DateTime, Text, Boolean, Float, ForeignKey
+)
+from sqlalchemy import Enum as SqlEnum
+from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 
 Base = declarative_base()
 
+
+# =========================================================
+# USER
+# =========================================================
 class User(Base):
     __tablename__ = "users"
 
@@ -11,7 +19,7 @@ class User(Base):
     username = Column(String, unique=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)
-    isAdmin = Column(Boolean, default=False) # Changed "False" to False (boolean type)
+    isAdmin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -20,12 +28,11 @@ class User(Base):
     user_spaces = relationship("UserSpace", back_populates="user")
 
 
+# =========================================================
+# SPACE
+# =========================================================
 class Space(Base):
-    """
-    Modèle pour la table 'spaces'.
-    Représente un espace ou un lieu.
-    """
-    __tablename__ = 'spaces'
+    __tablename__ = "spaces"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
@@ -35,27 +42,27 @@ class Space(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relation récursive : Un espace peut contenir d'autres espaces (enfants)
-    parent_id = Column(Integer, ForeignKey('spaces.id'), nullable=True)
+    # Relation récursive : un espace peut contenir d'autres espaces
+    parent_id = Column(Integer, ForeignKey("spaces.id"), nullable=True)
     parent = relationship("Space", remote_side=[id], backref="children")
 
     # Relations
     users = relationship("UserSpace", back_populates="space")
     nodes = relationship("Node", back_populates="space")
 
+
+# =========================================================
+# USERSPACE
+# =========================================================
 class UserSpace(Base):
-    """
-    Modèle pour la table d'association 'user_spaces'.
-    Gère la relation N:M entre les utilisateurs et les espaces.
-    """
-    __tablename__ = 'user_spaces'
+    __tablename__ = "user_spaces"
 
     id = Column(Integer, primary_key=True, index=True)
     permissions = Column(String)
 
-    user_id = Column(Integer, ForeignKey('users.id'), index=True)
-    space_id = Column(Integer, ForeignKey('spaces.id'), index=True)
-    role_id = Column(Integer, ForeignKey('roles.id'), index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    space_id = Column(Integer, ForeignKey("spaces.id"), index=True)
+    role_id = Column(Integer, ForeignKey("roles.id"), index=True)
 
     # Relations
     user = relationship("User", back_populates="user_spaces")
@@ -63,11 +70,10 @@ class UserSpace(Base):
     role = relationship("Role", back_populates="user_spaces")
 
 
+# =========================================================
+# ROLE
+# =========================================================
 class Role(Base):
-    """
-    Modèle les différents rôles utilisateurs.
-    Le rôle sert à donner un droit d'édition d'un Espace à un Utilisateur
-    """
     __tablename__ = "roles"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -78,97 +84,81 @@ class Role(Base):
     # Relations
     user_spaces = relationship("UserSpace", back_populates="role")
 
+
+# =========================================================
+# NODE
+# =========================================================
 class Node(Base):
-    """
-    Modèle pour la table 'nodes'.
-    Représente un nœud Arduino (ou autre) physique.
-    """
-    __tablename__ = 'nodes'
+    __tablename__ = "nodes"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, index=True)
-    description = Column(Text)
-    firmware_version = Column(String)
-    location = Column(String)
-    api_key = Column(String, unique=True, nullable=False, index=True)
+    uid = Column(String, nullable=False)
     status = Column(String)
-    last_connection = Column(DateTime)
-    battery_level = Column(Float)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    deleted_at = Column(DateTime)
+    RSSI = Column(Integer)
 
     # Relations
-    space_id = Column(Integer, ForeignKey('spaces.id'), index=True)
+    space_id = Column(Integer, ForeignKey("spaces.id"), index=True)
     space = relationship("Space", back_populates="nodes")
-    sensors = relationship("Sensor", back_populates="node")
 
-class Sensor(Base):
-    """
-    Modèle pour la table 'sensors'.
-    Représente un capteur individuel.
-    """
-    __tablename__ = 'sensors'
+    # Un node contient des relevés analytiques
+    analytics = relationship("Analytic", back_populates="node")
+    alerts = relationship("Alert", back_populates="node")
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, index=True)
-    type = Column(String)
-    model = Column(String)
-    position_on_node = Column(String)
-    is_active = Column(Boolean, default=True)
-    min_value = Column(Float)
-    max_value = Column(Float)
-    calibration_offset = Column(Float)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relations
-    node_id = Column(Integer, ForeignKey('nodes.id'), index=True)
-    node = relationship("Node", back_populates="sensors")
-    data_readings = relationship("SensorData", back_populates="sensor")
-    alerts = relationship("Alert", back_populates="sensor")
+# =========================================================
+# ANALYTICS
+# =========================================================
+class AnalyticType(str, Enum):
+    SOIL_TEMPERATURE = "SOIL_TEMPERATURE"
+    AIR_TEMPERATURE = "AIR_TEMPERATURE"
+    LIGHT = "LIGHT"
+    SOIL_HUMIDITY = "SOIL_HUMIDITY"
+    AIR_HUMIDITY = "AIR_HUMIDITY"
 
-class SensorData(Base):
-    """
-    Modèle pour la table 'sensor_data'.
-    Stocke les relevés de données des capteurs.
-    """
-    __tablename__ = 'sensor_data'
 
-    id = Column(Integer, primary_key=True, index=True)
+class Analytic(Base):
+    __tablename__ = "analytic"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     value = Column(Float, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
-    unit_of_measure = Column(String)
+    occured_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    analytic_type = Column(SqlEnum(AnalyticType), nullable=False)
+    sensor_code = Column(String, nullable=False)
 
     # Relations
-    sensor_id = Column(Integer, ForeignKey('sensors.id'), index=True)
-    sensor = relationship("Sensor", back_populates="data_readings")
+    node_id = Column(Integer, ForeignKey("nodes.id"), index=True)
+    node = relationship("Node", back_populates="analytics")
 
+
+# =========================================================
+# ALERTS
+# =========================================================
 class Alert(Base):
-    """
-    Modèle pour la table 'alerts'.
-    Définit les conditions d'alerte pour les capteurs.
-    """
-    __tablename__ = 'alerts'
+    __tablename__ = "alerts"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    condition = Column(String, nullable=False) # Ex: ">", "<", "=="
+    condition = Column(String, nullable=False)  # Ex: ">", "<", "=="
     threshold = Column(Float, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    sensor_code = Column(String, nullable=False)
 
     # Relations
-    sensor_id = Column(Integer, ForeignKey('sensors.id'), index=True)
-    sensor = relationship("Sensor", back_populates="alerts")
+    node_id = Column(Integer, ForeignKey("nodes.id"), index=True)
+    node = relationship("Node", back_populates="alerts")
     history = relationship("AlertHistory", back_populates="alert")
 
+
+# =========================================================
+# ALERT HISTORY
+# =========================================================
 class AlertHistory(Base):
-    """
-    Modèle pour la table 'alert_history'.
-    Enregistre l'historique des déclenchements d'alertes.
-    """
-    __tablename__ = 'alert_history'
+    __tablename__ = "alert_history"
 
     id = Column(Integer, primary_key=True, index=True)
     triggered_at = Column(DateTime, nullable=False)
@@ -177,15 +167,15 @@ class AlertHistory(Base):
     message = Column(Text)
 
     # Relations
-    alert_id = Column(Integer, ForeignKey('alerts.id'), index=True)
+    alert_id = Column(Integer, ForeignKey("alerts.id"), index=True)
     alert = relationship("Alert", back_populates="history")
 
+
+# =========================================================
+# REFRESH TOKENS
+# =========================================================
 class RefreshToken(Base):
-    """
-    Modèle pour la table 'refresh_tokens'.
-    Gère les tokens de rafraîchissement pour l'authentification.
-    """
-    __tablename__ = 'refresh_tokens'
+    __tablename__ = "refresh_tokens"
 
     id = Column(Integer, primary_key=True, index=True)
     token = Column(String, unique=True, nullable=False)
@@ -193,5 +183,5 @@ class RefreshToken(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relations
-    user_id = Column(Integer, ForeignKey('users.id'), index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
     user = relationship("User", back_populates="refresh_tokens")
