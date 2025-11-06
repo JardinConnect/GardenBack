@@ -1,7 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Optional
-from datetime import datetime
 
 # db
 from db.database import get_db
@@ -10,7 +8,7 @@ from services.auth.bearer import JWTBearer
 # analytics
 from services.analytics import repository
 from services.analytics.schemas import (
-    AnalyticsFilter, AnalyticResult, AnalyticType
+    AnalyticsFilter, AnalyticResult
 )
 
 router = APIRouter()

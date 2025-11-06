@@ -1,7 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, desc
-from typing import List, Optional, Dict, Any
+from sqlalchemy import and_
+from typing import List, Dict
 from db.models import Analytic
 
 from services.analytics.errors import (

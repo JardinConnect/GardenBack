@@ -674,3 +674,11 @@
 1762428377: Client auto-F14DE7F2-3EAB-EF96-348D-C912737D8A3F closed its connection.
 1762428378: New connection from 172.19.0.3:42393 on port 1883.
 1762428378: New client connected from 172.19.0.3:42393 as auto-06ACC9AF-ED31-8248-420A-D18EA1767CDB (p2, c1, k60).
+1762429054: mosquitto version 2.0.22 starting
+1762429054: Config loaded from /mosquitto/config/mosquitto.conf.
+1762429054: Opening ipv4 listen socket on port 1883.
+1762429054: Opening ipv6 listen socket on port 1883.
+1762429054: Opening websockets listen socket on port 9001.
+1762429054: mosquitto version 2.0.22 running
+1762429055: New connection from 172.19.0.3:54393 on port 1883.
+1762429055: New client connected from 172.19.0.3:54393 as auto-1E8DA3F7-2ABE-37DC-F616-0722E87C4B25 (p2, c1, k60).
