@@ -7,7 +7,7 @@ Ce service est construit avec **FastAPI** et utilise **SQLite** comme base de do
 Ce README vous guidera à travers les étapes de configuration et d’exécution du projet.
 
 🛠️ Prérequis
--------------
+---
 
 Assurez-vous d’avoir les éléments suivants installés :
 
@@ -16,7 +16,7 @@ Assurez-vous d’avoir les éléments suivants installés :
 *   **Make** (généralement préinstallé sur Unix/macOS ; sous Windows, utilisez [Chocolatey](https://chocolatey.org/packages/make) ou [WSL](https://learn.microsoft.com/fr-fr/windows/wsl/install)).
 
 ⚙️ Installation & Lancement
----------------
+---
 
 1. Clonez le projet
 
@@ -42,7 +42,7 @@ API : http://localhost:8000
 Documentation Swagger : http://localhost:8000/docs
 
 🐳 Docker – Commandes utiles
----------------
+---
 
 ### Développement
 `docker-compose up --build`
@@ -60,7 +60,7 @@ Documentation Swagger : http://localhost:8000/docs
 `docker-compose exec fastapi-backend bash`
 
 🗄️ Gestion de la Base de Données (Alembic)
----------------
+---
 
 Le projet utilise Alembic pour gérer les migrations de la base de données.
 
@@ -77,7 +77,7 @@ Le projet utilise Alembic pour gérer les migrations de la base de données.
 `make history`
 
 🧪 Tests
----------------
+---
 
 ### Exécuter les tests :
 
@@ -94,27 +94,23 @@ Le projet utilise Alembic pour gérer les migrations de la base de données.
 `docker-compose exec fastapi-backend python -m pytest`
 
 ❓ Aide
----------------
+---
 
 ### Lister toutes les commandes disponibles dans le Makefile :
 
 `make help`
 
 🛠️ Workflow
----------------
+---
 
-### Exemple 1:  Démarrage initial
+### Exemple 1:  Démarrage initial via commande make
 
 1. Démarrer tous les services
-`docker-compose up --build`
+`make up`
 
-2. Dans un autre terminal, setup initial de la DB
+    > _tips: si on lance le projet pour la première fois, on peut lancer le projet en 'seedant' la bdd avec la commande `make up-seed`_
 
-`docker-compose --profile tools run --rm db-setup python -m alembic revision --autogenerate -m "Initial migration"`
-
-`docker-compose --profile tools run --rm db-setup python -m alembic upgrade head`
-
-`docker-compose --profile tools run --rm db-setup python db/seed.py`
+---
 
 ### Exemple 2: Workflow pour nouvelles migrations (services tournant)
 
@@ -132,3 +128,18 @@ Le projet utilise Alembic pour gérer les migrations de la base de données.
 
 `docker-compose restart fastapi-backend`
 
+
+---
+
+### Exemple 3:  Démarrage initial via docker
+
+1. Démarrer tous les services
+`docker-compose up --build`
+
+2. Dans un autre terminal, setup initial de la DB
+
+`docker-compose --profile tools run --rm db-setup python -m alembic revision --autogenerate -m "Initial migration"`
+
+`docker-compose --profile tools run --rm db-setup python -m alembic upgrade head`
+
+`docker-compose --profile tools run --rm db-setup python db/seed.py`
