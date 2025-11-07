@@ -185,19 +185,19 @@ test-coverage-powershell:
 	@powershell -Command "\
 if (Test-Path '$(TEST_DIR)') { \
 	$$env:PYTHONPATH='.'; \
-	& '$(PYTHON_BIN)' -m pytest --cov=. --cov-report=html --cov-report=term  \
+	& '$(PYTHON_BIN)' -m pytest --cov=services --cov-report=html --cov-report=term  \
 } else { \
 	$$env:PYTHONPATH='.'; \
-	& '$(PYTHON_BIN)' -m pytest --cov=. --cov-report=html --cov-report=term --ignore=$(VENV_DIR)  \
+	& '$(PYTHON_BIN)' -m pytest --cov=services --cov-report=html --cov-report=term --ignore=$(VENV_DIR)  \
 }; \
 
 test-coverage-unix:
 	@echo "📊 $(GREEN)Exécution des tests avec couverture de code...$(NO_COLOR)"
 	@if command -v $(PYTHON_BIN) -c "import pytest_cov" 2>/dev/null; then \
 		if [ -d "$(TEST_DIR)" ]; then \
-			$(PYTEST_CMD) $(TEST_DIR) --cov=. --cov-report=html --cov-report=term; \
+			$(PYTEST_CMD) $(TEST_DIR) --cov=services --cov-report=html --cov-report=term; \
 		else \
-			$(PYTEST_CMD) . --cov=. --cov-report=html --cov-report=term --ignore=$(VENV_DIR); \
+			$(PYTEST_CMD) . --cov=services --cov-report=html --cov-report=term --ignore=$(VENV_DIR); \
 		fi; \
 		echo "📈 $(CYAN)Rapport de couverture généré dans htmlcov/index.html$(NO_COLOR)"; \
 	else \
