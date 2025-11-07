@@ -10,11 +10,20 @@ PURPLE = \033[0;35m
 # --- Config ---
 VENV = venv
 # PYTHON_BIN = $(shell which python || which python3)
-PYTHON_BIN = $(VENV)/bin/python
+# PYTHON_BIN = $(VENV)/bin/python
+VENV_DIR = venv
+ifeq ($(OS),Windows_NT)
+	PYTHON_BIN := $(VENV_DIR)/Scripts/python.exe # Chemin vers l'exécutable Python dans l'environnement virtuel Windows
+else
+	PYTHON_BIN := $(VENV_DIR)/bin/python3 # Chemin vers l'exécutable Python dans l'environnement virtuel Unix
+endif
+
 ALEMBIC_CMD = $(PYTHON_BIN) -m alembic
 
-TEST_DIR = test
+TEST_DIR = tests
 PYTEST_CMD = $(PYTHON_BIN) -m pytest
+
+.PHONY: test
 
 # --- Aide ---
 help:
@@ -38,18 +47,14 @@ help:
 
 # --- Tests ---
 test:
-	@echo "🧪 $(GREEN)Exécution des tests...$(NO_COLOR)"
-	@if [ -d "$(TEST_DIR)" ]; then \
-	    PYTHONPATH=. $(PYTEST_CMD) $(TEST_DIR) -q; \
-	else \
-	    PYTHONPATH=. $(PYTEST_CMD) . -q; \
-	fi
+	@echo "🧪 $(GREEN)Exécution de tous les tests...$(NO_COLOR)"
+	$(MAKE) $(TEST_TARGET)
 	@echo "✅ $(GREEN)Tests terminés.$(NO_COLOR)"
 
 test-coverage:
-	@echo "📊 $(GREEN)Exécution des tests avec couverture...$(NO_COLOR)"
-	PYTHONPATH=. $(PYTEST_CMD) --cov=. --cov-report=html --cov-report=term
-	@echo "📈 $(CYAN)Rapport généré dans htmlcov/index.html$(NO_COLOR)"
+	@echo "🧪 $(GREEN)Exécution des tests avec rapport de couverture...$(NO_COLOR)"
+	$(MAKE) $(TESTCOVERAGE_TARGET)
+	@echo "✅ $(GREEN)Tests terminés avec rapport de couverture.$(NO_COLOR)"
 
 # --- Alembic ---
 generate-migration:
@@ -94,3 +99,109 @@ down:
 	@echo "🧹 $(RED)Arrêt et nettoyage des conteneurs...$(NO_COLOR)"
 	docker compose down --remove-orphans
 	@echo "✅ $(GREEN)Tous les conteneurs ont été arrêtés et nettoyés.$(NO_COLOR)"
+
+
+# -- CI --
+REQUIREMENTS_FILE = requirements.txt
+
+ifeq ($(OS),Windows_NT)
+TEST_TARGET := test-powershell
+INSTALL_TARGET := install-powershell
+CLEAN_TARGET := clean-powershell
+TESTCOVERAGE_TARGET := test-coverage-powershell
+else
+TEST_TARGET := test-unix
+INSTALL_TARGET := install-unix
+CLEAN_TARGET := clean-unix
+TESTCOVERAGE_TARGET := test-coverage-unix
+endif
+
+
+install:
+	$(MAKE) $(INSTALL_TARGET)
+
+install-powershell:
+	@powershell -Command "\
+	if (-not (Test-Path '$(VENV_DIR)')) { \
+	    & python -m venv $(VENV_DIR); \
+	    Write-Host 'Environnement virtuel ''$(VENV_DIR)'' créé.'; \
+	} else { \
+	    Write-Host 'L''environnement virtuel ''$(VENV_DIR)'' existe déjà.'; \
+	} \
+	& '$(PYTHON_BIN)' -m pip install -r $(REQUIREMENTS_FILE)"
+
+install-unix:
+	@if [ ! -d "$(VENV_DIR)" ]; then \
+	    python3 -m venv $(VENV_DIR); \
+	    echo "Environnement virtuel '$(VENV_DIR)' créé."; \
+	else \
+	    echo "L'environnement virtuel '$(VENV_DIR)' existe déjà."; \
+	fi
+
+	@echo "Installation des dépendances à partir de $(REQUIREMENTS_FILE)..."
+	$(PYTHON_BIN) -m pip install -r $(REQUIREMENTS_FILE)
+
+
+clean:
+	$(MAKE) $(CLEAN_TARGET)
+
+clean-powershell:
+	@powershell -Command "\
+	if (Test-Path '$(VENV_DIR)') { \
+	    Remove-Item -Recurse -Force $(VENV_DIR); \
+	    Write-Host 'Environnement virtuel ''$(VENV_DIR)'' supprimé.'; \
+	} else { \
+	    Write-Host 'L''environnement virtuel ''$(VENV_DIR)'' n''existe pas.'; \
+	}"
+
+clean-unix:
+	@echo "Suppression de l'environnement virtuel '$(VENV_DIR)'..."
+	@if [ -d "$(VENV_DIR)" ]; then \
+		rm -rf $(VENV_DIR); \
+		echo "Environnement virtuel '$(VENV_DIR)' supprimé."; \
+	else \
+		echo "L'environnement virtuel '$(VENV_DIR)' n'existe pas."; \
+	fi
+
+
+test-powershell:
+	@powershell -Command "\
+if (Test-Path '$(TEST_DIR)') { \
+    $$env:PYTHONPATH='.'; \
+    & '$(PYTHON_BIN)' -m pytest $(TEST_DIR) -q \
+} else { \
+    $$env:PYTHONPATH='.'; \
+    & '$(PYTHON_BIN)' -m pytest . -q --ignore=$(VENV_DIR) \
+}"
+
+test-unix:
+	@if [ -d "$(TEST_DIR)" ]; then \
+	    PYTHONPATH=. $(PYTEST_CMD) $(TEST_DIR) -q; \
+	else \
+	    PYTHONPATH=. $(PYTEST_CMD) . -q --ignore=$(VENV_DIR); \
+	fi
+
+test-coverage-powershell:
+	@powershell -Command "\
+if (Test-Path '$(TEST_DIR)') { \
+	$$env:PYTHONPATH='.'; \
+	& '$(PYTHON_BIN)' -m pytest --cov=. --cov-report=html --cov-report=term  \
+} else { \
+	$$env:PYTHONPATH='.'; \
+	& '$(PYTHON_BIN)' -m pytest --cov=. --cov-report=html --cov-report=term --ignore=$(VENV_DIR)  \
+}; \
+
+test-coverage-unix:
+	@echo "📊 $(GREEN)Exécution des tests avec couverture de code...$(NO_COLOR)"
+	@if command -v $(PYTHON_BIN) -c "import pytest_cov" 2>/dev/null; then \
+		if [ -d "$(TEST_DIR)" ]; then \
+			$(PYTEST_CMD) $(TEST_DIR) --cov=. --cov-report=html --cov-report=term; \
+		else \
+			$(PYTEST_CMD) . --cov=. --cov-report=html --cov-report=term --ignore=$(VENV_DIR); \
+		fi; \
+		echo "📈 $(CYAN)Rapport de couverture généré dans htmlcov/index.html$(NO_COLOR)"; \
+	else \
+		echo "⚠️  $(YELLOW)pytest-cov n'est pas installé. Exécution des tests sans couverture...$(NO_COLOR)"; \
+		make test; \
+		echo "💡 $(CYAN)Pour activer la couverture, ajoutez 'pytest-cov' à $(REQUIREMENTS_FILE)$(NO_COLOR)"; \
+	fi

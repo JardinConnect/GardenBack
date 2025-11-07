@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from services.user.errors import UserAlreadyExistsError, UserNotFoundError
+from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID, UserNotFoundErrorEmail
 from db.models import User
 from services.user.schemas import UserLoginSchema, UserSchema
 
@@ -12,7 +12,7 @@ def check_user(db: Session, data: UserLoginSchema):
     user = db.query(User).filter(User.email == data.email).first()
 
     if not user: 
-        raise UserNotFoundError(404)
+        raise UserNotFoundErrorEmail(data.email)
     
     if verify_password(data.password, user.password):
         return True
@@ -20,7 +20,7 @@ def check_user(db: Session, data: UserLoginSchema):
 def get_user(db: Session, user_id: int):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise UserNotFoundError(404)
+        raise UserNotFoundErrorID(user_id)
     return user
 
 
@@ -30,7 +30,7 @@ def get_userByEmail(db: Session, user_email: str):
     print(f"[DEBUG] Utilisateur trouvé: {user is not None}")
 
     if not user:
-        raise UserNotFoundError(404)
+        raise UserNotFoundErrorEmail(user_email)
     return user
 
 
@@ -65,7 +65,7 @@ def create_user(db: Session, user: UserSchema):
 def delete_user(db: Session, user_id: int):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise UserNotFoundError(user_id)
+        raise UserNotFoundErrorID(user_id)
     db.delete(user)
     db.commit()
     return True
