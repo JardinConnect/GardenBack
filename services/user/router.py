@@ -9,7 +9,7 @@ from services.auth.bearer import JWTBearer
 # user
 from services.user import repository
 from services.user.schemas import UserResponse, UserSchema
-from services.user.errors import UserAlreadyExistsError, UserNotFoundError
+from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID, UserNotFoundErrorEmail
 
 router = APIRouter()
 
@@ -32,7 +32,9 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     try:
         user = repository.get_user(db, user_id=user_id)
         return user
-    except UserNotFoundError as e:
+    except UserNotFoundErrorID as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except UserNotFoundErrorEmail as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -58,7 +60,9 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     try:
         repository.delete_user(db, user_id=user_id)
         return {"message": "Utilisateur {user_id} supprimé avec succès"}
-    except UserNotFoundError as e:
+    except UserNotFoundErrorID as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except UserNotFoundErrorEmail as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,127 +1,145 @@
 🚀 Backend du Projet
 ====================
 
-Bienvenue dans le backend de notre application ! Ce service est construit avec **FastAPI** et utilise **SQLite** comme base de données, gérée par **Alembic** pour les migrations. Ce README vous guidera à travers les étapes de configuration et d'exécution du projet en utilisant les commandes make pratiques fournies.
-    
+Bienvenue dans le backend de Garden Connect 🌱
+Ce service est construit avec **FastAPI** et utilise **SQLite** comme base de données, gérée par **Alembic** pour les migrations.
+
+Ce README vous guidera à travers les étapes de configuration et d’exécution du projet.
 
 🛠️ Prérequis
--------------
+---
 
-Assurez-vous d'avoir les éléments suivants installés sur votre système :
+Assurez-vous d’avoir les éléments suivants installés :
 
-*   **Python 3.8+**
+*   **Docker & Docker Compose**
+
+*   **Make** (généralement préinstallé sur Unix/macOS ; sous Windows, utilisez [Chocolatey](https://chocolatey.org/packages/make) ou [WSL](https://learn.microsoft.com/fr-fr/windows/wsl/install)).
+
+⚙️ Installation & Lancement
+---
+
+1. Clonez le projet
+
+    `git clone git@github.com:JardinConnect/GardenBack.git`
     
-*   **Make** (généralement préinstallé sur les systèmes Unix/Linux et macOS ; pour Windows, vous pouvez l'obtenir via [Chocolatey](https://chocolatey.org/packages/make) ou [WSL](https://learn.microsoft.com/fr-fr/windows/wsl/install)).
-    
+    `cd GardenBack`
 
-⚙️ Installation
----------------
 
-Pour configurer l'environnement de développement, suivez ces étapes :
+2. Configurez vos variables d’environnement
 
-1.  `git clone git@github.com:JardinConnect/GardenBack.git`
+    `cp .env.example .env`
 
-2.  `cp .env.example .env` et renseignez ce fichier d'environnement
-    
-3.  `make install` Vous verrez des messages indiquant la création de l'environnement et l'installation des paquets.
-    
 
-🚀 Exécution du Serveur
------------------------
+3. Lancez le projet avec Docker :
 
-Une fois l'installation terminée et les migrations appliquées (voir section suivante), vous pouvez lancer le serveur FastAPI :
-`   make run   `
+    `docker-compose up --build`
 
-Le serveur : [http://localhost:8000]\
-La documentation : [http://localhost:8000/docs]
 
-🗄️ Gestion de la Base de Données (Alembic)
--------------------------------------------
+Le serveur sera disponible sur :
 
-Le projet utilise **Alembic** pour gérer les migrations de la base de données SQLite. Alembic nous aide à gérer les changements de schéma de notre base de données au fil du temps.
+API : http://localhost:8000
 
-### Générer une Nouvelle Migration
+Documentation Swagger : http://localhost:8000/docs
 
-Lorsqu'on modifie nos modèles de données (par exemple, ajoutez une nouvelle table ou colonne), on doit générer une nouvelle migration :\
-`   make generate-migration MESSAGE="Ajout de la table utilisateurs"   `
-
-Remplacez "Ajout de la table utilisateurs" par un message descriptif pour la migration. Alembic tentera de détecter automatiquement les changements. N'oubliez pas de **toujours vérifier le fichier de migration** généré dans alembic/versions/ pour s'assurer qu'il correspond aux attentes.
-
-### Appliquer les Migrations
-
-Pour appliquer toutes les migrations en attente à la base de données (ce qui est nécessaire pour créer les tables ou les modifier) : \
-`   make upgrade   `
-
-Cette commande mettra la base de données à jour vers la dernière version.
-
-### Annuler la Dernière Migration
-
-Si vous avez besoin d'annuler la dernière migration appliquée (attention, cela peut entraîner une perte de données si la migration a supprimé des colonnes ou tables) : \
-`   make downgrade   `
-
-### Historique des Migrations
-
-Pour voir l'historique complet de toutes les migrations disponibles et appliquées : \
-`   make history   `
-
-🔧 Maintenance
---------------
-
-Voici quelques commandes utiles pour la maintenance de votre environnement et de votre base de données.
-
-### Nettoyer l'Environnement
-
-Pour supprimer l'environnement virtuel et toutes les dépendances installées :\
-`   make clean   `
-
-### Réinitialiser la Base de Données
-
-Cette commande supprime le fichier de la base de données SQLite (database.db). C'est utile pour repartir de zéro :\
-`   make reset-db   `
-
-### Reconstruire la Base de Données
-
-Combine la suppression de la base de données et l'application de toutes les migrations. Utile pour une reconstruction propre :\
-`   make rebuild   `
-
-### Remplir la Base de Données (Seed)
-
-Exécute un script pour remplir votre base de données avec des données initiales ou de test. Cette commande s'assure d'abord que toutes les migrations sont appliquées.\
-`   make seed   `
-
-### Mettre à Jour les Dépendances
-
-Si vous avez ajouté ou supprimé manuellement des paquets Python et que vous souhaitez mettre à jour le fichier requirements.txt :\
-`   make freeze   `
-
-❓ Aide
-------
-
-Pour obtenir un aperçu de toutes les commandes make disponibles et leur description :
-`   make help   `
-
-🐳 Docker
---------------
-
-Voici quelques commandes utiles pour la maintenance de votre environnement et de votre base de données.
+🐳 Docker – Commandes utiles
+---
 
 ### Développement
 `docker-compose up --build`
 
-### Production  
+### Production
 `docker-compose --profile production up -d fastapi-backend-prod`
 
-### Voir les logs
+### Logs
 `docker-compose logs -f`
 
 ### Arrêter
 `docker-compose down`
 
-### Tests
+### Shell dans le conteneur
+`docker-compose exec fastapi-backend bash`
+
+🗄️ Gestion de la Base de Données (Alembic)
+---
+
+Le projet utilise Alembic pour gérer les migrations de la base de données.
+
+### Générer une migration
+`make generate-migration MESSAGE="Ajout de la table utilisateurs"`
+
+### Appliquer les migrations
+`make upgrade`
+
+### Annuler la dernière migration
+`make downgrade`
+
+### Voir l’historique
+`make history`
+
+🧪 Tests
+---
+
+### Exécuter les tests :
+
+`make test`
+
+
+### Exécuter les tests avec couverture :
+
+`make test-coverage`
+
+
+### Ou directement dans Docker :
+
 `docker-compose exec fastapi-backend python -m pytest`
 
-### Migrations
-`docker-compose exec fastapi-backend python -m alembic upgrade head`
+❓ Aide
+---
 
-### Shell
-`docker-compose exec fastapi-backend bash`
+### Lister toutes les commandes disponibles dans le Makefile :
+
+`make help`
+
+🛠️ Workflow
+---
+
+### Exemple 1:  Démarrage initial via commande make
+
+1. Démarrer tous les services
+`make up`
+
+    > _tips: si on lance le projet pour la première fois, on peut lancer le projet en 'seedant' la bdd avec la commande `make up-seed`_
+
+---
+
+### Exemple 2: Workflow pour nouvelles migrations (services tournant)
+
+1. Modifier vos modèles dans models.py
+
+2. Générer la migration
+
+`docker-compose --profile tools run --rm db-setup python -m alembic revision --autogenerate -m "Add new field to User"`
+
+3. Appliquer la migration
+
+`docker-compose --profile tools run --rm db-setup python -m alembic upgrade head`
+
+4. Redémarrer FastAPI pour prendre en compte les changements
+
+`docker-compose restart fastapi-backend`
+
+
+---
+
+### Exemple 3:  Démarrage initial via docker
+
+1. Démarrer tous les services
+`docker-compose up --build`
+
+2. Dans un autre terminal, setup initial de la DB
+
+`docker-compose --profile tools run --rm db-setup python -m alembic revision --autogenerate -m "Initial migration"`
+
+`docker-compose --profile tools run --rm db-setup python -m alembic upgrade head`
+
+`docker-compose --profile tools run --rm db-setup python db/seed.py`

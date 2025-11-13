@@ -1,8 +1,8 @@
-"""create initial bdd schema
+"""initial-migration
 
-Revision ID: 5a3e00a753c8
+Revision ID: 5f1bebd28095
 Revises: 
-Create Date: 2025-07-21 11:22:36.852898
+Create Date: 2025-11-06 12:12:51.267428
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '5a3e00a753c8'
+revision: str = '5f1bebd28095'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -24,12 +24,12 @@ def upgrade() -> None:
     op.create_table('roles',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(), nullable=True),
-    sa.Column('description', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_roles_id'), 'roles', ['id'], unique=False)
+    op.create_index(op.f('ix_roles_name'), 'roles', ['name'], unique=True)
     op.create_table('spaces',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
@@ -59,23 +59,17 @@ def upgrade() -> None:
     op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
     op.create_table('nodes',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('name', sa.String(), nullable=False),
-    sa.Column('description', sa.Text(), nullable=True),
-    sa.Column('firmware_version', sa.String(), nullable=True),
-    sa.Column('location', sa.String(), nullable=True),
-    sa.Column('api_key', sa.String(), nullable=False),
+    sa.Column('uid', sa.String(), nullable=False),
     sa.Column('status', sa.String(), nullable=True),
-    sa.Column('last_connection', sa.DateTime(), nullable=True),
-    sa.Column('battery_level', sa.Float(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
+    sa.Column('RSSI', sa.Integer(), nullable=True),
     sa.Column('space_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['space_id'], ['spaces.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_nodes_api_key'), 'nodes', ['api_key'], unique=True)
     op.create_index(op.f('ix_nodes_id'), 'nodes', ['id'], unique=False)
-    op.create_index(op.f('ix_nodes_name'), 'nodes', ['name'], unique=False)
     op.create_index(op.f('ix_nodes_space_id'), 'nodes', ['space_id'], unique=False)
     op.create_table('refresh_tokens',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -104,25 +98,6 @@ def upgrade() -> None:
     op.create_index(op.f('ix_user_spaces_role_id'), 'user_spaces', ['role_id'], unique=False)
     op.create_index(op.f('ix_user_spaces_space_id'), 'user_spaces', ['space_id'], unique=False)
     op.create_index(op.f('ix_user_spaces_user_id'), 'user_spaces', ['user_id'], unique=False)
-    op.create_table('sensors',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('name', sa.String(), nullable=False),
-    sa.Column('type', sa.String(), nullable=True),
-    sa.Column('model', sa.String(), nullable=True),
-    sa.Column('position_on_node', sa.String(), nullable=True),
-    sa.Column('is_active', sa.Boolean(), nullable=True),
-    sa.Column('min_value', sa.Float(), nullable=True),
-    sa.Column('max_value', sa.Float(), nullable=True),
-    sa.Column('calibration_offset', sa.Float(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.Column('node_id', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['node_id'], ['nodes.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_sensors_id'), 'sensors', ['id'], unique=False)
-    op.create_index(op.f('ix_sensors_name'), 'sensors', ['name'], unique=False)
-    op.create_index(op.f('ix_sensors_node_id'), 'sensors', ['node_id'], unique=False)
     op.create_table('alerts',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
@@ -131,23 +106,25 @@ def upgrade() -> None:
     sa.Column('is_active', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.Column('sensor_id', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['sensor_id'], ['sensors.id'], ),
+    sa.Column('sensor_code', sa.String(), nullable=False),
+    sa.Column('node_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['node_id'], ['nodes.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_alerts_id'), 'alerts', ['id'], unique=False)
-    op.create_index(op.f('ix_alerts_sensor_id'), 'alerts', ['sensor_id'], unique=False)
-    op.create_table('sensor_data',
-    sa.Column('id', sa.Integer(), nullable=False),
+    op.create_index(op.f('ix_alerts_node_id'), 'alerts', ['node_id'], unique=False)
+    op.create_table('analytic',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('value', sa.Float(), nullable=False),
-    sa.Column('timestamp', sa.DateTime(), nullable=False),
-    sa.Column('unit_of_measure', sa.String(), nullable=True),
-    sa.Column('sensor_id', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['sensor_id'], ['sensors.id'], ),
+    sa.Column('occured_at', sa.DateTime(), nullable=False),
+    sa.Column('analytic_type', sa.Enum('SOIL_TEMPERATURE', 'AIR_TEMPERATURE', 'LIGHT', 'SOIL_HUMIDITY', 'AIR_HUMIDITY', name='analytictype'), nullable=False),
+    sa.Column('sensor_code', sa.String(), nullable=False),
+    sa.Column('node_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['node_id'], ['nodes.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_sensor_data_id'), 'sensor_data', ['id'], unique=False)
-    op.create_index(op.f('ix_sensor_data_sensor_id'), 'sensor_data', ['sensor_id'], unique=False)
+    op.create_index(op.f('ix_analytic_id'), 'analytic', ['id'], unique=False)
+    op.create_index(op.f('ix_analytic_node_id'), 'analytic', ['node_id'], unique=False)
     op.create_table('alert_history',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('triggered_at', sa.DateTime(), nullable=False),
@@ -169,16 +146,12 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_alert_history_id'), table_name='alert_history')
     op.drop_index(op.f('ix_alert_history_alert_id'), table_name='alert_history')
     op.drop_table('alert_history')
-    op.drop_index(op.f('ix_sensor_data_sensor_id'), table_name='sensor_data')
-    op.drop_index(op.f('ix_sensor_data_id'), table_name='sensor_data')
-    op.drop_table('sensor_data')
-    op.drop_index(op.f('ix_alerts_sensor_id'), table_name='alerts')
+    op.drop_index(op.f('ix_analytic_node_id'), table_name='analytic')
+    op.drop_index(op.f('ix_analytic_id'), table_name='analytic')
+    op.drop_table('analytic')
+    op.drop_index(op.f('ix_alerts_node_id'), table_name='alerts')
     op.drop_index(op.f('ix_alerts_id'), table_name='alerts')
     op.drop_table('alerts')
-    op.drop_index(op.f('ix_sensors_node_id'), table_name='sensors')
-    op.drop_index(op.f('ix_sensors_name'), table_name='sensors')
-    op.drop_index(op.f('ix_sensors_id'), table_name='sensors')
-    op.drop_table('sensors')
     op.drop_index(op.f('ix_user_spaces_user_id'), table_name='user_spaces')
     op.drop_index(op.f('ix_user_spaces_space_id'), table_name='user_spaces')
     op.drop_index(op.f('ix_user_spaces_role_id'), table_name='user_spaces')
@@ -188,9 +161,7 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_refresh_tokens_id'), table_name='refresh_tokens')
     op.drop_table('refresh_tokens')
     op.drop_index(op.f('ix_nodes_space_id'), table_name='nodes')
-    op.drop_index(op.f('ix_nodes_name'), table_name='nodes')
     op.drop_index(op.f('ix_nodes_id'), table_name='nodes')
-    op.drop_index(op.f('ix_nodes_api_key'), table_name='nodes')
     op.drop_table('nodes')
     op.drop_index(op.f('ix_users_id'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
@@ -198,6 +169,7 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_spaces_name'), table_name='spaces')
     op.drop_index(op.f('ix_spaces_id'), table_name='spaces')
     op.drop_table('spaces')
+    op.drop_index(op.f('ix_roles_name'), table_name='roles')
     op.drop_index(op.f('ix_roles_id'), table_name='roles')
     op.drop_table('roles')
     # ### end Alembic commands ###

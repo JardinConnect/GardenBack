@@ -24,8 +24,8 @@ class UserLoginSchema(BaseModel):
     model_config = ConfigDict(
         json_schema_extra = {
             "example": {
-                "email": "sam@x.com",
-                "password": "weakpassword"
+                "email": "admin@garden.com",
+                "password": "admin123"
             }
         }
     )

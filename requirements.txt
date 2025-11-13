@@ -4,10 +4,10 @@ pydantic
 email-validator
 alembic
 sqlalchemy
-bcrypt
+bcrypt>=4.0.0,<4.1.0
 python-jose[cryptography]
 python-multipart
-passlib
+passlib[bcrypt]>=1.7.4
 PyJWT
 pytest
 pytest-mock

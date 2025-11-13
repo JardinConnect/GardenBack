@@ -7,7 +7,7 @@ from services.user.repository import (
     check_user, get_user, get_users, create_user, delete_user
 )
 
-from services.user.errors import UserAlreadyExistsError, UserNotFoundError
+from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorEmail, UserNotFoundErrorID
 from services.user.schemas import UserLoginSchema, UserSchema
 from db.models import User
 
@@ -54,7 +54,7 @@ class TestUserService:
         login_data = UserLoginSchema(email="nonexistent@example.com", password="password")
         
         # Act & Assert
-        with pytest.raises(UserNotFoundError) as exc_info:
+        with pytest.raises(UserNotFoundErrorEmail) as exc_info:
             check_user(self.mock_db, login_data)
         
         assert "nonexistent@example.com" in str(exc_info.value)
@@ -91,7 +91,7 @@ class TestUserService:
         self.mock_query.filter.return_value.first.return_value = None
         
         # Act & Assert
-        with pytest.raises(UserNotFoundError) as exc_info:
+        with pytest.raises(UserNotFoundErrorID) as exc_info:
             get_user(self.mock_db, 999)
         
         assert "999" in str(exc_info.value)
@@ -188,7 +188,7 @@ class TestUserService:
         self.mock_query.filter.return_value.first.return_value = None
         
         # Act & Assert
-        with pytest.raises(UserNotFoundError) as exc_info:
+        with pytest.raises(UserNotFoundErrorID) as exc_info:
             delete_user(self.mock_db, 999)
         
         assert "999" in str(exc_info.value)

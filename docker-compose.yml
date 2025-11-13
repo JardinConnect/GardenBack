@@ -27,3 +27,30 @@ services:
       - ./mosquitto/config:/mosquitto/config
       - ./mosquitto/data:/mosquitto/data
       - ./mosquitto/log:/mosquitto/log
+
+  # Service pour les commandes manuelles (ex : migrations, shell, tests)
+  db-setup:
+    build: .
+    container_name: fastapi-db-setup
+    volumes:
+      - .:/app
+      - ./data:/app/data
+    env_file:
+      - .env
+    profiles:
+      - tools  # Ne démarre pas avec docker-compose up
+    working_dir: /app
+    command: bash  # Shell interactif par défaut
+
+  # Service pour lancer le seed une seule fois
+  seed-db:
+    build: .
+    container_name: garden-seed
+    command: >
+      sh -c "python db/seed.py"
+    volumes:
+      - .:/app
+      - ./data:/app/data
+    env_file:
+      - .env
+    restart: "no"
