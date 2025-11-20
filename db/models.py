@@ -126,6 +126,7 @@ class AnalyticType(str, Enum):
         """
         prefix_map = {
             "AT": cls.AIR_TEMPERATURE,
+            "ST": cls.SOIL_TEMPERATURE,
             "AH": cls.AIR_HUMIDITY,
             "SH": cls.SOIL_HUMIDITY,
             "LI": cls.LIGHT,
