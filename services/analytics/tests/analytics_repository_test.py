@@ -3,9 +3,9 @@ from datetime import datetime, timedelta
 from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
 from db.models import AnalyticType
-from services.analytics.repository import get_analytics, validate_request
+from services.analytics.repository import get_analytics, validate_request, create_analytic
 from services.analytics.errors import InvalidDateRangeError, DataNotFoundError
-from services.analytics.schemas import AnalyticsFilter, AnalyticResult
+from services.analytics.schemas import AnalyticsFilter, AnalyticResult, AnalyticCreate
 
 
 # === Simulation du modèle Analytic ===
@@ -132,3 +132,37 @@ def test_get_analytics_filters_work(db_session):
     analytic = result.result[AnalyticType.SOIL_HUMIDITY][0]
     assert analytic.value == 61.3
     assert analytic.sensorCode == "SH-1"
+
+
+# === TESTS pour create_analytic ===
+
+def test_create_analytic_success(db_session):
+    """Teste la création réussie d'une entrée analytique via le repository."""
+    analytic_data = AnalyticCreate(
+        sensor_code="AT-1",
+        value=25.5,
+        timestamp=datetime(2023, 10, 27, 10, 0, 0)
+    )
+
+    result_schema = create_analytic(db_session, analytic_data)
+
+    # Vérifie le retour de la fonction
+    assert result_schema.value == 25.5
+    assert result_schema.sensorCode == "AT-1"
+
+    # Vérifie que l'objet a bien été créé en base de données
+    created_analytic = db_session.query(Analytic).filter_by(sensor_code="AT-1").one()
+    assert created_analytic is not None
+    assert created_analytic.value == 25.5
+    assert created_analytic.analytic_type == AnalyticType.AIR_TEMPERATURE
+
+
+def test_create_analytic_invalid_prefix(db_session):
+    """Teste qu'un préfixe invalide lève une ValueError."""
+    analytic_data = AnalyticCreate(
+        sensor_code="INVALID-1",
+        value=30.0,
+        timestamp=datetime(2023, 10, 27, 11, 0, 0)
+    )
+    with pytest.raises(ValueError, match="Préfixe de capteur invalide: INVALID"):
+        create_analytic(db_session, analytic_data)

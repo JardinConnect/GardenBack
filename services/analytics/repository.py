@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from typing import List, Dict
+from typing import List, Dict, cast
 from db.models import Analytic
 
 from services.analytics.errors import (
@@ -9,7 +9,7 @@ from services.analytics.errors import (
     DataNotFoundError
 )
 from services.analytics.schemas import (
-    AnalyticsFilter, AnalyticSchema, AnalyticResult, AnalyticType
+    AnalyticsFilter, AnalyticSchema, AnalyticResult, AnalyticType, AnalyticCreate
 )
 
 def validate_request(start: datetime, end: datetime):
@@ -63,3 +63,30 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> AnalyticResult:
         result.setdefault(analytic_type, []).append(analytic)
 
     return AnalyticResult(result=result)
+
+
+def create_analytic(db: Session, analytic_input: AnalyticCreate) -> AnalyticSchema:
+    """Crée une nouvelle entrée d'analytique."""
+
+    analytic_type_prefix = analytic_input.sensor_code.split('-')[0]
+    
+    try:
+        analytic_type = AnalyticType.from_prefix(analytic_type_prefix)
+    except ValueError as e:
+        raise ValueError(f"Préfixe de capteur invalide: {analytic_type_prefix}") from e
+
+    db_analytic = Analytic(
+        value=analytic_input.value,
+        occured_at=analytic_input.timestamp,
+        sensor_code=analytic_input.sensor_code,
+        analytic_type=analytic_type
+    )
+    db.add(db_analytic)
+    db.commit()
+    db.refresh(db_analytic)
+
+    return AnalyticSchema(
+        value=cast(float, db_analytic.value),
+        occured_at=cast(datetime, db_analytic.occured_at),
+        sensorCode=cast(str, db_analytic.sensor_code)
+    )

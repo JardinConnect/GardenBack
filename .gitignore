@@ -7,3 +7,5 @@ __pycache__
 .ruff_cache
 Lib
 htmlcov
+mosquitto/log/mosquitto.log
+database.db

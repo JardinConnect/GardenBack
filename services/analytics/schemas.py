@@ -60,3 +60,19 @@ class AnalyticResult(BaseModel):
             }
         }
     )
+
+
+class AnalyticCreate(BaseModel):
+    sensor_code: str = Field(description="Code du capteur, ex: 'AT-1'")
+    value: float = Field(description="Valeur de la mesure")
+    timestamp: datetime = Field(description="Date et heure de la mesure")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "sensor_code": "AT-1",
+                "value": 25.5,
+                "timestamp": "2025-11-05T10:30:00"
+            }
+        }
+    )
