@@ -118,6 +118,23 @@ class AnalyticType(str, Enum):
     SOIL_HUMIDITY = "SOIL_HUMIDITY"
     AIR_HUMIDITY = "AIR_HUMIDITY"
 
+    @classmethod
+    def from_prefix(cls, prefix: str) -> "AnalyticType":
+        """
+        Convertit un préfixe de capteur en type d'analytique.
+        Exemple: 'AT' -> AnalyticType.AIR_TEMPERATURE
+        """
+        prefix_map = {
+            "AT": cls.AIR_TEMPERATURE,
+            "ST": cls.SOIL_TEMPERATURE,
+            "AH": cls.AIR_HUMIDITY,
+            "SH": cls.SOIL_HUMIDITY,
+            "LI": cls.LIGHT,
+        }
+        try:
+            return prefix_map[prefix.upper()]
+        except KeyError:
+            raise ValueError
 
 class Analytic(Base):
     __tablename__ = "analytic"
