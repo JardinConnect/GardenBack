@@ -190,7 +190,7 @@ def seed_user_spaces(db):
 
 def seed_nodes(db):
     """Seed des nœuds (Nodes) - Adapté au schéma de la migration"""
-    print("Seeding Nœuds (avec UID réalistes)...")
+    print("Seeding Nœuds...")
     spaces = {s.name: s.id for s in db.query(Space.id, Space.name).all()}
     
     if not spaces:
@@ -225,14 +225,14 @@ def seed_nodes(db):
 
 def seed_analytic(db):
     """Seed des données analytiques - Adapté au schéma de la migration"""
-    print("Seeding Données (Analytic) avec cycle jour/nuit...")
+    print("Seeding Données (Analytic)...")
     nodes = db.query(Node).all()
     
     if not nodes:
         print("  > ⚠️  Impossible de créer des données analytiques : nœuds manquants.")
         return
     
-    # Définition des capteurs avec des codes au format string, comme attendu par l'application
+    # Définition des capteurs avec des codes au format string
     sensor_definitions = [
         {"code": "TA-1", "type": AnalyticType.AIR_TEMPERATURE, "base": 18, "amplitude": 10}, # Température Air
         {"code": "TS-1", "type": AnalyticType.SOIL_TEMPERATURE, "base": 16, "amplitude": 5}, # Température Sol
@@ -271,7 +271,7 @@ def seed_analytic(db):
     
     db.bulk_save_objects(data_to_add)
     db.commit()
-    print(f"  > {len(data_to_add)} points de données analytiques réalistes générés.")
+    print(f"  > {len(data_to_add)} points de données analytiques générés.")
 
 def seed_alerts(db):
     """Seed des alertes - Adapté au schéma de la migration"""

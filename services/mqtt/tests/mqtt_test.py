@@ -92,7 +92,7 @@ def test_process_data_message_success(db_session):
     test_node = Node(uid=node_uid_test, space_id=test_space.id)
     db_session.add(test_node)
     db_session.commit()
-    test_node_id = test_node.id  # On récupère l'ID avant que la session ne soit fermée
+    test_node_id = test_node.id 
 
     # 2. Action
     # On injecte la session de test dans la fonction qui crée la session

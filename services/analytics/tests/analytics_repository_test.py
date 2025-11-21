@@ -55,7 +55,7 @@ def test_get_analytics_success(db_session):
         analytic_type=AnalyticType.AIR_TEMPERATURE,
         value=22.5,
         occured_at=now,
-        node_id=1  # Ajout du node_id manquant
+        node_id=1 
     )
     db_session.add(analytic)
     db_session.commit()
@@ -93,14 +93,14 @@ def test_get_analytics_filters_work(db_session):
             analytic_type=AnalyticType.AIR_TEMPERATURE,
             value=21.7,
             occured_at=now,
-            node_id=1  # Ajout du node_id manquant
+            node_id=1 
         ),
         Analytic(
             sensor_code="HS-1",
             analytic_type=AnalyticType.SOIL_HUMIDITY,
             value=61.3,
             occured_at=now,
-            node_id=2  # Ajout du node_id manquant
+            node_id=2 
         ),
     ]
     db_session.add_all(data)

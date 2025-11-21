@@ -20,7 +20,6 @@ def process_data_message(payload: str):
         _, _, timestamp_str, node_uid, datas_str, _ = parts
         
         try:
-            # Essaye de parser avec ou sans les millisecondes/fuseau horaire
             timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
         except ValueError:
             timestamp = datetime.strptime(timestamp_str, "%Y-%m-%dT%H:%M:%S")
