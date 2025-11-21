@@ -1,18 +1,15 @@
 from enum import Enum
 from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import (
-    Column, Integer, String, DateTime, Text, Boolean, Float, ForeignKey
+    Integer, String, DateTime, Text, Boolean, Float, ForeignKey
 )
 from sqlalchemy import Enum as SqlEnum
+from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
 
-from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime, UTC
 
 Base = declarative_base()
 
-
-# SQLAlchemy 2.0 style imports
-from sqlalchemy.orm import Mapped, mapped_column
 
 # =========================================================
 # USER

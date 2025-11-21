@@ -9,7 +9,7 @@ from services.analytics.errors import (
     DataNotFoundError
 )
 from services.analytics.schemas import (
-    AnalyticsFilter, AnalyticSchema, AnalyticResult, AnalyticType, AnalyticCreate, PaginatedAnalyticResult
+    AnalyticsFilter, AnalyticSchema, AnalyticType, AnalyticCreate, PaginatedAnalyticResult
 )
 
 def validate_request(start: datetime, end: datetime):
