@@ -10,6 +10,8 @@ class AnalyticsFilter(BaseModel):
     sensor_code: Optional[str] = Field(None, description="Code du capteur")
     start_date: datetime = Field(description="Date de début")
     end_date: datetime = Field(description="Date de fin")
+    skip: int = Field(0, description="Nombre d'éléments à sauter (pour la pagination)")
+    limit: int = Field(100, description="Nombre maximum d'éléments à retourner (pour la pagination)")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -19,6 +21,8 @@ class AnalyticsFilter(BaseModel):
                 "node_id": 1,
                 "start_date": "2025-11-03T00:00:00",
                 "end_date": "2025-11-06T23:59:59",
+                "skip": 0,     
+                "limit": 50   
             }
         }
     )
@@ -61,18 +65,27 @@ class AnalyticResult(BaseModel):
         }
     )
 
+class PaginatedAnalyticResult(BaseModel):
+    """Schéma pour une réponse analytique paginée."""
+    total: int
+    skip: int
+    limit: int
+    data: Dict[AnalyticType, List[AnalyticSchema]]
+
 
 class AnalyticCreate(BaseModel):
     sensor_code: str = Field(description="Code du capteur, ex: 'AT-1'")
     value: float = Field(description="Valeur de la mesure")
     timestamp: datetime = Field(description="Date et heure de la mesure")
+    node_id: int = Field(description="Identifiant du noeud")
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "sensor_code": "AT-1",
                 "value": 25.5,
-                "timestamp": "2025-11-05T10:30:00"
+                "timestamp": "2025-11-05T10:30:00",
+                "node_id": 1
             }
         }
     )

@@ -1,9 +1,9 @@
 import os
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from sqlalchemy import create_engine, inspect 
 from sqlalchemy.orm import sessionmaker
-# Importer les modèles qui existent VRAIMENT dans la migration
+# Importer les modèles qui existent dans la migration
 from models import AnalyticType, User, Space, Role, UserSpace, Node, Analytic, Alert, AlertHistory, RefreshToken
 import bcrypt
 import random
@@ -95,8 +95,8 @@ def seed_users(db):
                 email=user_data["email"],
                 password=bcrypt.hashpw(password, bcrypt.gensalt()).decode('utf-8'),
                 isAdmin=user_data["isAdmin"],
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC)
             )
             db.add(user)
             print(f"  > Utilisateur {user_data['username']} ajouté.")
@@ -117,8 +117,8 @@ def seed_roles(db):
         if not existing:
             role = Role(
                 name=role_data["name"],
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC)
             )
             db.add(role)
             print(f"  > Rôle {role_data['name']} ajouté.")
@@ -127,26 +127,31 @@ def seed_roles(db):
 
 def seed_spaces(db):
     """Seed des espaces (Compatible)"""
-    print("Seeding Espaces...")
+    print("Seeding Espaces (avec hiérarchie)...")
     spaces_data = [
         {"name": "Jardin Principal", "description": "Espace principal du jardin", "type": "outdoor", "location": "Entrée"},
         {"name": "Serre 1", "description": "Première serre pour les légumes", "type": "greenhouse", "location": "Nord"},
         {"name": "Serre 2", "description": "Seconde serre pour les fleurs", "type": "greenhouse", "location": "Sud"},
         {"name": "Zone Compost", "description": "Zone de compostage", "type": "compost", "location": "Arrière"},
     ]
-    
+
     for space_data in spaces_data:
         existing = db.query(Space).filter_by(name=space_data["name"]).first()
         if not existing:
-            space = Space(
-                **space_data,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
-            )
+            space = Space(**space_data)
             db.add(space)
             print(f"  > Espace {space_data['name']} ajouté.")
-    
     db.commit()
+
+    # Création de la hiérarchie : Les serres appartiennent au Jardin Principal
+    jardin = db.query(Space).filter_by(name="Jardin Principal").first()
+    serre1 = db.query(Space).filter_by(name="Serre 1").first()
+    serre2 = db.query(Space).filter_by(name="Serre 2").first()
+    if jardin and serre1 and serre2:
+        serre1.parent_id = jardin.id
+        serre2.parent_id = jardin.id
+        print("  > Hiérarchie des espaces créée.")
+        db.commit()
 
 def seed_user_spaces(db):
     """Seed des associations utilisateur-espace (Compatible)"""
@@ -193,10 +198,10 @@ def seed_nodes(db):
         return
     
     nodes_data = [
-        {"uid": "AA:BB:CC:DD:EE:01", "status": "online", "RSSI": -55, "space_name": "Jardin Principal"},
-        {"uid": "AA:BB:CC:DD:EE:02", "status": "online", "RSSI": -62, "space_name": "Serre 1"},
-        {"uid": "AA:BB:CC:DD:EE:03", "status": "offline", "RSSI": -90, "space_name": "Serre 2"},
-        {"uid": "AA:BB:CC:DD:EE:04", "status": "online", "RSSI": -71, "space_name": "Zone Compost"},
+        {"uid": "4C01", "status": "online", "RSSI": -55, "space_name": "Jardin Principal"},
+        {"uid": "B3D4", "status": "online", "RSSI": -62, "space_name": "Serre 1"},
+        {"uid": "A8F2", "status": "offline", "RSSI": -90, "space_name": "Serre 2"},
+        {"uid": "9E1C", "status": "online", "RSSI": -71, "space_name": "Zone Compost"},
     ]
     
     for node_data in nodes_data:
@@ -211,9 +216,7 @@ def seed_nodes(db):
                 uid=node_data["uid"],
                 status=node_data["status"],
                 RSSI=node_data["RSSI"],
-                space_id=space_id,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                space_id=space_id
             )
             db.add(node)
             print(f"  > Nœud {node_data['uid']} ajouté à l'espace {node_data['space_name']}.")
@@ -229,45 +232,51 @@ def seed_analytic(db):
         print("  > ⚠️  Impossible de créer des données analytiques : nœuds manquants.")
         return
     
-    # Un "sensor_code" est un identifiant (float) pour un capteur sur un nœud.
-    # Ex: 1.0 = Temp. Air, 2.0 = Hum. Air, 3.0 = Hum. Sol
+    # Définition des capteurs avec des codes au format string
     sensor_definitions = [
-        {"code": 1.0, "type": AnalyticType.AIR_TEMPERATURE, "min": 15, "max": 30},
-        {"code": 2.0, "type": AnalyticType.AIR_HUMIDITY, "min": 40, "max": 70},
-        {"code": 3.0, "type": AnalyticType.SOIL_HUMIDITY, "min": 200, "max": 800},
-        {"code": 4.0, "type": AnalyticType.LIGHT, "min": 1000, "max": 40000},
+        {"code": "TA-1", "type": AnalyticType.AIR_TEMPERATURE, "base": 18, "amplitude": 10}, # Température Air
+        {"code": "TS-1", "type": AnalyticType.SOIL_TEMPERATURE, "base": 16, "amplitude": 5}, # Température Sol
+        {"code": "HA-1", "type": AnalyticType.AIR_HUMIDITY, "base": 60, "amplitude": -20}, # Humidité Air (inverse de la temp)
+        {"code": "HS-1", "type": AnalyticType.SOIL_HUMIDITY, "base": 55, "amplitude": 0}, # Humidité Sol
+        {"code": "L-1", "type": AnalyticType.LIGHT, "base": 5, "amplitude": 4}, # Luminosité
+        {"code": "B-1", "type": AnalyticType.BATTERY, "base": 95, "amplitude": 0}, # Batterie
     ]
     
     data_to_add = []
     
     for node in nodes:
-        # Faisons comme si chaque nœud avait 2-3 capteurs
-        node_sensors = random.sample(sensor_definitions, random.randint(2, 3))
+        # Chaque nœud a tous les capteurs pour la démo
+        node_sensors = sensor_definitions
         
         for sensor in node_sensors:
-            for day in range(3):  # 3 jours de données
-                for hour in range(0, 24, 6):  # Toutes les 6 heures
-                    occured_at = datetime.utcnow() - timedelta(days=day, hours=hour, minutes=random.randint(0,59))
-                    value = random.uniform(sensor["min"], sensor["max"])
+            for day in range(5):  # 5 jours de données
+                for hour in range(24):  # Toutes les heures
+                    occured_at = datetime.now(UTC) - timedelta(days=day, hours=hour)
+                    
+                    # Simulation d'un cycle sinusoïdal sur 24h pour la température et la lumière
+                    # Pic vers 14h, creux vers 4h du matin
+                    cycle = (1 + random.uniform(-0.1, 0.1) - 
+                             (1 + -1 * (hour - 14) / 12) ** 2)
+                    
+                    value = sensor["base"] + (sensor["amplitude"] * cycle) + random.uniform(-0.5, 0.5)
                     
                     data = Analytic(
                         node_id=node.id,
                         sensor_code=sensor["code"],
                         analytic_type=sensor["type"],
                         value=round(value, 2),
-                        occured_at=occured_at
+                        occured_at=occured_at,
                     )
                     data_to_add.append(data)
     
     db.bulk_save_objects(data_to_add)
     db.commit()
-    print(f"  > {len(data_to_add)} points de données (Analytic) générés.")
+    print(f"  > {len(data_to_add)} points de données analytiques générés.")
 
 def seed_alerts(db):
     """Seed des alertes - Adapté au schéma de la migration"""
     print("Seeding Alertes...")
     
-    # On crée des alertes basées sur les paires (node_id, sensor_code) qui existent
     analytics_to_alert_on = db.query(Analytic.node_id, Analytic.sensor_code)\
                               .distinct()\
                               .all()
@@ -277,16 +286,17 @@ def seed_alerts(db):
         return
 
     alert_templates = [
-        {"name": "Température élevée", "condition": ">", "threshold": 28.0, "code_match": 1.0},
-        {"name": "Sol trop sec", "condition": "<", "threshold": 300.0, "code_match": 3.0},
-        {"name": "Humidité basse", "condition": "<", "threshold": 45.0, "code_match": 2.0},
+        {"name": "Température élevée", "condition": ">", "threshold": 28.0, "code_prefix": "TA"},
+        {"name": "Sol trop sec", "condition": "<", "threshold": 30.0, "code_prefix": "HS"},
+        {"name": "Batterie faible", "condition": "<", "threshold": 20.0, "code_prefix": "B"},
     ]
     
     for node_id, sensor_code in analytics_to_alert_on:
         for template in alert_templates:
-            # Si le sensor_code correspond au type d'alerte
-            if sensor_code == template["code_match"]:
-                alert_name = f"{template['name']} - Nœud {node_id} / Capteur {sensor_code}"
+            # Si le début du sensor_code correspond au préfixe de l'alerte
+            if sensor_code.startswith(template["code_prefix"]):
+                node_uid = db.query(Node.uid).filter(Node.id == node_id).scalar()
+                alert_name = f"{template['name']} sur {node_uid}"
                 
                 existing = db.query(Alert).filter_by(name=alert_name).first()
                 if not existing:
@@ -294,11 +304,8 @@ def seed_alerts(db):
                         name=alert_name,
                         condition=template["condition"],
                         threshold=template["threshold"],
-                        is_active=True,
                         sensor_code=sensor_code,
-                        node_id=node_id,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow()
+                        node_id=node_id
                     )
                     db.add(alert)
                     print(f"  > Alerte '{alert_name}' créée.")
@@ -318,7 +325,7 @@ def seed_alert_history(db):
     
     for alert in alerts:
         for _ in range(random.randint(1, 3)):
-            triggered_at = datetime.utcnow() - timedelta(days=random.randint(0, 3), hours=random.randint(0, 23))
+            triggered_at = datetime.now(UTC) - timedelta(days=random.randint(0, 4), hours=random.randint(0, 23))
             resolved_at = triggered_at + timedelta(minutes=random.randint(30, 240)) if random.choice([True, False]) else None
             
             history = AlertHistory(
@@ -347,8 +354,7 @@ def seed_refresh_tokens(db):
         token = RefreshToken(
             token=str(uuid.uuid4()),
             user_id=user.id,
-            expires_at=datetime.utcnow() + timedelta(days=30),
-            created_at=datetime.utcnow()
+            expires_at=datetime.now(UTC) + timedelta(days=30)
         )
         db.add(token)
     
