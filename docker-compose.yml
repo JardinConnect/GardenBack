@@ -5,7 +5,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
+      - db_data:/app
       - ./data:/app/data
     env_file:
       - .env
@@ -33,7 +33,6 @@ services:
     build: .
     container_name: fastapi-db-setup
     volumes:
-      - .:/app
       - ./data:/app/data
     env_file:
       - .env
@@ -49,8 +48,11 @@ services:
     command: >
       sh -c "python db/seed.py"
     volumes:
-      - .:/app
+      - db_data:/app
       - ./data:/app/data
     env_file:
       - .env
     restart: "no"
+
+volumes:
+  db_data:

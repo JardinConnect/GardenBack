@@ -9,3 +9,4 @@ Lib
 htmlcov
 mosquitto/log/mosquitto.log
 database.db
+mosquitto/data/mosquitto.db
