@@ -9,7 +9,7 @@ from services.analytics.errors import (
     DataNotFoundError
 )
 from services.analytics.schemas import (
-    AnalyticsFilter, AnalyticSchema, AnalyticResult, AnalyticType, AnalyticCreate
+    AnalyticsFilter, AnalyticSchema, AnalyticResult, AnalyticType, AnalyticCreate, PaginatedAnalyticResult
 )
 
 def validate_request(start: datetime, end: datetime):
@@ -19,7 +19,7 @@ def validate_request(start: datetime, end: datetime):
             raise InvalidDateRangeError()
 
 
-def get_analytics(db: Session, request: AnalyticsFilter) -> AnalyticResult:
+def get_analytics(db: Session, request: AnalyticsFilter) -> PaginatedAnalyticResult:
     # 1. Validation
     validate_request(request.start_date, request.end_date)
 
@@ -47,12 +47,18 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> AnalyticResult:
     if filters:
         query = query.filter(and_(*filters))
 
-    # 4. Execution
-    rows = query.all()
+    # 4. Compter le nombre total de résultats avant la pagination
+    total_count = query.count()
+
+    # 5. Appliquer la pagination
+    paginated_query = query.offset(request.skip).limit(request.limit)
+
+    # 6. Exécution
+    rows = paginated_query.all()
     if not rows:
         raise DataNotFoundError()
 
-    # 5. Mapping -> Dict[AnalyticType, List[Analytic]]
+    # 7. Mapping -> Dict[AnalyticType, List[Analytic]]
     result: Dict[AnalyticType, List[AnalyticSchema]] = {}
     for value, occured_at, sensor_code, analytic_type in rows:
         analytic = AnalyticSchema(
@@ -62,7 +68,12 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> AnalyticResult:
         )
         result.setdefault(analytic_type, []).append(analytic)
 
-    return AnalyticResult(result=result)
+    return PaginatedAnalyticResult(
+        total=total_count,
+        skip=request.skip,
+        limit=request.limit,
+        data=result
+    )
 
 
 def create_analytic(db: Session, analytic_input: AnalyticCreate) -> AnalyticSchema:
@@ -79,7 +90,8 @@ def create_analytic(db: Session, analytic_input: AnalyticCreate) -> AnalyticSche
         value=analytic_input.value,
         occured_at=analytic_input.timestamp,
         sensor_code=analytic_input.sensor_code,
-        analytic_type=analytic_type
+        analytic_type=analytic_type,
+        node_id=analytic_input.node_id
     )
     db.add(db_analytic)
     db.commit()

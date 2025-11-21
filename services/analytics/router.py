@@ -8,12 +8,12 @@ from services.auth.bearer import JWTBearer
 # analytics
 from services.analytics import repository
 from services.analytics.schemas import (
-    AnalyticsFilter, AnalyticResult, AnalyticCreate, AnalyticSchema
+    AnalyticsFilter, PaginatedAnalyticResult, AnalyticCreate, AnalyticSchema
 )
 
 router = APIRouter()
 
-@router.get("/analytics/", dependencies=[Depends(JWTBearer())], response_model=AnalyticResult)
+@router.get("/analytics/", dependencies=[Depends(JWTBearer())], response_model=PaginatedAnalyticResult)
 async def get_analytics(
     request: AnalyticsFilter = Depends(),
     db: Session = Depends(get_db)
