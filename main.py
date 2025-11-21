@@ -53,25 +53,18 @@ app.include_router(mqtt_router, tags=["MQTT"])
 app.include_router(user_router, tags=["User"])
 
 
-@app.on_event("startup")
-def startup_event():
-    """
-    Actions à effectuer au démarrage de l'application.
-    """
-    print("[FASTAPI] Démarrage de l'application...")
-    connect_mqtt()  # Démarre le client MQTT en background
-
-
-# ✅ AJOUTE CETTE PARTIE À LA FIN
+# Config OpenAPI
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
+    
     openapi_schema = get_openapi(
         title="GardenConnect API",
         version="1.0.0",
-        description="API pour la gestion intelligente des serres connectées (Garden Connect)",
         routes=app.routes,
     )
+    
+    openapi_schema.setdefault("components", {})
     openapi_schema["components"]["securitySchemes"] = {
         "BearerAuth": {
             "type": "http",
@@ -79,9 +72,19 @@ def custom_openapi():
             "bearerFormat": "JWT",
         }
     }
-    openapi_schema["security"] = [{"BearerAuth": []}]
+    
+    for path in openapi_schema["paths"].values():
+        for method in path.values():
+            if isinstance(method, dict):
+                method["security"] = [{"BearerAuth": []}]
+    
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
-
 app.openapi = custom_openapi
+
+
+@app.on_event("startup")
+def startup_event():
+    print("[FASTAPI] Démarrage de l'application...")
+    connect_mqtt()

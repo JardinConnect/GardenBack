@@ -97,7 +97,7 @@ up-seed:
 # Stoppe et supprime les conteneurs, réseaux, volumes anonymes
 down:
 	@echo "🧹 $(RED)Arrêt et nettoyage des conteneurs...$(NO_COLOR)"
-	docker compose down --remove-orphans
+	docker compose down --remove-orphans --rmi all
 	@echo "✅ $(GREEN)Tous les conteneurs ont été arrêtés et nettoyés.$(NO_COLOR)"
 
 
