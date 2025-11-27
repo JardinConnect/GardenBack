@@ -47,29 +47,23 @@ def seed():
             
         print("--- Démarrage du Seeding ---")
 
-        # Seed des rôles
-        seed_roles(db) 
+        # Nettoyage des anciennes données
+        print("Nettoyage des tables...")
+        db.query(Analytic).delete()
+        db.query(Sensor).delete()
+        db.query(Cell).delete()
+        db.query(Area).delete()
+        db.query(RefreshToken).delete()
+        db.commit()
 
         # Seed des utilisateurs
         seed_users(db)
         
-        # Seed des espaces
-        seed_spaces(db)
+        # Seed de la structure hiérarchique : Areas -> Cells -> Sensors
+        seed_garden_hierarchy(db)
         
-        # Seed des associations utilisateur-espace
-        seed_user_spaces(db)
-        
-        # Seed des nœuds (Nodes) - Modifié pour correspondre au schéma
-        seed_nodes(db)
-        
-        # Seed des données analytiques - Remplace seed_sensor_data
-        seed_analytic(db)
-        
-        # Seed des alertes - Modifié pour correspondre au schéma
-        seed_alerts(db)
-        
-        # Seed de l'historique des alertes
-        seed_alert_history(db)
+        # Seed des données analytiques
+        seed_analytics(db)
         
         # Seed des tokens de rafraîchissement
         seed_refresh_tokens(db)
@@ -79,15 +73,15 @@ def seed():
     except Exception as e:
         db.rollback()
         print(f"❌ Erreur lors du seeding : {e}")
-        # Ligne utile pour le débogage, imprime la trace de l'erreur
         import traceback
         traceback.print_exc()
     finally:
         db.close()
 
+
 def seed_users(db):
-    """Seed des utilisateurs (Compatible)"""
-    print("Seeding Utilisateurs...")
+    """Seed des utilisateurs"""
+    print("\n📋 Seeding Utilisateurs...")
     users_data = [
         {"first_name": "Sam", "last_name": "Gardener", "phone_number": "0611223344", "email": "sam@garden.com", "password": "garden1", "isAdmin": False},
         {"first_name": "Admin", "last_name": "Istrator", "phone_number": "0655667788", "email": "admin@garden.com", "password": "admin123", "isAdmin": True},
@@ -118,45 +112,73 @@ def seed_users(db):
         else:
             print(f"  > Utilisateur {user_data['email']} existe déjà, ignoré.")
 
-def seed_roles(db):
-    """Seed des rôles (Compatible)"""
-    print("Seeding Rôles...")
-    roles_data = [
-        {"name": "manager"},
-        {"name": "user"},
-        {"name": "technician"},
-    ]
 
-    for role_data in roles_data:
-        existing = db.query(Role).filter_by(name=role_data["name"]).first()
-        if not existing:
-            role = Role(
-                name=role_data["name"],
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC)
-            )
-            db.add(role)
-            print(f"  > Rôle {role_data['name']} ajouté.")
+def seed_garden_hierarchy(db):
+    """
+    Seed de la structure hiérarchique complète du jardin.
+    Structure : Parcelle (niveau 1) -> Planches (niveau 2) -> Cellules -> Capteurs
+    """
+    print("\n🌱 Seeding Structure Hiérarchique du Jardin...")
+    
+    # === NIVEAU 1 : PARCELLES ===
+    print("\n  📍 Création des parcelles (Niveau 1)...")
+    parcelle_nord = Area(
+        name="Parcelle Nord",
+        color="#2E8B57",
+        level=1,
+        parent_id=None
+    )
+    parcelle_sud = Area(
+        name="Parcelle Sud", 
+        color="#228B22",
+        level=1,
+        parent_id=None
+    )
+    
+    db.add_all([parcelle_nord, parcelle_sud])
     db.commit()
+    db.refresh(parcelle_nord)
+    db.refresh(parcelle_sud)
+    print(f"    ✓ Parcelle '{parcelle_nord.name}' (ID: {parcelle_nord.id})")
+    print(f"    ✓ Parcelle '{parcelle_sud.name}' (ID: {parcelle_sud.id})")
 
-
-def seed_spaces(db):
-    """Seed des espaces (Compatible)"""
-    print("Seeding Espaces (avec hiérarchie)...")
-    spaces_data = [
-        {"name": "Jardin Principal", "description": "Espace principal du jardin", "type": "outdoor", "location": "Entrée"},
-        {"name": "Serre 1", "description": "Première serre pour les légumes", "type": "greenhouse", "location": "Nord"},
-        {"name": "Serre 2", "description": "Seconde serre pour les fleurs", "type": "greenhouse", "location": "Sud"},
-        {"name": "Zone Compost", "description": "Zone de compostage", "type": "compost", "location": "Arrière"},
-    ]
-
-    for space_data in spaces_data:
-        existing = db.query(Space).filter_by(name=space_data["name"]).first()
-        if not existing:
-            space = Space(**space_data)
-            db.add(space)
-            print(f"  > Espace {space_data['name']} ajouté.")
+    # === NIVEAU 2 : PLANCHES (enfants des parcelles) ===
+    print("\n  📍 Création des planches (Niveau 2)...")
+    
+    # Planches de la Parcelle Nord
+    planche_tomates = Area(
+        name="Planche Tomates",
+        color="#FF6347",
+        level=2,
+        parent_id=parcelle_nord.id
+    )
+    planche_salades = Area(
+        name="Planche Salades",
+        color="#90EE90",
+        level=2,
+        parent_id=parcelle_nord.id
+    )
+    
+    # Planches de la Parcelle Sud
+    planche_carottes = Area(
+        name="Planche Carottes",
+        color="#FFA500",
+        level=2,
+        parent_id=parcelle_sud.id
+    )
+    planche_herbes = Area(
+        name="Planche Herbes Aromatiques",
+        color="#9ACD32",
+        level=2,
+        parent_id=parcelle_sud.id
+    )
+    
+    db.add_all([planche_tomates, planche_salades, planche_carottes, planche_herbes])
     db.commit()
+    
+    for planche in [planche_tomates, planche_salades, planche_carottes, planche_herbes]:
+        db.refresh(planche)
+        print(f"    ✓ Planche '{planche.name}' (ID: {planche.id}, Parent: {planche.parent_id})")
 
     # Création de la hiérarchie : Les serres appartiennent au Jardin Principal
     jardin = db.query(Space).filter_by(name="Jardin Principal").first()
@@ -202,66 +224,109 @@ def seed_user_spaces(db):
                 db.add(user_space)
                 print(f"  > Association {assoc['email']} -> {assoc['space_name']} ajoutée.")
     db.commit()
+    db.refresh(sous_planche_tomates_cerises)
+    db.refresh(sous_planche_tomates_coeur)
+    print(f"    ✓ Sous-planche '{sous_planche_tomates_cerises.name}' (ID: {sous_planche_tomates_cerises.id})")
+    print(f"    ✓ Sous-planche '{sous_planche_tomates_coeur.name}' (ID: {sous_planche_tomates_coeur.id})")
 
-def seed_nodes(db):
-    """Seed des nœuds (Nodes) - Adapté au schéma de la migration"""
-    print("Seeding Nœuds...")
-    spaces = {s.name: s.id for s in db.query(Space.id, Space.name).all()}
+    # === CELLULES ET CAPTEURS ===
+    print("\n  📦 Création des cellules et capteurs...")
     
-    if not spaces:
-        print("  > ⚠️  Impossible de créer les nœuds : espaces manquants.")
-        return
-    
-    nodes_data = [
-        {"uid": "4C01", "status": "online", "RSSI": -55, "space_name": "Jardin Principal"},
-        {"uid": "B3D4", "status": "online", "RSSI": -62, "space_name": "Serre 1"},
-        {"uid": "A8F2", "status": "offline", "RSSI": -90, "space_name": "Serre 2"},
-        {"uid": "9E1C", "status": "online", "RSSI": -71, "space_name": "Zone Compost"},
+    # Dictionnaire pour stocker les configurations de cellules
+    cells_config = [
+        # Cellules de la sous-planche Tomates Cerises
+        {
+            "area": sous_planche_tomates_cerises,
+            "cells": [
+                {
+                    "name": "Rangée A - Tomates Cerises",
+                    "sensors": [
+                        {"sensor_id": "TC-A-TEMP-01", "type": "temperature"},
+                        {"sensor_id": "TC-A-HUM-01", "type": "humidity"},
+                        {"sensor_id": "TC-A-LIGHT-01", "type": "light"},
+                    ]
+                },
+                {
+                    "name": "Rangée B - Tomates Cerises",
+                    "sensors": [
+                        {"sensor_id": "TC-B-TEMP-01", "type": "temperature"},
+                        {"sensor_id": "TC-B-HUM-01", "type": "humidity"},
+                    ]
+                }
+            ]
+        },
+        # Cellules de la sous-planche Tomates Coeur de Boeuf
+        {
+            "area": sous_planche_tomates_coeur,
+            "cells": [
+                {
+                    "name": "Rangée A - Coeur de Boeuf",
+                    "sensors": [
+                        {"sensor_id": "CB-A-TEMP-01", "type": "temperature"},
+                        {"sensor_id": "CB-A-HUM-01", "type": "humidity"},
+                    ]
+                }
+            ]
+        },
+        # Cellules de la planche Salades
+        {
+            "area": planche_salades,
+            "cells": [
+                {
+                    "name": "Section Laitues",
+                    "sensors": [
+                        {"sensor_id": "SAL-L-TEMP-01", "type": "temperature"},
+                        {"sensor_id": "SAL-L-HUM-01", "type": "humidity"},
+                    ]
+                },
+                {
+                    "name": "Section Roquette",
+                    "sensors": [
+                        {"sensor_id": "SAL-R-TEMP-01", "type": "temperature"},
+                    ]
+                }
+            ]
+        },
+        # Cellules de la planche Carottes
+        {
+            "area": planche_carottes,
+            "cells": [
+                {
+                    "name": "Carottes Nantaises",
+                    "sensors": [
+                        {"sensor_id": "CAR-N-TEMP-01", "type": "temperature"},
+                        {"sensor_id": "CAR-N-HUM-01", "type": "humidity"},
+                    ]
+                }
+            ]
+        },
+        # Cellules de la planche Herbes
+        {
+            "area": planche_herbes,
+            "cells": [
+                {
+                    "name": "Section Basilic",
+                    "sensors": [
+                        {"sensor_id": "HER-B-TEMP-01", "type": "temperature"},
+                        {"sensor_id": "HER-B-HUM-01", "type": "humidity"},
+                        {"sensor_id": "HER-B-LIGHT-01", "type": "light"},
+                    ]
+                },
+                {
+                    "name": "Section Persil",
+                    "sensors": [
+                        {"sensor_id": "HER-P-TEMP-01", "type": "temperature"},
+                    ]
+                }
+            ]
+        }
     ]
     
-    for node_data in nodes_data:
-        existing = db.query(Node).filter_by(uid=node_data["uid"]).first()
-        if not existing:
-            space_id = spaces.get(node_data["space_name"])
-            if not space_id:
-                print(f"  > ⚠️  Espace '{node_data['space_name']}' non trouvé. Nœud {node_data['uid']} non créé.")
-                continue
-                
-            node = Node(
-                uid=node_data["uid"],
-                status=node_data["status"],
-                RSSI=node_data["RSSI"],
-                space_id=space_id
-            )
-            db.add(node)
-            print(f"  > Nœud {node_data['uid']} ajouté à l'espace {node_data['space_name']}.")
-    
-    db.commit()
-
-def seed_analytic(db):
-    """Seed des données analytiques - Adapté au schéma de la migration"""
-    print("Seeding Données (Analytic)...")
-    nodes = db.query(Node).all()
-    
-    if not nodes:
-        print("  > ⚠️  Impossible de créer des données analytiques : nœuds manquants.")
-        return
-    
-    # Définition des capteurs avec des codes au format string
-    sensor_definitions = [
-        {"code": "TA-1", "type": AnalyticType.AIR_TEMPERATURE, "base": 18, "amplitude": 10}, # Température Air
-        {"code": "TS-1", "type": AnalyticType.SOIL_TEMPERATURE, "base": 16, "amplitude": 5}, # Température Sol
-        {"code": "HA-1", "type": AnalyticType.AIR_HUMIDITY, "base": 60, "amplitude": -20}, # Humidité Air (inverse de la temp)
-        {"code": "HS-1", "type": AnalyticType.SOIL_HUMIDITY, "base": 55, "amplitude": 0}, # Humidité Sol
-        {"code": "L-1", "type": AnalyticType.LIGHT, "base": 5, "amplitude": 4}, # Luminosité
-        {"code": "B-1", "type": AnalyticType.BATTERY, "base": 95, "amplitude": 0}, # Batterie
-    ]
-    
-    data_to_add = []
-    
-    for node in nodes:
-        # Chaque nœud a tous les capteurs pour la démo
-        node_sensors = sensor_definitions
+    # Créer toutes les cellules et capteurs
+    all_sensors = []
+    for area_config in cells_config:
+        area = area_config["area"]
+        print(f"\n    📍 Area '{area.name}':")
         
         for sensor in node_sensors:
             for day in range(5):  # 5 jours de données
@@ -354,19 +419,104 @@ def seed_alert_history(db):
                 status="resolved" if resolved_at else "active",
                 message=f"Alerte déclenchée : {alert.name} (valeur X)"
             )
-            history_to_add.append(history)
+            db.add(cell)
+            db.commit()
+            db.refresh(cell)
+            print(f"      ✓ Cellule '{cell.name}' (ID: {cell.id})")
             
-    db.bulk_save_objects(history_to_add)
+            # Créer les capteurs de cette cellule
+            for sensor_config in cell_config["sensors"]:
+                sensor = Sensor(
+                    sensor_id=sensor_config["sensor_id"],
+                    sensor_type=sensor_config["type"],
+                    status="active",
+                    cell_id=cell.id
+                )
+                db.add(sensor)
+                all_sensors.append(sensor)
+                print(f"        • Capteur '{sensor.sensor_id}' ({sensor.sensor_type})")
+    
     db.commit()
-    print(f"  > {len(history_to_add)} entrées d'historique d'alertes créées.")
+    print(f"\n  ✅ Structure créée : {len(all_sensors)} capteurs répartis dans les cellules")
+
+
+def seed_analytics(db):
+    """
+    Seed des données analytiques pour tous les capteurs.
+    Génère 7 jours d'historique avec des relevés toutes les heures.
+    """
+    print("\n📊 Seeding Données Analytiques...")
+    
+    sensors = db.query(Sensor).all()
+    
+    if not sensors:
+        print("  ⚠️  Aucun capteur trouvé. Impossible de générer des analytics.")
+        return
+    
+    analytics_to_add = []
+    total_days = 7
+    
+    for sensor in sensors:
+        print(f"  📡 Génération de données pour '{sensor.sensor_id}' ({sensor.sensor_type})...")
+        
+        # Configuration selon le type de capteur
+        if sensor.sensor_type == "temperature":
+            analytic_type = AnalyticType.AIR_TEMPERATURE
+            base_value = 22.0
+            amplitude = 6.0
+            noise = 0.5
+        elif sensor.sensor_type == "humidity":
+            analytic_type = AnalyticType.AIR_HUMIDITY
+            base_value = 65.0
+            amplitude = -10.0  # Inverse de la température (quand il fait chaud, moins humide)
+            noise = 2.0
+        elif sensor.sensor_type == "light":
+            analytic_type = AnalyticType.LIGHT
+            base_value = 50.0
+            amplitude = 40.0
+            noise = 5.0
+        else:
+            continue
+        
+        # Générer les données pour chaque jour et chaque heure
+        for day in range(total_days):
+            for hour in range(24):
+                occured_at = datetime.now(UTC) - timedelta(days=day, hours=hour)
+                
+                # Simulation d'un cycle sinusoïdal sur 24h
+                # Pic vers 14h, creux vers 4h du matin
+                hour_factor = 1 - ((hour - 14) / 12) ** 2
+                cycle_value = hour_factor + random.uniform(-0.1, 0.1)
+                
+                value = base_value + (amplitude * cycle_value) + random.uniform(-noise, noise)
+                
+                # Éviter les valeurs négatives
+                value = max(0, value)
+                
+                analytic = Analytic(
+                    sensor_id=sensor.id,
+                    sensor_code=sensor.sensor_id,
+                    analytic_type=analytic_type,
+                    value=round(value, 2),
+                    occured_at=occured_at
+                )
+                analytics_to_add.append(analytic)
+    
+    # Insertion en masse pour les performances
+    db.bulk_save_objects(analytics_to_add)
+    db.commit()
+    
+    print(f"  ✅ {len(analytics_to_add)} points de données analytiques générés")
+    print(f"     ({total_days} jours × 24 heures × {len(sensors)} capteurs)")
+
 
 def seed_refresh_tokens(db):
-    """Seed des tokens de rafraîchissement (Compatible)"""
-    print("Seeding Tokens de Rafraîchissement...")
+    """Seed des tokens de rafraîchissement"""
+    print("\n🔑 Seeding Tokens de Rafraîchissement...")
     users = db.query(User).all()
     
     if not users:
-        print("  > ⚠️  Impossible de créer les tokens : utilisateurs manquants.")
+        print("  ⚠️  Impossible de créer les tokens : utilisateurs manquants.")
         return
     
     for user in users:
@@ -376,9 +526,10 @@ def seed_refresh_tokens(db):
             expires_at=datetime.now(UTC) + timedelta(days=30)
         )
         db.add(token)
+        print(f"  ✓ Token créé pour '{user.username}'")
     
     db.commit()
-    print(f"  > {len(users)} tokens de rafraîchissement créés.")
+
 
 if __name__ == "__main__":
     seed()
