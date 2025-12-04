@@ -1,5 +1,4 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
 from db.models import Area as AreaModel
 from .schemas import Area as AreaSchema, Cell as CellSchema
 from .errors import AreaNotFoundError
