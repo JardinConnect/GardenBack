@@ -59,7 +59,56 @@ Documentation Swagger : http://localhost:8000/docs
 ### Shell dans le conteneur
 `docker-compose exec fastapi-backend bash`
 
-🗄️ Gestion de la Base de Données (Alembic)
+�️ Schéma de la Base de Données
+---
+
+Voici un aperçu de la structure de la base de données, représentée avec Mermaid.
+
+```mermaid
+erDiagram
+    User {
+        int id PK
+        string email
+        string hashed_password
+        string role
+    }
+
+    Area {
+        int id PK
+        string name
+        string color
+        int parent_id FK "Référence à elle-même (self-reference)"
+        int level
+    }
+
+    Cell {
+        int id PK
+        string name
+        int area_id FK
+    }
+
+    Sensor {
+        int id PK
+        string sensor_id "ID unique du capteur physique"
+        string sensor_type
+        int cell_id FK
+    }
+
+    Analytic {
+        int id PK
+        float value
+        datetime occured_at
+        string analytic_type "Enum"
+        int sensor_id FK
+    }
+
+    Area ||--o{ Area : "contient (parent/enfant)"
+    Area ||--o{ Cell : "contient"
+    Cell ||--o{ Sensor : "contient"
+    Sensor ||--o{ Analytic : "enregistre"
+```
+
+�🗄️ Gestion de la Base de Données (Alembic)
 ---
 
 Le projet utilise Alembic pour gérer les migrations de la base de données.
