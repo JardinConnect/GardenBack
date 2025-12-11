@@ -20,6 +20,7 @@ def build_area_schema(area: AreaModel) -> AreaSchema:
     cell_schemas = [CellSchema.model_validate(cell) for cell in area.cells] if area.cells else []
 
     return AreaSchema(
+        id=area.id,
         name=area.name,
         color=area.color,
         areas=[build_area_schema(child) for child in area.children] if area.children else [],

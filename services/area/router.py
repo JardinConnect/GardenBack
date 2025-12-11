@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, Path
 from sqlalchemy.orm import Session
 
 from .schemas import Area
-from . import repository
+from . import service
+from .errors import AreaNotFoundError
 from db.database import get_db
 from services.auth.bearer import JWTBearer
 
@@ -14,6 +15,9 @@ def get_area(
     db: Session = Depends(get_db),
 ) -> Area:
     """
-    Récupère une zone de jardin spécifique par son ID, avec toute sa hiérarchie.
+    Récupère une zone de jardin spécifique par son ID, avec toute sa hiérarchie et les moyennes analytiques.
     """
-    return repository.get_area_by_id(db, area_id)
+    area = service.get_area_with_analytics(db, area_id)
+    if not area:
+        raise AreaNotFoundError
+    return area

@@ -4,7 +4,6 @@ from fastapi import HTTPException
 from sqlalchemy.orm import sessionmaker
 from db.models import Base, Area, Cell, Sensor, Analytic, AnalyticType, User
 from services.area.repository import get_area_by_id
-from services.area.errors import AreaNotFoundError
 from datetime import datetime
 
 @pytest.fixture(scope="function")
