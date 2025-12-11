@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from . import schemas
-from db.models import Area as AreaModel, Cell as CellModel, Analytic as AnalyticModel, AnalyticType
+from db.models import Area as AreaModel, Analytic as AnalyticModel, AnalyticType
 
 
 def _process_area_recursively(db: Session, area: AreaModel) -> Tuple[schemas.Area, List[AnalyticModel]]:
