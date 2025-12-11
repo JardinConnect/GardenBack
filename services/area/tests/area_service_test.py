@@ -27,12 +27,14 @@ def test_get_area_single_level_with_analytics(db_session):
 
     sensor_temp = SensorModel(sensor_id="T1", sensor_type="temperature", cell_id=cell1.id)
     sensor_hum = SensorModel(sensor_id="H1", sensor_type="humidity", cell_id=cell1.id)
-    db_session.add_all([sensor_temp, sensor_hum])
+    sensor_soil_hum = SensorModel(sensor_id="SH1", sensor_type="soil_humidity", cell_id=cell1.id)
+    db_session.add_all([sensor_temp, sensor_hum, sensor_soil_hum])
     db_session.commit()
 
     analytic_temp = AnalyticModel(sensor_id=sensor_temp.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=25.5, sensor_code="T1")
     analytic_hum = AnalyticModel(sensor_id=sensor_hum.id, analytic_type=AnalyticType.AIR_HUMIDITY, value=60.0, sensor_code="H1")
-    db_session.add_all([analytic_temp, analytic_hum])
+    analytic_soil_hum = AnalyticModel(sensor_id=sensor_soil_hum.id, analytic_type=AnalyticType.SOIL_HUMIDITY, value=45.0, sensor_code="SH1")
+    db_session.add_all([analytic_temp, analytic_hum, analytic_soil_hum])
     db_session.commit()
 
     # --- Exécution ---
@@ -43,8 +45,10 @@ def test_get_area_single_level_with_analytics(db_session):
     assert result_area.name == "Area 1"
     assert len(result_area.areas) == 0
     assert result_area.analytics_average is not None
-    assert result_area.analytics_average.temperature == 25.5
-    assert result_area.analytics_average.humidity == 60.0
+    assert result_area.analytics_average.air_temperature == 25.5
+    assert result_area.analytics_average.air_humidity == 60.0
+    assert result_area.analytics_average.soil_humidity == 45.0
+    assert result_area.analytics_average.soil_temperature is None
     assert result_area.analytics_average.light is None
 
 
@@ -93,11 +97,11 @@ def test_get_area_multi_level_aggregation(db_session):
     result_child = result_area.areas[0]
     assert result_child.name == "Child Area"
     assert result_child.analytics_average is not None
-    assert result_child.analytics_average.temperature == 30.0
+    assert result_child.analytics_average.air_temperature == 30.0
 
     # Vérifier l'agrégation sur la zone parente
     assert result_area.analytics_average is not None
-    assert result_area.analytics_average.temperature == (10.0 + 30.0) / 2  # Moyenne de 10 et 30
+    assert result_area.analytics_average.air_temperature == (10.0 + 30.0) / 2  # Moyenne de 10 et 30
 
 
 def test_get_area_uses_latest_analytic_only(db_session):
@@ -129,4 +133,4 @@ def test_get_area_uses_latest_analytic_only(db_session):
     assert result_area is not None
     assert result_area.analytics_average is not None
     # La moyenne doit être basée sur la dernière valeur (50.0), pas l'ancienne (10.0)
-    assert result_area.analytics_average.temperature == 50.0
+    assert result_area.analytics_average.air_temperature == 50.0

@@ -7,8 +7,10 @@ class Cell(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class AnalyticsAverage(BaseModel):
-    temperature: Optional[float] = None
-    humidity: Optional[float] = None
+    air_temperature: Optional[float] = None
+    soil_temperature: Optional[float] = None
+    air_humidity: Optional[float] = None
+    soil_humidity: Optional[float] = None
     light: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -18,7 +20,7 @@ class Area(BaseModel):
     name: str
     color: Optional[str] = None
     areas: List['Area'] = Field(default_factory=list)
-    cells: List[Cell] = Field(default_factory=list)
+    cells: Optional[List[Cell]] = None
     analytics_average: Optional[AnalyticsAverage] = None
 
     model_config = ConfigDict(from_attributes=True)

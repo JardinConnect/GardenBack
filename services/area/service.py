@@ -43,13 +43,17 @@ def _process_area_recursively(db: Session, area: AreaModel) -> Tuple[schemas.Are
     # 3. Calculer les moyennes pour la zone actuelle (incluant tous les enfants)
     analytics_average = None
     if all_analytics:
-        temps = [data.value for data in all_analytics if data.analytic_type == AnalyticType.AIR_TEMPERATURE]
-        humids = [data.value for data in all_analytics if data.analytic_type == AnalyticType.AIR_HUMIDITY]
+        air_temps = [data.value for data in all_analytics if data.analytic_type == AnalyticType.AIR_TEMPERATURE]
+        soil_temps = [data.value for data in all_analytics if data.analytic_type == AnalyticType.SOIL_TEMPERATURE]
+        air_humids = [data.value for data in all_analytics if data.analytic_type == AnalyticType.AIR_HUMIDITY]
+        soil_humids = [data.value for data in all_analytics if data.analytic_type == AnalyticType.SOIL_HUMIDITY]
         lights = [data.value for data in all_analytics if data.analytic_type == AnalyticType.LIGHT]
 
         analytics_average = schemas.AnalyticsAverage(
-            temperature=sum(temps) / len(temps) if temps else None,
-            humidity=sum(humids) / len(humids) if humids else None,
+            air_temperature=sum(air_temps) / len(air_temps) if air_temps else None,
+            soil_temperature=sum(soil_temps) / len(soil_temps) if soil_temps else None,
+            air_humidity=sum(air_humids) / len(air_humids) if air_humids else None,
+            soil_humidity=sum(soil_humids) / len(soil_humids) if soil_humids else None,
             light=sum(lights) / len(lights) if lights else None,
         )
 

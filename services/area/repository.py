@@ -17,7 +17,7 @@ def build_area_schema(area: AreaModel) -> AreaSchema:
     """
     Construit récursivement le schéma Pydantic pour une zone donnée.
     """
-    cell_schemas = [CellSchema.model_validate(cell) for cell in area.cells] if area.cells else []
+    cell_schemas = [CellSchema.model_validate(cell) for cell in area.cells] if area.cells else None
 
     return AreaSchema(
         id=area.id,
