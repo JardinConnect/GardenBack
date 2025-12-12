@@ -88,9 +88,9 @@ up:
 up-seed:
 	@echo "🌱 $(YELLOW)Lancement avec seeding initial...$(NO_COLOR)"
 	# Étape 1 : appliquer les migrations
-	docker compose run --rm fastapi-backend sh -c "python -m alembic upgrade head"
+	docker compose run --build --rm fastapi-backend sh -c "python -m alembic upgrade head"
 	# Étape 2 : exécuter le seed
-	docker compose run --rm seed-db
+	docker compose run --build --rm seed-db
 	# Étape 3 : lancer le backend et mosquitto
 	docker compose up --build fastapi-backend mosquitto
 

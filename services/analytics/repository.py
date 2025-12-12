@@ -33,8 +33,8 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> PaginatedAnalyticRes
 
     # 3. Filters
     filters = []
-    if request.node_id:
-        filters.append(Analytic.node_id == request.node_id)
+    if request.sensor_id:
+        filters.append(Analytic.sensor_id == request.sensor_id)
     if request.sensor_code:
         filters.append(Analytic.sensor_code == request.sensor_code)
     if request.analytic_type:
@@ -91,7 +91,7 @@ def create_analytic(db: Session, analytic_input: AnalyticCreate) -> AnalyticSche
         occured_at=analytic_input.timestamp,
         sensor_code=analytic_input.sensor_code,
         analytic_type=analytic_type,
-        node_id=analytic_input.node_id
+        sensor_id=analytic_input.sensor_id
     )
     db.add(db_analytic)
     db.commit()

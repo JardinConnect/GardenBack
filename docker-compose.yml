@@ -3,9 +3,9 @@ services:
     build: .
     container_name: fastapi-backend
     ports:
-      - "8000:8000"
+      - "${APP_PORT}:${APP_PORT}"
     volumes:
-      - db_data:/app
+      - .:/app
       - ./data:/app/data
     env_file:
       - .env
@@ -48,7 +48,7 @@ services:
     command: >
       sh -c "python db/seed.py"
     volumes:
-      - db_data:/app
+      - .:/app
       - ./data:/app/data
     env_file:
       - .env
@@ -56,3 +56,4 @@ services:
 
 volumes:
   db_data:
+    # Ce volume n'est plus utilisé pour le code, mais pourrait l'être pour la DB si besoin.

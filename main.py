@@ -9,6 +9,7 @@ from services.api_gateway.router import router as gateway_router
 from services.auth.router import router as auth_router
 from services.analytics.router import router as data_router
 from services.lora_gpio.router import router as lora_router
+from services.area.router import router as area_router
 from services.mqtt.router import router as mqtt_router
 from services.user.router import router as user_router
 
@@ -49,6 +50,7 @@ app.include_router(gateway_router, prefix="/gateway", tags=["API Gateway"])
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(data_router, prefix="/data", tags=["Data"])
 app.include_router(lora_router, prefix="/lora", tags=["Lora GPIO"])
+app.include_router(area_router, prefix="/area", tags=["Area"])
 app.include_router(mqtt_router, tags=["MQTT"])
 app.include_router(user_router, tags=["User"])
 
