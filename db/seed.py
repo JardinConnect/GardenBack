@@ -1,16 +1,9 @@
 import os
 import uuid
 from datetime import datetime, timedelta, UTC
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect 
 from sqlalchemy.orm import sessionmaker
-# Importer les modèles qui existent dans la migration
-from db.models import (
-    User, Space, Role, UserSpace, Node, Analytic, Alert, AlertHistory, RefreshToken, AnalyticType
-)
-try:
-    from settings import settings
-except ImportError:
-    settings = None
+from models import AnalyticType, User, Area, Analytic, RefreshToken, Cell, Sensor
 import bcrypt
 import random
 
@@ -30,19 +23,17 @@ def seed():
     """
     Fonction de remplissage de la base de données avec des données initiales.
     """
-    print(f"DEBUG: Le script seed.py utilise l'URL de base de données : {DATABASE_URL}")
+    print(f"DEBUG: Le script seed.py s'attend à trouver la base de données à : {DATABASE_PATH}")
 
-    # Extraire le chemin du fichier depuis l'URL
-    db_path = DATABASE_URL.split("sqlite:///")[-1]
-    if "sqlite" in DATABASE_URL and not os.path.exists(db_path):
-        print("DEBUG: ERREUR - Le fichier de base de données SQLite n'existe PAS.")
+    if not os.path.exists(DATABASE_PATH):
+        print(f"DEBUG: ERREUR - Le fichier de base de données n'existe PAS à : {DATABASE_PATH}")
         return
 
     db = SessionLocal()
     try:
         inspector = inspect(engine)
-        if not inspector.has_table("users"): # Vérifie si la table users existe
-            print("DEBUG: ERREUR - La table 'users' n'existe PAS. Assurez-vous que les migrations ont été appliquées.")
+        if not inspector.has_table("users"):
+            print(f"DEBUG: ERREUR - La table 'users' n'existe PAS dans la base de données à : {DATABASE_PATH}")
             return
             
         print("--- Démarrage du Seeding ---")
@@ -95,22 +86,19 @@ def seed_users(db):
             user = User(
                 first_name=user_data["first_name"],
                 last_name=user_data["last_name"],
-                phone_number=user_data["phone_number"],
+                phone_number=user_data.get("phone_number"),
                 email=user_data["email"],
                 password=bcrypt.hashpw(password, bcrypt.gensalt()).decode('utf-8'),
                 isAdmin=user_data["isAdmin"],
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC)
             )
-            try:
-                db.add(user)
-                db.commit()
-                print(f"  > Utilisateur {user_data['first_name']} {user_data['last_name']} ajouté.")
-            except Exception as e:
-                db.rollback()
-                print(f"  > ⚠️  Erreur lors de l'ajout de l'utilisateur {user_data['email']}: {e}")
+            db.add(user)
+            print(f"  ✓ Utilisateur '{user_data['first_name']} {user_data['last_name']}' créé")
         else:
-            print(f"  > Utilisateur {user_data['email']} existe déjà, ignoré.")
+            print(f"  - Utilisateur '{user_data['email']}' existe déjà, ignoré.")
+    
+    db.commit()
 
 
 def seed_garden_hierarchy(db):
@@ -180,49 +168,23 @@ def seed_garden_hierarchy(db):
         db.refresh(planche)
         print(f"    ✓ Planche '{planche.name}' (ID: {planche.id}, Parent: {planche.parent_id})")
 
-    # Création de la hiérarchie : Les serres appartiennent au Jardin Principal
-    jardin = db.query(Space).filter_by(name="Jardin Principal").first()
-    serre1 = db.query(Space).filter_by(name="Serre 1").first()
-    serre2 = db.query(Space).filter_by(name="Serre 2").first()
-    if jardin and serre1 and serre2:
-        serre1.parent_id = jardin.id
-        serre2.parent_id = jardin.id
-        print("  > Hiérarchie des espaces créée.")
-        db.commit()
-
-def seed_user_spaces(db):
-    """Seed des associations utilisateur-espace (Compatible)"""
-    print("Seeding Associations User-Space...")
-    users = {u.email: u.id for u in db.query(User.id, User.email).all()}
-    spaces = {s.name: s.id for s in db.query(Space.id, Space.name).all()}
-    roles = {r.name: r.id for r in db.query(Role.id, Role.name).all()}
-
-    if not users or not spaces or not roles:
-        print("  > ⚠️  Impossible de créer les associations : utilisateurs, espaces ou rôles manquants.")
-        return
-
-    associations = [
-        {"email": "sam@garden.com", "space_name": "Jardin Principal", "role_name": "manager", "permissions": "read,write,admin"},
-        {"email": "sam@garden.com", "space_name": "Serre 1", "role_name": "manager", "permissions": "read,write,admin"},
-        {"email": "marie@garden.com", "space_name": "Serre 2", "role_name": "user", "permissions": "read,write"},
-    ]
-
-    for assoc in associations:
-        user_id = users.get(assoc["email"])
-        space_id = spaces.get(assoc["space_name"])
-        role_id = roles.get(assoc["role_name"])
-
-        if user_id and space_id and role_id:
-            existing = db.query(UserSpace).filter_by(user_id=user_id, space_id=space_id).first()
-            if not existing:
-                user_space = UserSpace(
-                    user_id=user_id,
-                    space_id=space_id,
-                    role_id=role_id,
-                    permissions=assoc["permissions"]
-                )
-                db.add(user_space)
-                print(f"  > Association {assoc['email']} -> {assoc['space_name']} ajoutée.")
+    # === NIVEAU 3 : SOUS-PLANCHES (exemple avec une planche qui contient d'autres planches) ===
+    print("\n  📍 Création des sous-planches (Niveau 3)...")
+    
+    sous_planche_tomates_cerises = Area(
+        name="Section Tomates Cerises",
+        color="#FF4500",
+        level=3,
+        parent_id=planche_tomates.id
+    )
+    sous_planche_tomates_coeur = Area(
+        name="Section Tomates Coeur de Boeuf",
+        color="#DC143C",
+        level=3,
+        parent_id=planche_tomates.id
+    )
+    
+    db.add_all([sous_planche_tomates_cerises, sous_planche_tomates_coeur])
     db.commit()
     db.refresh(sous_planche_tomates_cerises)
     db.refresh(sous_planche_tomates_coeur)
@@ -340,96 +302,11 @@ def seed_user_spaces(db):
         area = area_config["area"]
         print(f"\n    📍 Area '{area.name}':")
         
-        for sensor in node_sensors:
-            for day in range(5):  # 5 jours de données
-                for hour in range(24):  # Toutes les heures
-                    occured_at = datetime.now(UTC) - timedelta(days=day, hours=hour)
-                    
-                    cycle = 0.0
-                    # Simulation d'un cycle journalier (sinusoïdal) sur 24h
-                    # Pic vers 14h, creux vers 4h du matin
-                    if sensor["type"] == AnalyticType.LIGHT:
-                        if 6 <= hour <= 20: # La lumière n'est présente que pendant la journée
-                            cycle = (1 + random.uniform(-0.1, 0.1) - ((hour - 14) / 8) ** 2)
-                        # else cycle reste 0 (pas de lumière la nuit)
-                    else: # Pour les autres capteurs, la variation est continue
-                        cycle = (1 + random.uniform(-0.1, 0.1) - ((hour - 14) / 12) ** 2)
-                    
-                    value = sensor["base"] + (sensor["amplitude"] * cycle) + random.uniform(-0.5, 0.5)
-                    data = Analytic(
-                        node_id=node.id,
-                        sensor_code=sensor["code"],
-                        analytic_type=sensor["type"],
-                        value=round(value, 2),
-                        occured_at=occured_at,
-                    )
-                    data_to_add.append(data)
-    
-    db.bulk_save_objects(data_to_add)
-    db.commit()
-    print(f"  > {len(data_to_add)} points de données analytiques générés.")
-
-def seed_alerts(db):
-    """Seed des alertes - Adapté au schéma de la migration"""
-    print("Seeding Alertes...")
-    
-    analytics_to_alert_on = db.query(Analytic.node_id, Analytic.sensor_code)\
-                              .distinct()\
-                              .all()
-    
-    if not analytics_to_alert_on:
-        print("  > ⚠️  Impossible de créer des alertes : aucune donnée analytique à surveiller.")
-        return
-
-    alert_templates = [
-        {"name": "Température élevée", "condition": ">", "threshold": 28.0, "code_prefix": "TA"},
-        {"name": "Sol trop sec", "condition": "<", "threshold": 30.0, "code_prefix": "HS"},
-        {"name": "Batterie faible", "condition": "<", "threshold": 20.0, "code_prefix": "B"},
-    ]
-    
-    for node_id, sensor_code in analytics_to_alert_on:
-        for template in alert_templates:
-            # Si le début du sensor_code correspond au préfixe de l'alerte
-            if sensor_code.startswith(template["code_prefix"]):
-                node_uid = db.query(Node.uid).filter(Node.id == node_id).scalar()
-                alert_name = f"{template['name']} sur {node_uid}"
-                
-                existing = db.query(Alert).filter_by(name=alert_name).first()
-                if not existing:
-                    alert = Alert(
-                        name=alert_name,
-                        condition=template["condition"],
-                        threshold=template["threshold"],
-                        sensor_code=sensor_code,
-                        node_id=node_id
-                    )
-                    db.add(alert)
-                    print(f"  > Alerte '{alert_name}' créée.")
-    
-    db.commit()
-
-def seed_alert_history(db):
-    """Seed de l'historique des alertes (Compatible)"""
-    print("Seeding Historique des Alertes...")
-    alerts = db.query(Alert).all()
-    
-    if not alerts:
-        print("  > ⚠️  Impossible de créer l'historique : alertes manquantes.")
-        return
-    
-    history_to_add = []
-    
-    for alert in alerts:
-        for _ in range(random.randint(1, 3)):
-            triggered_at = datetime.now(UTC) - timedelta(days=random.randint(0, 4), hours=random.randint(0, 23))
-            resolved_at = triggered_at + timedelta(minutes=random.randint(30, 240)) if random.choice([True, False]) else None
-            
-            history = AlertHistory(
-                alert_id=alert.id,
-                triggered_at=triggered_at,
-                resolved_at=resolved_at,
-                status="resolved" if resolved_at else "active",
-                message=f"Alerte déclenchée : {alert.name} (valeur X)"
+        for cell_config in area_config["cells"]:
+            # Créer la cellule
+            cell = Cell(
+                name=cell_config["name"],
+                area_id=area.id
             )
             db.add(cell)
             db.commit()
@@ -548,7 +425,7 @@ def seed_refresh_tokens(db):
             expires_at=datetime.now(UTC) + timedelta(days=30)
         )
         db.add(token)
-        print(f"  ✓ Token créé pour '{user.username}'")
+        print(f"  ✓ Token créé pour '{user.email}'")
     
     db.commit()
 
