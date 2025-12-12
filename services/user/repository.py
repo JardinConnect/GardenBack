@@ -47,7 +47,9 @@ def create_user(db: Session, user: UserSchema):
     now = datetime.now()
 
     db_user = User(
-        username=user.username,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        phone_number=user.phone_number,
         email=user.email,
         password=get_password_hash(user.password),
         isAdmin=False,

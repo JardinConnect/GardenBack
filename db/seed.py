@@ -1,10 +1,16 @@
 import os
 import uuid
 from datetime import datetime, timedelta, UTC
-from sqlalchemy import create_engine, inspect 
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 # Importer les modèles qui existent dans la migration
-from models import AnalyticType, User, Space, Role, UserSpace, Node, Analytic, Alert, AlertHistory, RefreshToken
+from db.models import (
+    User, Space, Role, UserSpace, Node, Analytic, Alert, AlertHistory, RefreshToken, AnalyticType
+)
+try:
+    from settings import settings
+except ImportError:
+    settings = None
 import bcrypt
 import random
 
@@ -24,17 +30,19 @@ def seed():
     """
     Fonction de remplissage de la base de données avec des données initiales.
     """
-    print(f"DEBUG: Le script seed.py s'attend à trouver la base de données à : {DATABASE_PATH}")
+    print(f"DEBUG: Le script seed.py utilise l'URL de base de données : {DATABASE_URL}")
 
-    if not os.path.exists(DATABASE_PATH):
-        print(f"DEBUG: ERREUR - Le fichier de base de données n'existe PAS à : {DATABASE_PATH}")
+    # Extraire le chemin du fichier depuis l'URL
+    db_path = DATABASE_URL.split("sqlite:///")[-1]
+    if "sqlite" in DATABASE_URL and not os.path.exists(db_path):
+        print(f"DEBUG: ERREUR - Le fichier de base de données SQLite n'existe PAS.")
         return
 
     db = SessionLocal()
     try:
         inspector = inspect(engine)
-        if not inspector.has_table("users"):
-            print(f"DEBUG: ERREUR - La table 'users' n'existe PAS dans la base de données à : {DATABASE_PATH}")
+        if not inspector.has_table("users"): # Vérifie si la table users existe
+            print(f"DEBUG: ERREUR - La table 'users' n'existe PAS. Assurez-vous que les migrations ont été appliquées.")
             return
             
         print("--- Démarrage du Seeding ---")
@@ -81,27 +89,34 @@ def seed_users(db):
     """Seed des utilisateurs (Compatible)"""
     print("Seeding Utilisateurs...")
     users_data = [
-        {"username": "sam", "email": "sam@garden.com", "password": "garden1", "isAdmin": False},
-        {"username": "admin", "email": "admin@garden.com", "password": "admin123", "isAdmin": True},
-        {"username": "marie", "email": "marie@garden.com", "password": "marie123", "isAdmin": False},
+        {"first_name": "Sam", "last_name": "Gardener", "phone_number": "0611223344", "email": "sam@garden.com", "password": "garden1", "isAdmin": False},
+        {"first_name": "Admin", "last_name": "Istrator", "phone_number": "0655667788", "email": "admin@garden.com", "password": "admin123", "isAdmin": True},
+        {"first_name": "Marie", "last_name": "Fleur", "phone_number": "0699887766", "email": "marie@garden.com", "password": "marie123", "isAdmin": False},
     ]
     
     for user_data in users_data:
-        existing = db.query(User).filter_by(username=user_data["username"]).first()
+        existing = db.query(User).filter_by(email=user_data["email"]).first()
         if not existing:
             password = user_data["password"].encode('utf-8')
             user = User(
-                username=user_data["username"],
+                first_name=user_data["first_name"],
+                last_name=user_data["last_name"],
+                phone_number=user_data["phone_number"],
                 email=user_data["email"],
                 password=bcrypt.hashpw(password, bcrypt.gensalt()).decode('utf-8'),
                 isAdmin=user_data["isAdmin"],
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC)
             )
-            db.add(user)
-            print(f"  > Utilisateur {user_data['username']} ajouté.")
-    
-    db.commit()
+            try:
+                db.add(user)
+                db.commit()
+                print(f"  > Utilisateur {user_data['first_name']} {user_data['last_name']} ajouté.")
+            except Exception as e:
+                db.rollback()
+                print(f"  > ⚠️  Erreur lors de l'ajout de l'utilisateur {user_data['email']}: {e}")
+        else:
+            print(f"  > Utilisateur {user_data['email']} existe déjà, ignoré.")
 
 def seed_roles(db):
     """Seed des rôles (Compatible)"""
@@ -156,7 +171,7 @@ def seed_spaces(db):
 def seed_user_spaces(db):
     """Seed des associations utilisateur-espace (Compatible)"""
     print("Seeding Associations User-Space...")
-    users = {u.username: u.id for u in db.query(User.id, User.username).all()}
+    users = {u.email: u.id for u in db.query(User.id, User.email).all()}
     spaces = {s.name: s.id for s in db.query(Space.id, Space.name).all()}
     roles = {r.name: r.id for r in db.query(Role.id, Role.name).all()}
 
@@ -165,13 +180,13 @@ def seed_user_spaces(db):
         return
 
     associations = [
-        {"username": "sam", "space_name": "Jardin Principal", "role_name": "manager", "permissions": "read,write,admin"},
-        {"username": "sam", "space_name": "Serre 1", "role_name": "manager", "permissions": "read,write,admin"},
-        {"username": "marie", "space_name": "Serre 2", "role_name": "user", "permissions": "read,write"},
+        {"email": "sam@garden.com", "space_name": "Jardin Principal", "role_name": "manager", "permissions": "read,write,admin"},
+        {"email": "sam@garden.com", "space_name": "Serre 1", "role_name": "manager", "permissions": "read,write,admin"},
+        {"email": "marie@garden.com", "space_name": "Serre 2", "role_name": "user", "permissions": "read,write"},
     ]
 
     for assoc in associations:
-        user_id = users.get(assoc["username"])
+        user_id = users.get(assoc["email"])
         space_id = spaces.get(assoc["space_name"])
         role_id = roles.get(assoc["role_name"])
 
@@ -185,7 +200,7 @@ def seed_user_spaces(db):
                     permissions=assoc["permissions"]
                 )
                 db.add(user_space)
-                print(f"  > Association {assoc['username']} -> {assoc['space_name']} ajoutée.")
+                print(f"  > Association {assoc['email']} -> {assoc['space_name']} ajoutée.")
     db.commit()
 
 def seed_nodes(db):
@@ -253,13 +268,17 @@ def seed_analytic(db):
                 for hour in range(24):  # Toutes les heures
                     occured_at = datetime.now(UTC) - timedelta(days=day, hours=hour)
                     
-                    # Simulation d'un cycle sinusoïdal sur 24h pour la température et la lumière
+                    cycle = 0.0
+                    # Simulation d'un cycle journalier (sinusoïdal) sur 24h
                     # Pic vers 14h, creux vers 4h du matin
-                    cycle = (1 + random.uniform(-0.1, 0.1) - 
-                             (1 + -1 * (hour - 14) / 12) ** 2)
+                    if sensor["type"] == AnalyticType.LIGHT:
+                        if 6 <= hour <= 20: # La lumière n'est présente que pendant la journée
+                            cycle = (1 + random.uniform(-0.1, 0.1) - ((hour - 14) / 8) ** 2)
+                        # else cycle reste 0 (pas de lumière la nuit)
+                    else: # Pour les autres capteurs, la variation est continue
+                        cycle = (1 + random.uniform(-0.1, 0.1) - ((hour - 14) / 12) ** 2)
                     
                     value = sensor["base"] + (sensor["amplitude"] * cycle) + random.uniform(-0.5, 0.5)
-                    
                     data = Analytic(
                         node_id=node.id,
                         sensor_code=sensor["code"],
