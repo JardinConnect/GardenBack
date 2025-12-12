@@ -8,10 +8,11 @@ from db.database import get_db
 from services.auth.bearer import JWTBearer
 # user
 from services.user import repository
-from services.user.schemas import UserResponse, UserSchema
+from services.user.schemas import UserResponse, UserSchema, UserUpdate
 from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID, UserNotFoundErrorEmail
 
 router = APIRouter()
+
 
 @router.get("/users/", dependencies=[Depends(JWTBearer())], response_model=List[UserResponse])
 def get_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
@@ -52,6 +53,19 @@ def create_user(user: UserSchema, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.put("/users/{user_id}", dependencies=[Depends(JWTBearer())], response_model=UserResponse)
+def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_db)):
+    """
+    Met à jour les informations d'un utilisateur.
+    """
+    try:
+        updated_user = repository.update_user(db, user_id=user_id, user_data=user_data)
+        return updated_user
+    except UserNotFoundErrorID as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.delete("/users/{user_id}", dependencies=[Depends(JWTBearer())])
 def delete_user(user_id: int, db: Session = Depends(get_db)):
     """
@@ -59,10 +73,11 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     """
     try:
         repository.delete_user(db, user_id=user_id)
-        return {"message": "Utilisateur {user_id} supprimé avec succès"}
+        return {"message": f"Utilisateur {user_id} supprimé avec succès"}
     except UserNotFoundErrorID as e:
         raise HTTPException(status_code=404, detail=str(e))
     except UserNotFoundErrorEmail as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    

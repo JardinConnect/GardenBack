@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID, UserNotFoundErrorEmail
 from db.models import User
-from services.user.schemas import UserLoginSchema, UserSchema
+from services.user.schemas import UserLoginSchema, UserSchema, UserUpdate
 
 from services.auth.utils.security import get_password_hash, verify_password
 
@@ -47,7 +47,9 @@ def create_user(db: Session, user: UserSchema):
     now = datetime.now()
 
     db_user = User(
-        username=user.username,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        phone_number=user.phone_number,
         email=user.email,
         password=get_password_hash(user.password),
         isAdmin=False,
@@ -60,6 +62,21 @@ def create_user(db: Session, user: UserSchema):
     db.refresh(db_user)
     return db_user
 
+
+def update_user(db: Session, user_id: int, user_data: UserUpdate) -> User:
+    """Met à jour un utilisateur existant."""
+    db_user = get_user(db, user_id)  # Réutilise get_user pour gérer le cas "non trouvé"
+
+    update_data = user_data.model_dump(exclude_unset=True)
+
+    for key, value in update_data.items():
+        setattr(db_user, key, value)
+
+    db_user.updated_at = datetime.now()
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
 
 
 def delete_user(db: Session, user_id: int):

@@ -25,7 +25,9 @@ def mock_user_schema():
     # Créer une instance concrète de UserResponse
     return UserResponse(
         id=1,
-        username='Test User',
+        first_name='Test',
+        last_name='User',
+        phone_number='1234567890',
         email='test@example.com',
         isAdmin=False,
         created_at=datetime.now(),
