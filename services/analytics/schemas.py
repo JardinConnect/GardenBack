@@ -29,7 +29,6 @@ class AnalyticsFilter(BaseModel):
 
 
 class AnalyticSchema(BaseModel):
-    analytic_type: AnalyticType
     value: float
     occured_at: datetime
     sensorCode: Optional[str] = None

@@ -24,5 +24,6 @@ def build_area_schema(area: AreaModel) -> AreaSchema:
         name=area.name,
         color=area.color,
         areas=[build_area_schema(child) for child in area.children] if area.children else [],
-        cells=cell_schemas
+        cells=cell_schemas,
+        analytics={}
     )
