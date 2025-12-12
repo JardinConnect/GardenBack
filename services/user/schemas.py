@@ -32,8 +32,14 @@ class UserLoginSchema(BaseModel):
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
-    email: Optional[str] = None
-    role: Optional[str] = None
+
+    model_config = ConfigDict(
+        json_schema_extra = {
+            "example": {
+                "username": "john cena"
+            }
+        }
+    )
 
 class UserResponse(BaseModel):
     id: int
