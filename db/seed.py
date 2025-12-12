@@ -35,14 +35,14 @@ def seed():
     # Extraire le chemin du fichier depuis l'URL
     db_path = DATABASE_URL.split("sqlite:///")[-1]
     if "sqlite" in DATABASE_URL and not os.path.exists(db_path):
-        print(f"DEBUG: ERREUR - Le fichier de base de données SQLite n'existe PAS.")
+        print("DEBUG: ERREUR - Le fichier de base de données SQLite n'existe PAS.")
         return
 
     db = SessionLocal()
     try:
         inspector = inspect(engine)
         if not inspector.has_table("users"): # Vérifie si la table users existe
-            print(f"DEBUG: ERREUR - La table 'users' n'existe PAS. Assurez-vous que les migrations ont été appliquées.")
+            print("DEBUG: ERREUR - La table 'users' n'existe PAS. Assurez-vous que les migrations ont été appliquées.")
             return
             
         print("--- Démarrage du Seeding ---")
