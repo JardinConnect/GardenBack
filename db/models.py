@@ -22,14 +22,33 @@ class User(Base):
     phone_number: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     password: Mapped[str] = mapped_column(String, nullable=False)
-    isAdmin: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
+    # Relation vers le rôle
+    role_id: Mapped[int] = mapped_column(Integer, ForeignKey("roles.id"))
+
     if TYPE_CHECKING:
         refresh_tokens: Mapped[List["RefreshToken"]] = relationship("RefreshToken", back_populates="user")
+        role: Mapped["Role"] = relationship("Role", back_populates="users")
     else:
         refresh_tokens = relationship("RefreshToken", back_populates="user")
+        role = relationship("Role", back_populates="users")
+
+
+# =========================================================
+# ROLES
+# =========================================================
+class Role(Base):
+    __tablename__ = "roles"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+
+    if TYPE_CHECKING:
+        users: Mapped[List["User"]] = relationship("User", back_populates="role")
+    else:
+        users = relationship("User", back_populates="role")
 
 
 # =========================================================

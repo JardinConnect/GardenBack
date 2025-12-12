@@ -8,8 +8,8 @@ from services.user.repository import (
 )
 
 from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorEmail, UserNotFoundErrorID
-from services.user.schemas import UserLoginSchema, UserSchema, UserUpdate
-from db.models import User
+from services.user.schemas import UserLoginSchema, UserSchema, UserUpdate, RoleNameEnum
+from db.models import User, Role
 
 
 class TestUserService:
@@ -21,6 +21,9 @@ class TestUserService:
         self.mock_query = Mock()
         self.mock_db.query.return_value = self.mock_query
         
+        # Rôle de test
+        self.test_role = Role(id=1, name="employees")
+
         # Utilisateur de test
         self.test_user = User(
             id=1,
@@ -29,7 +32,8 @@ class TestUserService:
             phone_number="0102030405",
             email="test@example.com",
             password="hashed_password",
-            isAdmin=False,
+            role_id=self.test_role.id,
+            role=self.test_role,
             created_at=datetime(2024, 1, 1),
             updated_at=datetime(2024, 1, 1)
         )
@@ -136,13 +140,15 @@ class TestUserService:
         mock_datetime.now.return_value = datetime(2024, 1, 1)
         mock_hash.return_value = "hashed_password"
         self.mock_query.filter.return_value.first.return_value = None  # Pas d'utilisateur existant
+        self.mock_db.query.return_value.filter.return_value.first.return_value = self.test_role # Simule la recherche du rôle
         
         user_data = UserSchema(
             first_name="new",
             last_name="user",
             phone_number="0601020304",
             email="new@example.com",
-            password="password123"
+            password="password123", 
+            role_name=RoleNameEnum.EMPLOYEES
         )
         
         # Act
@@ -163,7 +169,8 @@ class TestUserService:
             first_name="test",
             last_name="user",
             email="test@example.com",
-            password="password123"
+            password="password123",
+            role_name=RoleNameEnum.EMPLOYEES
         )
         
         # Act & Assert
@@ -249,7 +256,8 @@ class TestUserService:
                         first_name="workflow",
                         last_name="user",
                         email="workflow@example.com",
-                        password="password123"
+                        password="password123",
+                        role_name=RoleNameEnum.EMPLOYEES
                     )
                     
                     create_user(self.mock_db, user_data)
