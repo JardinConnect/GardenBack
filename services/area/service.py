@@ -1,6 +1,7 @@
 from typing import List, Tuple, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from datetime import datetime, timedelta, date, timezone
 
 from . import schemas
 from db.models import Area as AreaModel, Analytic as AnalyticModel, AnalyticType
@@ -25,12 +26,12 @@ def _process_area_recursively(db: Session, area: AreaModel) -> Tuple[schemas.Are
     all_analytics: List[AnalyticModel] = []
     for cell in area.cells:
         for sensor in cell.sensors:
-            latest_analytic = db.query(AnalyticModel)\
-                .filter(AnalyticModel.sensor_id == sensor.id)\
-                .order_by(desc(AnalyticModel.occured_at))\
-                .first()
-            if latest_analytic:
-                all_analytics.append(latest_analytic)
+            # On ne prend que les analytiques des 7 derniers jours
+            seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+            analytics_for_sensor = db.query(AnalyticModel)\
+                .filter(AnalyticModel.sensor_id == sensor.id, AnalyticModel.occured_at >= seven_days_ago)\
+                .all()
+            all_analytics.extend(analytics_for_sensor)
 
     # 2. Traiter récursivement les sous-zones et agréger leurs données
     processed_sub_areas: List[schemas.Area] = []
@@ -41,21 +42,34 @@ def _process_area_recursively(db: Session, area: AreaModel) -> Tuple[schemas.Are
         all_analytics.extend(sub_area_analytics)
 
     # 3. Calculer les moyennes pour la zone actuelle (incluant tous les enfants)
-    analytics_average = None
+    analytics_average = []
     if all_analytics:
-        air_temps = [data.value for data in all_analytics if data.analytic_type == AnalyticType.AIR_TEMPERATURE]
-        soil_temps = [data.value for data in all_analytics if data.analytic_type == AnalyticType.SOIL_TEMPERATURE]
-        air_humids = [data.value for data in all_analytics if data.analytic_type == AnalyticType.AIR_HUMIDITY]
-        soil_humids = [data.value for data in all_analytics if data.analytic_type == AnalyticType.SOIL_HUMIDITY]
-        lights = [data.value for data in all_analytics if data.analytic_type == AnalyticType.LIGHT]
+        # Regrouper les analytiques par jour
+        analytics_by_day_and_type: dict[tuple[date, AnalyticType], list[float]] = {}
+        for analytic in all_analytics:
+            day = analytic.occured_at.date()
+            key = (day, analytic.analytic_type)
+            analytics_by_day_and_type.setdefault(key, []).append(analytic.value)
 
-        analytics_average = schemas.AnalyticsAverage(
-            air_temperature=sum(air_temps) / len(air_temps) if air_temps else None,
-            soil_temperature=sum(soil_temps) / len(soil_temps) if soil_temps else None,
-            air_humidity=sum(air_humids) / len(air_humids) if air_humids else None,
-            soil_humidity=sum(soil_humids) / len(soil_humids) if soil_humids else None,
-            light=sum(lights) / len(lights) if lights else None,
-        )
+        # Calculer la moyenne pour les 7 derniers jours
+        today = datetime.now(timezone.utc).date()
+        for i in range(7):
+            current_day = today - timedelta(days=i)
+            # Itérer sur tous les types d'analytiques possibles
+            for analytic_type in AnalyticType:
+                daily_values = analytics_by_day_and_type.get((current_day, analytic_type))
+
+                average_value = 0.0
+                if daily_values:
+                    average_value = sum(daily_values) / len(daily_values)
+
+                # Créer une instance de AnalyticSchema pour la moyenne de ce type pour ce jour.
+                daily_average_analytic = schemas.AnalyticSchema(
+                    analytic_type=analytic_type,
+                    value=average_value,
+                    occured_at=datetime.combine(current_day, datetime.min.time()),
+                )
+                analytics_average.append(daily_average_analytic)
 
     # 4. Construire l'objet schéma Pydantic final pour cette zone
     # Utiliser model_validate pour convertir l'objet ORM en modèle Pydantic

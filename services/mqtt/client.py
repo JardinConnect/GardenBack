@@ -60,10 +60,13 @@ def process_data_message(payload: str):
                     sensor_id=sensor_id # Le champ est déjà correct ici, mais on vérifie
                 )
                 
-                # On passe le sensor_id à la fonction de création
-                create_analytic_repo(db, analytic_data)
-                print(f"[MQTT] Donnée analytique créée: {analytic_data.model_dump_json()}")
-                
+                try:
+                    # On passe le sensor_id à la fonction de création
+                    create_analytic_repo(db, analytic_data)
+                    print(f"[MQTT] Donnée analytique créée: {analytic_data.model_dump_json()}")
+                except Exception as e_create:
+                    print(f"[MQTT] Erreur lors de la création de l'analytique pour {sensor_code}: {e_create}")
+
         finally:
             db.close()
 

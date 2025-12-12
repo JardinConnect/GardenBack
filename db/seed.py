@@ -229,6 +229,15 @@ def seed_user_spaces(db):
     print(f"    ✓ Sous-planche '{sous_planche_tomates_cerises.name}' (ID: {sous_planche_tomates_cerises.id})")
     print(f"    ✓ Sous-planche '{sous_planche_tomates_coeur.name}' (ID: {sous_planche_tomates_coeur.id})")
 
+    # === COMPTEURS POUR LES SENSOR_ID UNIQUES ===
+    sensor_counters = {
+        "TA": 1, "TS": 1, "HA": 1, "HS": 1, "L": 1, "B": 1
+    }
+    def get_sensor_id(prefix: str) -> str:
+        num = sensor_counters[prefix]
+        sensor_counters[prefix] += 1
+        return f"{prefix}-{num}"
+
     # === CELLULES ET CAPTEURS ===
     print("\n  📦 Création des cellules et capteurs...")
     
@@ -241,16 +250,19 @@ def seed_user_spaces(db):
                 {
                     "name": "Rangée A - Tomates Cerises",
                     "sensors": [
-                        {"sensor_id": "TC-A-TEMP-01", "type": "temperature"},
-                        {"sensor_id": "TC-A-HUM-01", "type": "humidity"},
-                        {"sensor_id": "TC-A-LIGHT-01", "type": "light"},
+                        {"prefix": "TA", "type": "air_temperature"},
+                        {"prefix": "HA", "type": "air_humidity"},
+                        {"prefix": "L", "type": "light"},
+                        {"prefix": "TS", "type": "soil_temperature"},
+                        {"prefix": "HS", "type": "soil_humidity"},
+                        {"prefix": "B", "type": "battery"},
                     ]
                 },
                 {
                     "name": "Rangée B - Tomates Cerises",
                     "sensors": [
-                        {"sensor_id": "TC-B-TEMP-01", "type": "temperature"},
-                        {"sensor_id": "TC-B-HUM-01", "type": "humidity"},
+                        {"prefix": "TA", "type": "air_temperature"},
+                        {"prefix": "HA", "type": "air_humidity"},
                     ]
                 }
             ]
@@ -262,8 +274,8 @@ def seed_user_spaces(db):
                 {
                     "name": "Rangée A - Coeur de Boeuf",
                     "sensors": [
-                        {"sensor_id": "CB-A-TEMP-01", "type": "temperature"},
-                        {"sensor_id": "CB-A-HUM-01", "type": "humidity"},
+                        {"prefix": "TA", "type": "air_temperature"},
+                        {"prefix": "HA", "type": "air_humidity"},
                     ]
                 }
             ]
@@ -275,14 +287,14 @@ def seed_user_spaces(db):
                 {
                     "name": "Section Laitues",
                     "sensors": [
-                        {"sensor_id": "SAL-L-TEMP-01", "type": "temperature"},
-                        {"sensor_id": "SAL-L-HUM-01", "type": "humidity"},
+                        {"prefix": "TA", "type": "air_temperature"},
+                        {"prefix": "HA", "type": "air_humidity"},
                     ]
                 },
                 {
                     "name": "Section Roquette",
                     "sensors": [
-                        {"sensor_id": "SAL-R-TEMP-01", "type": "temperature"},
+                        {"prefix": "TA", "type": "air_temperature"},
                     ]
                 }
             ]
@@ -294,8 +306,8 @@ def seed_user_spaces(db):
                 {
                     "name": "Carottes Nantaises",
                     "sensors": [
-                        {"sensor_id": "CAR-N-TEMP-01", "type": "temperature"},
-                        {"sensor_id": "CAR-N-HUM-01", "type": "humidity"},
+                        {"prefix": "TA", "type": "air_temperature"},
+                        {"prefix": "HA", "type": "air_humidity"},
                     ]
                 }
             ]
@@ -307,15 +319,15 @@ def seed_user_spaces(db):
                 {
                     "name": "Section Basilic",
                     "sensors": [
-                        {"sensor_id": "HER-B-TEMP-01", "type": "temperature"},
-                        {"sensor_id": "HER-B-HUM-01", "type": "humidity"},
-                        {"sensor_id": "HER-B-LIGHT-01", "type": "light"},
+                        {"prefix": "TA", "type": "air_temperature"},
+                        {"prefix": "HA", "type": "air_humidity"},
+                        {"prefix": "L", "type": "light"},
                     ]
                 },
                 {
                     "name": "Section Persil",
                     "sensors": [
-                        {"sensor_id": "HER-P-TEMP-01", "type": "temperature"},
+                        {"prefix": "TA", "type": "air_temperature"},
                     ]
                 }
             ]
@@ -427,7 +439,7 @@ def seed_alert_history(db):
             # Créer les capteurs de cette cellule
             for sensor_config in cell_config["sensors"]:
                 sensor = Sensor(
-                    sensor_id=sensor_config["sensor_id"],
+                    sensor_id=get_sensor_id(sensor_config["prefix"]),
                     sensor_type=sensor_config["type"],
                     status="active",
                     cell_id=cell.id
@@ -459,31 +471,41 @@ def seed_analytics(db):
     for sensor in sensors:
         print(f"  📡 Génération de données pour '{sensor.sensor_id}' ({sensor.sensor_type})...")
         
-        # Configuration selon le type de capteur
-        if sensor.sensor_type == "temperature":
+        # Déterminer le type d'analytique à partir du préfixe du sensor_id
+        try:
+            prefix = sensor.sensor_id.split('-')[0]
+            analytic_type = AnalyticType.from_prefix(prefix)
+        except (ValueError, IndexError):
+            print(f"  ⚠️  Impossible de déterminer le type d'analytique pour '{sensor.sensor_id}'. Utilisation de AIR_TEMPERATURE par défaut.")
             analytic_type = AnalyticType.AIR_TEMPERATURE
+
+        # Configuration de base selon le type d'analytique
+        if analytic_type in [AnalyticType.AIR_TEMPERATURE, AnalyticType.SOIL_TEMPERATURE]:
             base_value = 22.0
             amplitude = 6.0
             noise = 0.5
-        elif sensor.sensor_type == "humidity":
-            analytic_type = AnalyticType.AIR_HUMIDITY
+        elif analytic_type in [AnalyticType.AIR_HUMIDITY, AnalyticType.SOIL_HUMIDITY]:
             base_value = 65.0
             amplitude = -10.0  # Inverse de la température (quand il fait chaud, moins humide)
             noise = 2.0
-        elif sensor.sensor_type == "light":
-            analytic_type = AnalyticType.LIGHT
+        elif analytic_type == AnalyticType.LIGHT:
             base_value = 50.0
             amplitude = 40.0
             noise = 5.0
+        elif analytic_type == AnalyticType.BATTERY:
+            base_value = 95.0
+            amplitude = -5.0 # La batterie se décharge un peu
+            noise = 1.0
         else:
             continue
         
         # Générer les données pour chaque jour et chaque heure
+        # On génère des données pour aujourd'hui (day=0) et les 6 jours précédents.
         for day in range(total_days):
             for hour in range(24):
                 occured_at = datetime.now(UTC) - timedelta(days=day, hours=hour)
                 
-                # Simulation d'un cycle sinusoïdal sur 24h
+                # Simulation d'un cycle journalier (sinusoïdal) sur 24h
                 # Pic vers 14h, creux vers 4h du matin
                 hour_factor = 1 - ((hour - 14) / 12) ** 2
                 cycle_value = hour_factor + random.uniform(-0.1, 0.1)

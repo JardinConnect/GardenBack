@@ -62,6 +62,7 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> PaginatedAnalyticRes
     result: Dict[AnalyticType, List[AnalyticSchema]] = {}
     for value, occured_at, sensor_code, analytic_type in rows:
         analytic = AnalyticSchema(
+            analytic_type=analytic_type,
             value=value,
             occured_at=occured_at,
             sensorCode=sensor_code
@@ -98,6 +99,7 @@ def create_analytic(db: Session, analytic_input: AnalyticCreate) -> AnalyticSche
     db.refresh(db_analytic)
 
     return AnalyticSchema(
+        analytic_type=db_analytic.analytic_type,
         value=cast(float, db_analytic.value),
         occured_at=cast(datetime, db_analytic.occured_at),
         sensorCode=cast(str, db_analytic.sensor_code)
