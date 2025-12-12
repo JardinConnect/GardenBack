@@ -2,11 +2,9 @@ import time
 from unittest.mock import patch
 import paho.mqtt.client as mqtt
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from db.models import Base, Analytic, Area, Cell, Sensor, User, RefreshToken
+from db.models import Analytic, Area, Cell, Sensor
 from services.mqtt.client import process_data_message
- 
+
 BROKER = "localhost"
 PORT = 1883
 TOPIC = "test/topic"
@@ -25,20 +23,6 @@ def subscriber():
     client.on_message = on_message
     client.connect(BROKER, PORT, 60)
     client.loop_forever()
-
-
-@pytest.fixture(scope="function")
-def db_session():
-    """Crée une base de données SQLite en mémoire pour un test."""
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine) # Crée toutes les tables
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    yield session
-    session.close()
-    Base.metadata.drop_all(engine)
-    engine.dispose()
-
 
 def publisher():
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)

@@ -1,8 +1,8 @@
 """Initial database schema
 
-Revision ID: 0fb40211b935
+Revision ID: 21c007cd2b75
 Revises: 
-Create Date: 2025-12-12 15:35:12.512228
+Create Date: 2025-12-12 16:24:24.100073
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '0fb40211b935'
+revision: str = '21c007cd2b75'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -36,21 +36,14 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_areas_id'), ['id'], unique=False)
         batch_op.create_index(batch_op.f('ix_areas_name'), ['name'], unique=False)
 
-    op.create_table('users',
+    op.create_table('roles',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('first_name', sa.String(), nullable=False),
-    sa.Column('last_name', sa.String(), nullable=False),
-    sa.Column('phone_number', sa.String(), nullable=True),
-    sa.Column('email', sa.String(), nullable=False),
-    sa.Column('password', sa.String(), nullable=False),
-    sa.Column('isAdmin', sa.Boolean(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.Column('updated_at', sa.DateTime(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.Column('name', sa.String(), nullable=False),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('name')
     )
-    with op.batch_alter_table('users', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_users_email'), ['email'], unique=True)
-        batch_op.create_index(batch_op.f('ix_users_id'), ['id'], unique=False)
+    with op.batch_alter_table('roles', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_roles_id'), ['id'], unique=False)
 
     op.create_table('cells',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -63,6 +56,23 @@ def upgrade() -> None:
     )
     with op.batch_alter_table('cells', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_cells_id'), ['id'], unique=False)
+
+    op.create_table('users',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('first_name', sa.String(), nullable=False),
+    sa.Column('last_name', sa.String(), nullable=False),
+    sa.Column('phone_number', sa.String(), nullable=True),
+    sa.Column('email', sa.String(), nullable=False),
+    sa.Column('password', sa.String(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.Column('role_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['role_id'], ['roles.id'], name=op.f('fk_users_role_id_roles')),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('users', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_users_email'), ['email'], unique=True)
+        batch_op.create_index(batch_op.f('ix_users_id'), ['id'], unique=False)
 
     op.create_table('refresh_tokens',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -128,15 +138,19 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_refresh_tokens_id'))
 
     op.drop_table('refresh_tokens')
-    with op.batch_alter_table('cells', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_cells_id'))
-
-    op.drop_table('cells')
     with op.batch_alter_table('users', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_users_id'))
         batch_op.drop_index(batch_op.f('ix_users_email'))
 
     op.drop_table('users')
+    with op.batch_alter_table('cells', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_cells_id'))
+
+    op.drop_table('cells')
+    with op.batch_alter_table('roles', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_roles_id'))
+
+    op.drop_table('roles')
     with op.batch_alter_table('areas', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_areas_name'))
         batch_op.drop_index(batch_op.f('ix_areas_id'))

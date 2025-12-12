@@ -1,22 +1,43 @@
-🚀 GardenBack - Le Cœur de JardinConnect
+🚀 GardenBack - JardinConnect
 =========================================
 
-> Bienvenue dans le backend de JardinConnect ! 🌱 Ce projet, propulsé par FastAPI, est le moteur qui gère les données de vos jardins connectés. Ce guide vous aidera à vous lancer en un rien de temps.
+> Bienvenue dans le backend de JardinConnect ! 🌱 Ce projet, propulsé par FastAPI, est le moteur qui gère les données de vos jardins connectés, la communication avec les capteurs et l'authentification des utilisateurs.
 
 ## 📋 Sommaire
-- [✨ Fonctionnalités](#-fonctionnalités)
+- [✨ Vue d'ensemble](#-vue-densemble)
+- [🛠️ Technologies Utilisées](#️-technologies-utilisées)
 - [🏁 Pour commencer](#-pour-commencer)
 - [🧑‍💻 Workflow de développement](#-workflow-de-développement)
-- [🗄️ Base de Données](#-base-de-données)
+- [ Authentification (JWT)](#-authentification-jwt)
+- [📡 Communication MQTT](#-communication-mqtt)
+- [️ Schéma de la Base de Données](#-schéma-de-la-base-de-données)
 - [🧪 Tests](#-tests)
+- [⚙️ Configuration](#️-configuration)
 - [❓ Aide](#-aide)
 
-## ✨ Fonctionnalités
-- API RESTful moderne avec **FastAPI**.
-- Base de données **SQLite** avec gestion des migrations via **Alembic**.
-- Intégration **MQTT** pour la communication en temps réel avec les capteurs.
-- Environnement de développement conteneurisé avec **Docker**.
-- Tâches de projet simplifiées grâce à un **Makefile**.
+## ✨ Vue d'ensemble
+
+GardenBack est une API RESTful moderne conçue pour être performante, facile à utiliser et à maintenir. Ses responsabilités principales sont :
+
+- **Gestion des Données :** CRUD pour les utilisateurs, les zones de jardin, les cellules et les capteurs.
+- **Agrégation d'Analytiques :** Collecte et traitement des données envoyées par les capteurs pour fournir des moyennes et des historiques.
+- **Communication en Temps Réel :** Utilisation du protocole MQTT pour recevoir les données des capteurs de manière asynchrone.
+- **Authentification Sécurisée :** Système basé sur les tokens JWT pour protéger les routes de l'API.
+- **Environnement Isolé :** Entièrement conteneurisé avec Docker pour une mise en place et un déploiement simplifiés.
+
+## 🛠️ Technologies Utilisées
+
+Ce projet s'appuie sur un ensemble d'outils modernes et robustes :
+
+- **[FastAPI](https://fastapi.tiangolo.com/)**: Framework web asynchrone pour construire des API performantes avec une validation de données automatique basée sur les types Python.
+- **[SQLAlchemy](https://www.sqlalchemy.org/)**: ORM (Object-Relational Mapper) qui fournit une boîte à outils SQL complète pour interagir avec la base de données de manière pythonique.
+- **[Alembic](https://alembic.sqlalchemy.org/)**: Outil de migration de base de données pour SQLAlchemy, permettant de gérer l'évolution du schéma de manière versionnée.
+- **[Pydantic](https://docs.pydantic.dev/)**: Bibliothèque de validation de données qui utilise les annotations de type Python pour garantir la conformité des données entrantes et sortantes.
+- **[PyJWT](https://pyjwt.readthedocs.io/)**: Pour l'encodage et le décodage des JSON Web Tokens (JWT) utilisés dans le système d'authentification.
+- **[Paho-MQTT](https://pypi.org/project/paho-mqtt/)**: Client MQTT pour Python, utilisé pour s'abonner aux topics et recevoir les messages des capteurs.
+- **[Docker & Docker Compose](https://www.docker.com/)**: Pour créer des environnements de développement et de production reproductibles et isolés.
+- **[Pytest](https://docs.pytest.org/)**: Framework de test pour écrire des tests simples et maintenables.
+- **[Makefile](https://www.gnu.org/software/make/)**: Pour automatiser les tâches courantes de développement (installation, tests, gestion des conteneurs, etc.).
 
 ## 🏁 Pour commencer
 
