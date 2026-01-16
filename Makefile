@@ -28,22 +28,29 @@ PYTEST_CMD = $(PYTHON_BIN) -m pytest
 # --- Aide ---
 help:
 	@echo ""
-	@echo "Commandes de test :$(NO_COLOR)"
-	@echo "  $(RED)make test$(NO_COLOR)            - Exécute tous les tests"
-	@echo "  $(PURPLE)make test-coverage$(NO_COLOR)   - Exécute les tests avec couverture de code"
-
+	@echo "Commandes disponibles pour le projet GardenBack :"
 	@echo ""
-	@echo "Commandes Alembic (Migrations de Base de Données) :$(NO_COLOR)"
-	@echo "  $(CYAN)make generate-migration MESSAGE=\"titre\"$(NO_COLOR) - Génère une nouvelle migration Alembic"
-	@echo "  $(GREEN)make upgrade$(NO_COLOR)         - Applique les migrations jusqu'à 'head'"
-	@echo "  $(YELLOW)make downgrade$(NO_COLOR)      - Annule la dernière migration"
-	@echo "  $(BLUE)make history$(NO_COLOR)          - Affiche l'historique des migrations"
-
+	@echo "  $(PURPLE)--- Gestion de l'environnement ---$(NO_COLOR)"
+	@echo "  $(GREEN)make install$(NO_COLOR)         - Crée l'environnement virtuel et installe les dépendances."
+	@echo "  $(RED)make clean$(NO_COLOR)           - Supprime l'environnement virtuel."
 	@echo ""
-	@echo "Commandes Docker :$(NO_COLOR)"
-	@echo "  $(GREEN)make up$(NO_COLOR)         	- Lancement de l'image docker backend "
-	@echo "  $(YELLOW)make up-seed$(NO_COLOR)       	- Lancement de l'image docker backend avec remplissage de bd (idéal pour un 1er lancement avec seed)"
-	@echo "  $(BLUE)make down$(NO_COLOR)          	- Stoppe et supprime les conteneurs, réseaux, volumes anonymes"
+	@echo "  $(CYAN)--- Migrations de Base de Données (Alembic) ---$(NO_COLOR)"
+	@echo "  $(CYAN)make generate-migration MESSAGE=\"...\"$(NO_COLOR) - Génère un nouveau fichier de migration."
+	@echo "  $(GREEN)make upgrade$(NO_COLOR)         - Applique toutes les migrations en attente."
+	@echo "  $(YELLOW)make downgrade$(NO_COLOR)      - Annule la dernière migration appliquée."
+	@echo "  $(BLUE)make history$(NO_COLOR)          - Affiche l'historique des migrations."
+	@echo "  $(RED)make delete-db$(NO_COLOR)       - Supprime le fichier de la base de données locale (database.db)."
+	@echo "  $(RED)make reset-db-history$(NO_COLOR) - (Avancé) Réinitialise l'historique sans toucher aux tables."
+	@echo ""
+	@echo "  $(PURPLE)--- Tests ---$(NO_COLOR)"
+	@echo "  $(GREEN)make test$(NO_COLOR)            - Lance la suite de tests complète."
+	@echo "  $(GREEN)make test-coverage$(NO_COLOR)   - Lance les tests et génère un rapport de couverture."
+	@echo ""
+	@echo "  $(BLUE)--- Docker ---$(NO_COLOR)"
+	@echo "  $(BLUE)make up$(NO_COLOR)              - Démarre les services avec Docker Compose."
+	@echo "  $(YELLOW)make up-seed$(NO_COLOR)         - Démarre les services et remplit la base de données (seed)."
+	@echo "  $(RED)make down$(NO_COLOR)            - Arrête et supprime les conteneurs, réseaux et volumes."
+	@echo ""
 
 # --- Tests ---
 test:
@@ -87,6 +94,8 @@ up:
 
 up-seed:
 	@echo "🌱 $(YELLOW)Lancement avec seeding initial...$(NO_COLOR)"
+	# Étape 0 : Nettoyage de l'ancienne base de données pour repartir de zéro
+	$(MAKE) delete-db
 	# Étape 1 : appliquer les migrations
 	docker compose run --build --rm fastapi-backend sh -c "python -m alembic upgrade head"
 	# Étape 2 : exécuter le seed
@@ -100,6 +109,25 @@ down:
 	docker compose down --remove-orphans --rmi all
 	@echo "✅ $(GREEN)Tous les conteneurs ont été arrêtés et nettoyés.$(NO_COLOR)"
 
+delete-db:
+	$(MAKE) $(DELETE_DB_TARGET)
+
+delete-db-powershell:
+	@powershell -Command "\
+	if (Test-Path 'database.db') { \
+	    Remove-Item -Force 'database.db'; \
+	    Write-Host 'Fichier de base de données ''database.db'' supprimé.'; \
+	} else { \
+	    Write-Host 'Aucun fichier de base de données ''database.db'' trouvé.'; \
+	}"
+
+delete-db-unix:
+	@if [ -f "database.db" ]; then \
+		echo "🗑️  Suppression du fichier de base de données 'database.db'..."; \
+		rm -f database.db; \
+	else \
+		echo "ℹ️  Aucun fichier de base de données 'database.db' trouvé."; \
+	fi
 
 # -- CI --
 REQUIREMENTS_FILE = requirements.txt
@@ -109,11 +137,13 @@ TEST_TARGET := test-powershell
 INSTALL_TARGET := install-powershell
 CLEAN_TARGET := clean-powershell
 TESTCOVERAGE_TARGET := test-coverage-powershell
+DELETE_DB_TARGET := delete-db-powershell
 else
 TEST_TARGET := test-unix
 INSTALL_TARGET := install-unix
 CLEAN_TARGET := clean-unix
 TESTCOVERAGE_TARGET := test-coverage-unix
+DELETE_DB_TARGET := delete-db-unix
 endif
 
 

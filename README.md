@@ -1,68 +1,78 @@
-🚀 Backend du Projet
-====================
+🚀 GardenBack - Le Cœur de JardinConnect
+=========================================
 
-Bienvenue dans le backend de Garden Connect 🌱
-Ce service est construit avec **FastAPI** et utilise **SQLite** comme base de données, gérée par **Alembic** pour les migrations.
+> Bienvenue dans le backend de JardinConnect ! 🌱 Ce projet, propulsé par FastAPI, est le moteur qui gère les données de vos jardins connectés. Ce guide vous aidera à vous lancer en un rien de temps.
 
-Ce README vous guidera à travers les étapes de configuration et d’exécution du projet.
+## 📋 Sommaire
+- [✨ Fonctionnalités](#-fonctionnalités)
+- [🏁 Pour commencer](#-pour-commencer)
+- [🧑‍💻 Workflow de développement](#-workflow-de-développement)
+- [🗄️ Base de Données](#-base-de-données)
+- [🧪 Tests](#-tests)
+- [❓ Aide](#-aide)
 
-🛠️ Prérequis
----
+## ✨ Fonctionnalités
+- API RESTful moderne avec **FastAPI**.
+- Base de données **SQLite** avec gestion des migrations via **Alembic**.
+- Intégration **MQTT** pour la communication en temps réel avec les capteurs.
+- Environnement de développement conteneurisé avec **Docker**.
+- Tâches de projet simplifiées grâce à un **Makefile**.
 
-Assurez-vous d’avoir les éléments suivants installés :
+## 🏁 Pour commencer
 
-*   **Docker & Docker Compose**
+Suivez ces étapes pour lancer le projet pour la première fois.
 
-*   **Make** (généralement préinstallé sur Unix/macOS ; sous Windows, utilisez [Chocolatey](https://chocolatey.org/packages/make) ou [WSL](https://learn.microsoft.com/fr-fr/windows/wsl/install)).
+### 1. Prérequis
+Assurez-vous d'avoir installé :
+- [Docker](https://www.docker.com/get-started) & Docker Compose
+- `make` (généralement préinstallé sur macOS/Linux)
 
-⚙️ Installation & Lancement
----
+### 2. Installation
+```bash
+# 1. Clonez le dépôt
+git clone git@github.com:JardinConnect/GardenBack.git
+cd GardenBack
 
-1. Clonez le projet
+# 2. Créez votre fichier d'environnement
+#    (pas besoin de le modifier pour un démarrage rapide)
+cp .env.example .env
 
-    `git clone git@github.com:JardinConnect/GardenBack.git`
-    
-    `cd GardenBack`
+# 3. Lancez tout avec une seule commande !
+make up-seed
+```
+Cette commande (`make up-seed`) va :
+1.  🗑️ Nettoyer l'ancienne base de données locale (si elle existe).
+2.  🏗️ Construire les images Docker.
+3.  ⬆️ Appliquer les migrations de la base de données.
+4.  🌱 Remplir la base de données avec des données de test (seed).
+5.  🚀 Démarrer l'application et les services.
 
+### 3. C'est prêt !
+Votre environnement est maintenant en ligne :
+- **API & Documentation (Swagger)**: http://localhost:8000/docs
+- **Documentation alternative (ReDoc)**: http://localhost:8000/redoc
 
-2. Configurez vos variables d’environnement
+## 🧑‍💻 Workflow de développement
 
-    `cp .env.example .env`
+### Commandes quotidiennes
+- **Démarrer** les services : `make up`
+- **Arrêter** les services et nettoyer : `make down`
+- **Voir les logs** en direct : `docker-compose logs -f fastapi-backend`
 
+### Gestion de la base de données (Migrations)
+Quand vous modifiez les modèles dans `db/models.py`, suivez ce processus :
+1.  **Générez un nouveau fichier de migration** :
+    ```bash
+    make generate-migration MESSAGE="Ajout du champ 'is_active' à User"
+    ```
+2.  **Appliquez la migration**. C'est automatique ! La prochaine fois que vous ferez `make up` ou `make up-seed`, Alembic appliquera les nouvelles migrations.
 
-3. Lancez le projet avec Docker :
+Pour des opérations plus avancées :
+- **Annuler la dernière migration** : `make downgrade`
+- **Voir l'historique** : `make history`
 
-    `docker-compose up --build`
-
-
-Le serveur sera disponible sur :
-
-API : http://localhost:8000
-
-Documentation Swagger : http://localhost:8000/docs
-
-🐳 Docker – Commandes utiles
----
-
-### Développement
-`docker-compose up --build`
-
-### Production
-`docker-compose --profile production up -d fastapi-backend-prod`
-
-### Logs
-`docker-compose logs -f`
-
-### Arrêter
-`docker-compose down`
-
-### Shell dans le conteneur
-`docker-compose exec fastapi-backend bash`
-
-�️ Schéma de la Base de Données
----
-
-Voici un aperçu de la structure de la base de données, représentée avec Mermaid.
+## 🗄️ Schéma de la Base de Données
+Voici un aperçu de la structure de nos tables.
 
 ```mermaid
 erDiagram
@@ -72,7 +82,6 @@ erDiagram
         string hashed_password
         string role
     }
-
     Area {
         int id PK
         string name
@@ -80,20 +89,17 @@ erDiagram
         int parent_id FK "Référence à elle-même (self-reference)"
         int level
     }
-
     Cell {
         int id PK
         string name
         int area_id FK
     }
-
     Sensor {
         int id PK
         string sensor_id "ID unique du capteur physique"
         string sensor_type
         int cell_id FK
     }
-
     Analytic {
         int id PK
         float value
@@ -101,7 +107,6 @@ erDiagram
         string analytic_type "Enum"
         int sensor_id FK
     }
-
     Area ||--o{ Area : "contient (parent/enfant)"
     Area ||--o{ Cell : "contient"
     Cell ||--o{ Sensor : "contient"

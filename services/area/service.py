@@ -3,8 +3,41 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, date, timezone
 
 from . import schemas
+from .errors import ParentAreaNotFoundError
 from db.models import Area as AreaModel, Analytic as AnalyticModel, AnalyticType
 
+
+def create_area(db: Session, area_data: schemas.AreaCreate) -> schemas.Area:
+    """
+    Crée une nouvelle zone (Area) dans la base de données.
+
+    - Si un `parent_id` est fourni, la nouvelle zone devient un enfant de cette zone parente
+      et son niveau hiérarchique est calculé en conséquence.
+    - Si aucun `parent_id` n'est fourni, la zone est créée au niveau racine (niveau 1).
+    - Lève une `ParentAreaNotFoundError` si le `parent_id` ne correspond à aucune zone existante.
+    """
+    level = 1
+    if area_data.parent_id:
+        parent_area = db.query(AreaModel).filter(AreaModel.id == area_data.parent_id).first()
+        if not parent_area:
+            raise ParentAreaNotFoundError
+        level = parent_area.level + 1
+
+    db_area = AreaModel(**area_data.model_dump(), level=level)
+    db.add(db_area)
+    db.commit()
+    db.refresh(db_area)
+
+    # Une nouvelle zone n'a pas encore d'enfants, de cellules ou d'historique analytique.
+    # On retourne un schéma Area complet mais vide pour la cohérence de l'API.
+    return schemas.Area(
+        id=db_area.id,
+        name=db_area.name,
+        color=db_area.color,
+        areas=[],
+        cells=[],
+        analytics={analytic_type: [] for analytic_type in AnalyticType}
+    )
 
 def _process_area_recursively(db: Session, area: AreaModel) -> Tuple[schemas.Area, List[AnalyticModel]]:
     """

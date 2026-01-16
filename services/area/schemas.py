@@ -10,6 +10,11 @@ class Cell(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class AreaCreate(BaseModel):
+    name: str
+    color: Optional[str] = None
+    parent_id: Optional[int] = Field(default=None, gt=0)
+
 class Area(BaseModel):
     id: int
     name: str
