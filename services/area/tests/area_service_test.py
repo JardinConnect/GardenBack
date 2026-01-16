@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, UTC
 
 from fastapi import HTTPException
 from db.models import Area as AreaModel, Cell as CellModel, Sensor as SensorModel, Analytic as AnalyticModel, AnalyticType
-from services.area.service import get_area_with_analytics, create_area, delete_area
+from services.area.service import get_area_with_analytics, create_area, delete_area, _get_analytics_for_area, _calculate_daily_averages
 from services.area.schemas import AreaCreate
 from services.area.errors import ParentAreaNotFoundError, AreaNotFoundError
 
@@ -144,6 +144,87 @@ def test_delete_area_with_hierarchy(db_session):
     # Vérifie que toutes les cellules ont bien leur area_id à None
     assert db_session.query(CellModel).filter(CellModel.area_id != None).count() == 0
 
+
+# === Tests for Helper Functions (_get_analytics_for_area, _calculate_daily_averages) ===
+
+def test_get_analytics_for_area_success(db_session):
+    """Vérifie que la fonction récupère bien les analytiques des 7 derniers jours."""
+    # Arrange
+    area = AreaModel(name="Test Area")
+    cell = CellModel(name="Test Cell", area=area)
+    sensor = SensorModel(sensor_id="S1", sensor_type="temp", cell=cell)
+    db_session.add_all([area, cell, sensor])
+    db_session.commit()
+
+    now = datetime.now(UTC)
+    analytic_recent = AnalyticModel(sensor_id=sensor.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=25, occured_at=now - timedelta(days=1), sensor_code="S1")
+    analytic_old = AnalyticModel(sensor_id=sensor.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=10, occured_at=now - timedelta(days=8), sensor_code="S1")
+    db_session.add_all([analytic_recent, analytic_old])
+    db_session.commit()
+
+    # Act
+    result = _get_analytics_for_area(db_session, area)
+
+    # Assert
+    assert len(result) == 1
+    assert result[0].id == analytic_recent.id
+    assert result[0].value == 25
+
+def test_get_analytics_for_area_no_sensors(db_session):
+    """Vérifie que la fonction retourne une liste vide si la zone n'a pas de capteurs."""
+    # Arrange
+    area = AreaModel(name="Empty Area")
+    db_session.add(area)
+    db_session.commit()
+
+    # Act
+    result = _get_analytics_for_area(db_session, area)
+
+    # Assert
+    assert result == []
+
+def test_calculate_daily_averages_basic():
+    """Vérifie le calcul de base des moyennes journalières."""
+    # Arrange
+    now = datetime.now(UTC)
+    analytics = [
+        AnalyticModel(analytic_type=AnalyticType.AIR_TEMPERATURE, value=20, occured_at=now),
+        AnalyticModel(analytic_type=AnalyticType.AIR_TEMPERATURE, value=30, occured_at=now),
+        AnalyticModel(analytic_type=AnalyticType.AIR_HUMIDITY, value=60, occured_at=now - timedelta(days=1)),
+    ]
+
+    # Act
+    result = _calculate_daily_averages(analytics)
+
+    # Assert
+    assert AnalyticType.AIR_TEMPERATURE in result
+    assert len(result[AnalyticType.AIR_TEMPERATURE]) == 7
+
+    today_avg_temp = next((a.value for a in result[AnalyticType.AIR_TEMPERATURE] if a.occured_at.date() == now.date()), None)
+    assert today_avg_temp == 25.0
+
+    yesterday_avg_hum = next((a.value for a in result[AnalyticType.AIR_HUMIDITY] if a.occured_at.date() == (now - timedelta(days=1)).date()), None)
+    assert yesterday_avg_hum == 60.0
+
+    two_days_ago_avg_temp = next((a.value for a in result[AnalyticType.AIR_TEMPERATURE] if a.occured_at.date() == (now - timedelta(days=2)).date()), None)
+    assert two_days_ago_avg_temp == 0.0
+
+def test_calculate_daily_averages_empty_input():
+    """Vérifie que la fonction gère une liste d'analytiques vide."""
+    result = _calculate_daily_averages([])
+    for analytic_type in AnalyticType:
+        assert len(result[analytic_type]) == 7
+        assert all(avg.value == 0.0 for avg in result[analytic_type])
+
+def test_calculate_daily_averages_rounding():
+    """Vérifie que les valeurs moyennes sont bien arrondies à 2 décimales."""
+    now = datetime.now(UTC)
+    analytics = [AnalyticModel(analytic_type=AnalyticType.LIGHT, value=v, occured_at=now) for v in [10, 15, 12]] # Moyenne = 12.333...
+
+    result = _calculate_daily_averages(analytics)
+
+    today_avg_light = next((a.value for a in result[AnalyticType.LIGHT] if a.occured_at.date() == now.date()), None)
+    assert today_avg_light == 12.33
 
 # === Tests for get_area_with_analytics ===
 

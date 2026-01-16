@@ -139,9 +139,22 @@ class TestUserService:
         # Arrange
         mock_datetime.now.return_value = datetime(2024, 1, 1)
         mock_hash.return_value = "hashed_password"
-        self.mock_query.filter.return_value.first.return_value = None  # Pas d'utilisateur existant
-        self.mock_db.query.return_value.filter.return_value.first.return_value = self.test_role # Simule la recherche du rôle
-        
+
+        # Configurer des mocks distincts pour chaque requête
+        mock_user_query = Mock()
+        mock_user_query.filter.return_value.first.return_value = None  # Pour la vérification de l'existence de l'utilisateur
+
+        mock_role_query = Mock()
+        mock_role_query.filter.return_value.first.return_value = self.test_role # Pour la récupération du rôle
+
+        def query_side_effect(model):
+            if model is User:
+                return mock_user_query
+            if model is Role:
+                return mock_role_query
+            return Mock()
+        self.mock_db.query.side_effect = query_side_effect
+
         user_data = UserSchema(
             first_name="new",
             last_name="user",
@@ -250,8 +263,21 @@ class TestUserService:
                 with patch('services.user.repository.datetime') as mock_dt:
                     mock_dt.now.return_value = datetime(2024, 1, 1)
                     
-                    # 1. Créer un utilisateur
-                    self.mock_query.filter.return_value.first.return_value = None
+                    # --- Étape 1: Créer un utilisateur ---
+                    # Configurer les mocks pour l'appel à create_user
+                    mock_user_create_query = Mock()
+                    mock_user_create_query.filter.return_value.first.return_value = None # L'utilisateur n'existe pas encore
+                    mock_role_query = Mock()
+                    mock_role_query.filter.return_value.first.return_value = self.test_role # Le rôle existe
+
+                    def create_side_effect(model):
+                        if model is User:
+                            return mock_user_create_query
+                        if model is Role:
+                            return mock_role_query
+                        return Mock()
+                    self.mock_db.query.side_effect = create_side_effect
+
                     user_data = UserSchema(
                         first_name="workflow",
                         last_name="user",
@@ -259,11 +285,14 @@ class TestUserService:
                         password="password123",
                         role_name=RoleNameEnum.EMPLOYEES
                     )
-                    
                     create_user(self.mock_db, user_data)
                     
-                    # 2. Vérifier l'utilisateur
-                    self.mock_query.filter.return_value.first.return_value = self.test_user
+                    # --- Étape 2: Vérifier l'utilisateur ---
+                    # Reconfigurer les mocks pour l'appel à check_user
+                    mock_user_check_query = Mock()
+                    mock_user_check_query.filter.return_value.first.return_value = self.test_user # L'utilisateur existe maintenant
+                    self.mock_db.query.side_effect = lambda model: mock_user_check_query if model is User else Mock()
+
                     login_data = UserLoginSchema(
                         email="workflow@example.com",
                         password="password123"

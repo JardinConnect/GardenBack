@@ -12,6 +12,7 @@ from services.lora_gpio.router import router as lora_router
 from services.area.router import router as area_router
 from services.mqtt.router import router as mqtt_router
 from services.user.router import router as user_router
+from services.farm_state.router import router as farm_state_router
 
 # Import du client MQTT
 from services.mqtt.client import connect_mqtt
@@ -53,6 +54,11 @@ app.include_router(lora_router, prefix="/lora", tags=["Lora GPIO"])
 app.include_router(area_router, prefix="/area", tags=["Area"])
 app.include_router(mqtt_router, tags=["MQTT"])
 app.include_router(user_router, tags=["User"])
+app.include_router(
+    farm_state_router,
+    prefix="/farm-stats",
+    tags=["Farm Stats"],
+)
 
 
 # Config OpenAPI
