@@ -3,9 +3,9 @@ from datetime import datetime, timedelta, UTC
 
 from fastapi import HTTPException
 from db.models import Area as AreaModel, Cell as CellModel, Sensor as SensorModel, Analytic as AnalyticModel, AnalyticType
-from services.area.service import get_area_with_analytics, create_area
+from services.area.service import get_area_with_analytics, create_area, delete_area
 from services.area.schemas import AreaCreate
-from services.area.errors import ParentAreaNotFoundError
+from services.area.errors import ParentAreaNotFoundError, AreaNotFoundError
 
 
 # === Tests for create_area ===
@@ -69,6 +69,80 @@ def test_create_area_with_nonexistent_parent_fails(db_session):
     # Vérifier qu'aucune zone n'a été ajoutée
     count = db_session.query(AreaModel).count()
     assert count == 0
+
+
+# === Tests for delete_area ===
+
+def test_delete_area_not_found(db_session):
+    """Vérifie qu'une erreur est levée lors de la suppression d'une zone inexistante."""
+    with pytest.raises(HTTPException) as exc_info:
+        delete_area(db_session, 999)
+
+    assert exc_info.value.status_code == AreaNotFoundError.status_code
+    assert exc_info.value.detail == AreaNotFoundError.detail
+
+
+def test_delete_area_single_with_cell(db_session):
+    """Vérifie la suppression d'une zone unique et le détachement de sa cellule."""
+    # Arrange
+    area = AreaModel(name="Area to delete")
+    db_session.add(area)
+    db_session.commit()
+
+    cell = CellModel(name="Cell to detach", area_id=area.id)
+    db_session.add(cell)
+    db_session.commit()
+
+    area_id = area.id
+    cell_id = cell.id
+
+    # Act
+    delete_area(db_session, area_id)
+
+    # Assert
+    # Vérifier que la zone a été supprimée
+    deleted_area = db_session.query(AreaModel).filter(AreaModel.id == area_id).first()
+    assert deleted_area is None
+
+    # Vérifier que la cellule existe toujours mais est détachée
+    detached_cell = db_session.query(CellModel).filter(CellModel.id == cell_id).first()
+    assert detached_cell is not None
+    assert detached_cell.area_id is None
+    assert detached_cell.name == "Cell to detach"
+
+
+def test_delete_area_with_hierarchy(db_session):
+    """
+    Vérifie la suppression d'une zone parente, de ses enfants,
+    et le détachement de toutes les cellules associées.
+    """
+    # Arrange
+    # Structure: Parent -> Child
+    parent = AreaModel(name="Parent", level=1)
+    db_session.add(parent)
+    db_session.commit()
+
+    child = AreaModel(name="Child", level=2, parent_id=parent.id)
+    db_session.add(child)
+    db_session.commit()
+
+    # Cellules attachées à chaque niveau
+    cell_parent = CellModel(name="Cell Parent", area_id=parent.id)
+    cell_child = CellModel(name="Cell Child", area_id=child.id)
+    db_session.add_all([cell_parent, cell_child])
+    db_session.commit()
+
+    parent_id = parent.id
+
+    # Act: Supprimer la zone parente
+    delete_area(db_session, parent_id)
+
+    # Assert
+    assert db_session.query(AreaModel).count() == 0
+    assert db_session.query(CellModel).count() == 2
+
+    # Vérifie que toutes les cellules ont bien leur area_id à None
+    assert db_session.query(CellModel).filter(CellModel.area_id != None).count() == 0
 
 
 # === Tests for get_area_with_analytics ===

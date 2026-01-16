@@ -70,11 +70,11 @@ class Area(Base):
     if TYPE_CHECKING:
         parent: Mapped[Optional["Area"]] = relationship("Area", remote_side=[id], back_populates="children")
         children: Mapped[List["Area"]] = relationship("Area", back_populates="parent")
-        cells: Mapped[List["Cell"]] = relationship("Cell", back_populates="area", cascade="all, delete-orphan")
+        cells: Mapped[List["Cell"]] = relationship("Cell", back_populates="area")
     else:
         parent = relationship("Area", remote_side=[id], back_populates="children")
         children = relationship("Area", back_populates="parent")
-        cells = relationship("Cell", back_populates="area", cascade="all, delete-orphan")
+        cells = relationship("Cell", back_populates="area")
 
 
 # =========================================================
@@ -89,7 +89,7 @@ class Cell(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     # Relation vers l'area parent
-    area_id: Mapped[int] = mapped_column(Integer, ForeignKey("areas.id"), nullable=False)
+    area_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("areas.id"), nullable=True)
 
     # Relations
     if TYPE_CHECKING:

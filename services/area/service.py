@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, date, timezone
 
 from . import schemas
-from .errors import ParentAreaNotFoundError
+from .errors import ParentAreaNotFoundError, AreaNotFoundError
 from db.models import Area as AreaModel, Analytic as AnalyticModel, AnalyticType
 
 
@@ -38,6 +38,47 @@ def create_area(db: Session, area_data: schemas.AreaCreate) -> schemas.Area:
         cells=[],
         analytics={analytic_type: [] for analytic_type in AnalyticType}
     )
+
+
+def delete_area(db: Session, area_id: int) -> None:
+    """
+    Supprime une zone et toutes ses sous-zones de manière récursive.
+
+    - Conforme à la demande: les cellules attachées aux zones supprimées
+      ne sont pas supprimées, mais leur `area_id` est mis à None.
+    - Lève une `AreaNotFoundError` si l'ID de la zone n'existe pas.
+    """
+    area_to_delete = db.query(AreaModel).filter(AreaModel.id == area_id).first()
+    if not area_to_delete:
+        raise AreaNotFoundError
+
+    # 1. Collecter la zone principale et toutes ses descendantes (parcours en largeur)
+    areas_to_delete = []
+    queue = [area_to_delete]
+    while queue:
+        current_area = queue.pop(0)
+        areas_to_delete.append(current_area)
+        # On charge explicitement les enfants pour le parcours
+        db.refresh(current_area, ['children'])
+        queue.extend(current_area.children)
+
+    # 2. Détacher toutes les cellules de toutes les zones à supprimer
+    for area in areas_to_delete:
+        # On charge explicitement les cellules pour les détacher
+        db.refresh(area, ['cells'])
+        for cell in area.cells:
+            cell.area_id = None
+    
+    # Le flush permet d'envoyer les UPDATE (cell.area_id = None) à la DB
+    # avant les DELETE, pour éviter les conflits de contraintes.
+    db.flush()
+
+    # 3. Supprimer les zones en partant des plus profondes (ordre inverse de la collecte)
+    for area in reversed(areas_to_delete):
+        db.delete(area)
+
+    db.commit()
+
 
 def _process_area_recursively(db: Session, area: AreaModel) -> Tuple[schemas.Area, List[AnalyticModel]]:
     """
