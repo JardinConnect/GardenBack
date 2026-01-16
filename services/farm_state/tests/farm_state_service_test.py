@@ -34,7 +34,6 @@ def test_get_farm_stats_repository_error(mock_get_counts):
     with pytest.raises(HTTPException) as exc_info:
         get_farm_stats(mock_db)
 
-    assert exc_info.value.status_code == FarmStatsError.status_code
-    assert exc_info.value.detail == FarmStatsError.detail
+    assert exc_info.value == FarmStatsError
 
     mock_get_counts.assert_called_once_with(mock_db)
