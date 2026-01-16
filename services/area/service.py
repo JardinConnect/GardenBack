@@ -44,8 +44,7 @@ def delete_area(db: Session, area_id: int) -> None:
     """
     Supprime une zone et toutes ses sous-zones de manière récursive.
 
-    - Conforme à la demande: les cellules attachées aux zones supprimées
-      ne sont pas supprimées, mais leur `area_id` est mis à None.
+    - les cellules attachées aux zones supprimées ne sont pas supprimées, mais leur `area_id` est mis à None
     - Lève une `AreaNotFoundError` si l'ID de la zone n'existe pas.
     """
     area_to_delete = db.query(AreaModel).filter(AreaModel.id == area_id).first()
