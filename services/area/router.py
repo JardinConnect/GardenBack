@@ -24,6 +24,21 @@ def create_area(
     return service.create_area(db, area_data)
 
 
+@router.delete("/{area_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(JWTBearer())])
+def delete_area(
+    area_id: int = Path(..., title="The ID of the area to delete", gt=0),
+    db: Session = Depends(get_db),
+) -> None:
+    """
+    Supprime une zone de jardin et toutes ses sous-zones.
+
+    - Les sous-zones sont supprimées en cascade.
+    - Les cellules qui étaient dans les zones supprimées ne sont PAS supprimées,
+      mais sont détachées (leur `area_id` devient `null`).
+    """
+    service.delete_area(db, area_id)
+    return None
+
 @router.get("/{area_id}", response_model=Area, dependencies=[Depends(JWTBearer())])
 def get_area(
     area_id: int = Path(..., title="The ID of the area to get", gt=0),
