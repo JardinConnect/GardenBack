@@ -1,8 +1,77 @@
+import pytest
 from datetime import datetime, timedelta, UTC
 
+from fastapi import HTTPException
 from db.models import Area as AreaModel, Cell as CellModel, Sensor as SensorModel, Analytic as AnalyticModel, AnalyticType
-from services.area.service import get_area_with_analytics
+from services.area.service import get_area_with_analytics, create_area
+from services.area.schemas import AreaCreate
+from services.area.errors import ParentAreaNotFoundError
 
+
+# === Tests for create_area ===
+
+def test_create_area_as_root_success(db_session):
+    """Vérifie la création réussie d'une zone racine."""
+    # Arrange
+    area_data = AreaCreate(name="Root Garden", color="#00FF00")
+
+    # Act
+    result = create_area(db_session, area_data)
+
+    # Assert
+    # Vérifier le schéma Pydantic retourné
+    assert result.id is not None
+    assert result.name == "Root Garden"
+    assert result.color == "#00FF00"
+    assert result.areas == []
+    assert result.cells == []
+
+    # Vérifier les données dans la base de données
+    db_area = db_session.query(AreaModel).filter(AreaModel.id == result.id).first()
+    assert db_area is not None
+    assert db_area.name == "Root Garden"
+    assert db_area.color == "#00FF00"
+    assert db_area.parent_id is None
+    assert db_area.level == 1
+
+def test_create_area_as_child_success(db_session):
+    """Vérifie la création réussie d'une zone enfant."""
+    # Arrange
+    parent_area = AreaModel(name="Parent Area", level=1)
+    db_session.add(parent_area)
+    db_session.commit()
+
+    area_data = AreaCreate(name="Child Area", color="#FFA500", parent_id=parent_area.id)
+
+    # Act
+    result = create_area(db_session, area_data)
+
+    # Assert
+    # Vérifier les données dans la base de données
+    db_area = db_session.query(AreaModel).filter(AreaModel.id == result.id).first()
+    assert db_area is not None
+    assert db_area.name == "Child Area"
+    assert db_area.parent_id == parent_area.id
+    assert db_area.level == 2
+
+def test_create_area_with_nonexistent_parent_fails(db_session):
+    """Vérifie qu'une erreur est levée si le parent n'existe pas."""
+    # Arrange
+    area_data = AreaCreate(name="Orphan Area", parent_id=999)
+
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        create_area(db_session, area_data)
+
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "Parent area not found"
+
+    # Vérifier qu'aucune zone n'a été ajoutée
+    count = db_session.query(AreaModel).count()
+    assert count == 0
+
+
+# === Tests for get_area_with_analytics ===
 
 def test_get_area_not_found(db_session):
     """
