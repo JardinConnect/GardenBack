@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID, UserNotFoundErrorEmail
-from db.models import User, Role
+from db.models import User, RoleEnum
 from services.user.schemas import UserLoginSchema, UserSchema, UserUpdate
 
 from services.auth.utils.security import get_password_hash, verify_password
@@ -44,12 +44,6 @@ def create_user(db: Session, user: UserSchema):
     if existing_user:
         raise UserAlreadyExistsError(user.email)
     
-    # Récupérer le rôle spécifié depuis la base de données
-    role = db.query(Role).filter(Role.name == user.role_name.value).first()
-    if not role:
-        # Gérer le cas où les rôles n'ont pas été seedés
-        raise Exception(f"Le rôle '{user.role_name.value}' n'a pas été trouvé. Veuillez lancer le seeding des rôles.")
-
     now = datetime.now()
 
     db_user = User(
@@ -58,7 +52,7 @@ def create_user(db: Session, user: UserSchema):
         phone_number=user.phone_number,
         email=user.email,
         password=get_password_hash(user.password),
-        role_id=role.id,
+        role=user.role_name,
         created_at=now,
         updated_at=now
     )

@@ -1,18 +1,14 @@
 import pytest
 from services.farm_state.repository import get_counts
-from db.models import User, Area, Cell, Role
+from db.models import User, Area, Cell, RoleEnum
 
 
 def test_get_counts_populated_db(db_session):
     """Vérifie que get_counts retourne les bons comptes pour une base de données remplie."""
     # Arrange
-    role = Role(name="test_role")
-    db_session.add(role)
-    db_session.commit()
-
     users = [
-        User(email="user1@test.com", password="pwd", role_id=role.id, first_name="f", last_name="l"),
-        User(email="user2@test.com", password="pwd", role_id=role.id, first_name="f", last_name="l"),
+        User(email="user1@test.com", password="pwd", role=RoleEnum.EMPLOYEES, first_name="f", last_name="l"),
+        User(email="user2@test.com", password="pwd", role=RoleEnum.EMPLOYEES, first_name="f", last_name="l"),
     ]
     areas = [Area(name="Area 1"), Area(name="Area 2"), Area(name="Area 3")]
     cells = [Cell(name="Cell 1"), Cell(name="Cell 2")]

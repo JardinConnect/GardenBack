@@ -2,8 +2,8 @@ import os
 import uuid
 from datetime import datetime, timedelta, UTC
 from sqlalchemy import create_engine, inspect 
-from sqlalchemy.orm import sessionmaker
-from models import AnalyticType, User, Area, Analytic, RefreshToken, Cell, Sensor, Role
+from sqlalchemy.orm import sessionmaker, Session
+from models import AnalyticType, User, Area, Analytic, RefreshToken, Cell, Sensor, RoleEnum
 import bcrypt
 import random
 
@@ -44,14 +44,9 @@ def seed():
         db.query(Sensor).delete()
         db.query(Cell).delete()
         db.query(Area).delete()
-        # On ne supprime pas les utilisateurs pour garder les comptes
-        # db.query(User).delete() 
+        db.query(User).delete() # On supprime les users pour repartir de zéro
         db.query(RefreshToken).delete()
-        db.query(Role).delete()
         db.commit()
-
-        # Seed des rôles (doit être fait avant les utilisateurs)
-        seed_roles(db)
 
         # Seed des utilisateurs
         seed_users(db)
@@ -75,33 +70,15 @@ def seed():
     finally:
         db.close()
 
-def seed_roles(db):
-    """Seed des rôles"""
-    print("\n👑 Seeding Rôles...")
-    roles = ["superadmin", "admin", "employees", "trainee"]
-    for role_name in roles:
-        existing_role = db.query(Role).filter_by(name=role_name).first()
-        if not existing_role:
-            role = Role(name=role_name)
-            db.add(role)
-            print(f"  ✓ Rôle '{role_name}' créé")
-        else:
-            print(f"  - Rôle '{role_name}' existe déjà, ignoré.")
-    db.commit()
-
-
-def seed_users(db):
+def seed_users(db: Session):
     """Seed des utilisateurs"""
     print("\n📋 Seeding Utilisateurs...")
     users_data = [
-        {"first_name": "Sam", "last_name": "Gardener", "phone_number": "0611223344", "email": "sam@garden.com", "password": "garden1", "isAdmin": False},
-        {"first_name": "Admin", "last_name": "Istrator", "phone_number": "0655667788", "email": "admin@garden.com", "password": "admin123", "isAdmin": True},
-        {"first_name": "Marie", "last_name": "Fleur", "phone_number": "0699887766", "email": "marie@garden.com", "password": "marie123", "isAdmin": False},
+        {"first_name": "Sam", "last_name": "Gardener", "phone_number": "0611223344", "email": "sam@garden.com", "password": "garden1", "role": RoleEnum.EMPLOYEES},
+        {"first_name": "Admin", "last_name": "Istrator", "phone_number": "0655667788", "email": "admin@garden.com", "password": "admin123", "role": RoleEnum.ADMIN},
+        {"first_name": "Marie", "last_name": "Fleur", "phone_number": "0699887766", "email": "marie@garden.com", "password": "marie123", "role": RoleEnum.EMPLOYEES},
+        {"first_name": "Super", "last_name": "Admin", "phone_number": "0600000000", "email": "superadmin@garden.com", "password": "superadmin123", "role": RoleEnum.SUPERADMIN},
     ]
-    
-    # Récupérer les objets Role depuis la DB
-    admin_role = db.query(Role).filter_by(name="admin").one()
-    employee_role = db.query(Role).filter_by(name="employees").one()
 
     for user_data in users_data:
         existing = db.query(User).filter_by(email=user_data["email"]).first()
@@ -113,7 +90,7 @@ def seed_users(db):
                 phone_number=user_data.get("phone_number"),
                 email=user_data["email"],
                 password=bcrypt.hashpw(password, bcrypt.gensalt()).decode('utf-8'),
-                role_id=admin_role.id if user_data["isAdmin"] else employee_role.id,
+                role=user_data["role"],
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC)
             )

@@ -3,10 +3,6 @@ from datetime import datetime
 from typing import Optional
 from enum import Enum
 
-class RoleSchema(BaseModel):
-    name: str
-    model_config = ConfigDict(from_attributes=True)
-
 class RoleNameEnum(str, Enum):
     SUPERADMIN = "superadmin"
     ADMIN = "admin"
@@ -68,7 +64,7 @@ class UserResponse(BaseModel):
     last_name: str
     phone_number: Optional[str] = None
     email: str
-    role: RoleSchema
+    role: RoleNameEnum
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
