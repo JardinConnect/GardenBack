@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+import uuid
 from sqlalchemy.orm import Session
 
 from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID, UserNotFoundErrorEmail
@@ -20,7 +21,7 @@ def check_user(db: Session, data: UserLoginSchema) -> Optional[User]:
     
     return None
 
-def get_user(db: Session, user_id: int):
+def get_user(db: Session, user_id: uuid.UUID):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise UserNotFoundErrorID(user_id)
@@ -66,7 +67,7 @@ def create_user(db: Session, user: UserSchema):
     return db_user
 
 
-def update_user(db: Session, user_id: int, user_data: UserUpdate) -> User:
+def update_user(db: Session, user_id: uuid.UUID, user_data: UserUpdate) -> User:
     """Met à jour un utilisateur existant."""
     db_user = get_user(db, user_id)  # Réutilise get_user pour gérer le cas "non trouvé"
 
@@ -82,7 +83,7 @@ def update_user(db: Session, user_id: int, user_data: UserUpdate) -> User:
     return db_user
 
 
-def delete_user(db: Session, user_id: int):
+def delete_user(db: Session, user_id: uuid.UUID):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise UserNotFoundErrorID(user_id)

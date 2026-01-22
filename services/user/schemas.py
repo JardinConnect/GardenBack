@@ -1,75 +1,42 @@
-from pydantic import BaseModel, EmailStr, ConfigDict, Field
-from datetime import datetime
+import uuid
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional
-from enum import Enum
+from db.models import RoleEnum
 
-class RoleEnum(str, Enum):
-    SUPERADMIN = "superadmin"
-    ADMIN = "admin"
-    EMPLOYEES = "employees"
-    TRAINEE = "trainee"
-
-class UserSchema(BaseModel):
-    first_name: str = Field(...)
-    last_name: str = Field(...)
-    phone_number: Optional[str] = None
-    email: EmailStr = Field(...)
-    password: str = Field(...)
-    role: RoleEnum = Field(..., description="Le nom du rôle (superadmin, admin, employees, trainee)")
-
-    model_config = ConfigDict(
-        json_schema_extra = {
-            "example": {
-                "first_name": "Sam",
-                "last_name": "Gardener",
-                "phone_number": "0612345678",
-                "email": "sam@x.com",
-                "password": "weakpassword",
-                "role": "employees"
-            }
-        }
-    )
-
+# Schema for user login
 class UserLoginSchema(BaseModel):
-    email: EmailStr = Field(...)
-    password: str = Field(...)
+    email: EmailStr
+    password: str
 
-    model_config = ConfigDict(
-        json_schema_extra = {
-            "example": {
-                "email": "admin@garden.com",
-                "password": "admin123"
-            }
-        }
-    )
+# This schema is used when creating a user. Password is required.
+# It was named UserCreate, renamed to UserSchema for consistency with imports.
+class UserSchema(BaseModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    password: str
+    phone_number: Optional[str] = None
+    role: RoleEnum = RoleEnum.EMPLOYEES
 
+# This schema is for updating a user. All fields are optional.
 class UserUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone_number: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[RoleEnum] = None
 
-    model_config = ConfigDict(
-        json_schema_extra = {
-            "example": {
-                "first_name": "John",
-                "last_name": "Cena",
-                "phone_number": "0687654321"
-            }
-        }
-    )
-
+# This schema is used when returning a user from the API. Password should not be included.
 class UserResponse(BaseModel):
-    id: int
+    id: uuid.UUID
     first_name: str
     last_name: str
+    email: EmailStr
     phone_number: Optional[str] = None
-    email: str
     role: RoleEnum
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
+# A generic message response for delete operations
 class MessageResponse(BaseModel):
-    """Modèle de réponse simple pour les messages de statut."""
     message: str

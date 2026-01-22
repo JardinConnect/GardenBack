@@ -1,8 +1,9 @@
 from enum import Enum as PyEnum
 from typing import Optional, List, TYPE_CHECKING
+import uuid
 from sqlalchemy import (
-    Integer, String, DateTime, Float, ForeignKey
-)
+    Integer, String, DateTime, Float, ForeignKey, UUID
+) 
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
 from datetime import datetime, UTC
@@ -22,7 +23,7 @@ class RoleEnum(str, PyEnum):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     first_name: Mapped[str] = mapped_column(String, nullable=False)
     last_name: Mapped[str] = mapped_column(String, nullable=False)
     phone_number: Mapped[Optional[str]] = mapped_column(String, nullable=True)
@@ -44,11 +45,11 @@ class User(Base):
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     token: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), index=True)
 
     if TYPE_CHECKING:
         user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")
@@ -62,7 +63,7 @@ class RefreshToken(Base):
 class Area(Base):
     __tablename__ = "areas"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     color: Mapped[Optional[str]] = mapped_column(String)
     level: Mapped[int] = mapped_column(Integer, default=1)  # Niveau de profondeur
@@ -70,7 +71,7 @@ class Area(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     # Auto-référence pour la hiérarchie
-    parent_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("areas.id"), nullable=True)
+    parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("areas.id"), nullable=True)
 
     # Relations
     if TYPE_CHECKING:
@@ -89,13 +90,13 @@ class Area(Base):
 class Cell(Base):
     __tablename__ = "cells"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     # Relation vers l'area parent
-    area_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("areas.id"), nullable=True)
+    area_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("areas.id"), nullable=True)
 
     # Relations
     if TYPE_CHECKING:
@@ -112,7 +113,7 @@ class Cell(Base):
 class Sensor(Base):
     __tablename__ = "sensors"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     sensor_id: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     sensor_type: Mapped[str] = mapped_column(String, nullable=False)  # 'temperature', 'humidity', etc.
     status: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 'active', 'inactive', 'error'
@@ -120,7 +121,7 @@ class Sensor(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     # Relation vers la cellule
-    cell_id: Mapped[int] = mapped_column(Integer, ForeignKey("cells.id"), nullable=False)
+    cell_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cells.id"), nullable=False)
 
     # Relations
     if TYPE_CHECKING:
@@ -161,14 +162,14 @@ class AnalyticType(str, PyEnum):
 class Analytic(Base):
     __tablename__ = "analytic"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True, autoincrement=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     value: Mapped[float] = mapped_column(Float, nullable=False)
     occured_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     analytic_type: Mapped[AnalyticType] = mapped_column(SqlEnum(AnalyticType), nullable=False)
     sensor_code: Mapped[str] = mapped_column(String, nullable=False)
 
     # Relations - maintenant lié au sensor au lieu du node
-    sensor_id: Mapped[int] = mapped_column(Integer, ForeignKey("sensors.id"), index=True)
+    sensor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("sensors.id"), index=True)
     
     if TYPE_CHECKING:
         sensor: Mapped["Sensor"] = relationship("Sensor", back_populates="analytics")

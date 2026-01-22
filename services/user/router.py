@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
+import uuid
 
 # db
 from db.database import get_db
@@ -26,7 +27,7 @@ def get_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     return users
 
 @router.get("/users/{user_id}", response_model=UserResponse)
-def get_user(user_id: int, db: Session = Depends(get_db)):
+def get_user(user_id: uuid.UUID, db: Session = Depends(get_db)):
     """
     Récupère un utilisateur par son ID.
 
@@ -63,7 +64,7 @@ def create_user(user: UserSchema, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.put("/users/{user_id}", response_model=UserResponse)
-def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_db)):
+def update_user(user_id: uuid.UUID, user_data: UserUpdate, db: Session = Depends(get_db)):
     """
     Met à jour les informations d'un utilisateur existant.
 
@@ -82,7 +83,7 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.delete("/users/{user_id}", response_model=MessageResponse)
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(user_id: uuid.UUID, db: Session = Depends(get_db)):
     """
     Supprime un utilisateur par son ID.
 

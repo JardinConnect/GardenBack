@@ -1,14 +1,15 @@
 import pytest
 from datetime import datetime
 from unittest.mock import Mock, patch
+import uuid
 from sqlalchemy.orm import Session
 
 from services.user.repository import (
     check_user, get_user, get_users, create_user, delete_user, update_user
 )
 
-from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorEmail, UserNotFoundErrorID
-from services.user.schemas import UserLoginSchema, UserSchema, UserUpdate, RoleEnum
+from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID
+from services.user.schemas import UserLoginSchema, UserSchema, UserUpdate
 from db.models import User, RoleEnum
 
 
@@ -21,9 +22,10 @@ class TestUserService:
         self.mock_query = Mock()
         self.mock_db.query.return_value = self.mock_query
 
+        self.test_user_id = uuid.uuid4()
         # Utilisateur de test
         self.test_user = User(
-            id=1,
+            id=self.test_user_id,
             first_name="test",
             last_name="user",
             phone_number="0102030405",
@@ -81,7 +83,7 @@ class TestUserService:
         self.mock_query.filter.return_value.first.return_value = self.test_user
         
         # Act
-        result = get_user(self.mock_db, 1)
+        result = get_user(self.mock_db, self.test_user_id)
         
         # Assert
         assert result == self.test_user
@@ -90,13 +92,14 @@ class TestUserService:
     def test_get_user_not_found(self):
         """Test utilisateur non trouvé par ID"""
         # Arrange
+        non_existent_id = uuid.uuid4()
         self.mock_query.filter.return_value.first.return_value = None
         
         # Act & Assert
         with pytest.raises(UserNotFoundErrorID) as exc_info:
-            get_user(self.mock_db, 999)
+            get_user(self.mock_db, non_existent_id)
         
-        assert "999" in str(exc_info.value)
+        assert str(non_existent_id) in str(exc_info.value)
 
     # Tests pour get_users
     def test_get_users_default_params(self):
@@ -189,7 +192,7 @@ class TestUserService:
         self.mock_query.filter.return_value.first.return_value = self.test_user
         
         # Act
-        result = delete_user(self.mock_db, 1)
+        result = delete_user(self.mock_db, self.test_user_id)
         
         # Assert
         assert result is True
@@ -199,13 +202,14 @@ class TestUserService:
     def test_delete_user_not_found(self):
         """Test suppression d'utilisateur non trouvé"""
         # Arrange
+        non_existent_id = uuid.uuid4()
         self.mock_query.filter.return_value.first.return_value = None
         
         # Act & Assert
         with pytest.raises(UserNotFoundErrorID) as exc_info:
-            delete_user(self.mock_db, 999)
+            delete_user(self.mock_db, non_existent_id)
         
-        assert "999" in str(exc_info.value)
+        assert str(non_existent_id) in str(exc_info.value)
         self.mock_db.delete.assert_not_called()
 
     # Tests pour update_user
@@ -221,10 +225,10 @@ class TestUserService:
             update_data = UserUpdate(first_name="new_firstname", last_name="new_lastname")
 
             # Act
-            result = update_user(self.mock_db, 1, update_data)
+            result = update_user(self.mock_db, self.test_user_id, update_data)
 
             # Assert
-            mock_get_user.assert_called_once_with(self.mock_db, 1)
+            mock_get_user.assert_called_once_with(self.mock_db, self.test_user_id)
             assert result.first_name == "new_firstname"
             assert result.last_name == "new_lastname"
             assert result.updated_at == now
@@ -235,13 +239,14 @@ class TestUserService:
     def test_update_user_not_found(self):
         """Test de mise à jour pour un utilisateur non trouvé"""
         # Arrange
-        with patch('services.user.repository.get_user', side_effect=UserNotFoundErrorID(999)) as mock_get_user:
+        non_existent_id = uuid.uuid4()
+        with patch('services.user.repository.get_user', side_effect=UserNotFoundErrorID(non_existent_id)) as mock_get_user:
             update_data = UserUpdate(first_name="any_name")
 
             # Act & Assert
             with pytest.raises(UserNotFoundErrorID):
-                update_user(self.mock_db, 999, update_data)
-            mock_get_user.assert_called_once_with(self.mock_db, 999)
+                update_user(self.mock_db, non_existent_id, update_data)
+            mock_get_user.assert_called_once_with(self.mock_db, non_existent_id)
 
     # Tests d'intégration
     def test_user_workflow(self):

@@ -1,5 +1,6 @@
 import pytest
 from fastapi import HTTPException
+import uuid
 from db.models import Area, Cell, Sensor, Analytic, AnalyticType
 from services.area.repository import get_area_by_id
 from datetime import datetime
@@ -38,7 +39,7 @@ def setup_hierarchy(db_session):
 def test_get_area_not_found(db_session):
     """Teste que l'erreur AreaNotFoundError est levée si l'ID n'existe pas."""
     with pytest.raises(HTTPException) as excinfo:
-        get_area_by_id(db_session, 999)
+        get_area_by_id(db_session, uuid.uuid4())
     assert excinfo.value.status_code == 404
     assert excinfo.value.detail == "Area not found"
 

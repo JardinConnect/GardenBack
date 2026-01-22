@@ -1,7 +1,8 @@
 from fastapi import HTTPException, status
+from uuid import UUID
 
 class UserNotFoundErrorID(HTTPException):
-    def __init__(self, user_id:int):
+    def __init__(self, user_id: UUID):
         super().__init__(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Utilisateur avec l'ID '{user_id}' est introuvable."

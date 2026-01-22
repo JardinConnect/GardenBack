@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session
+import uuid
 from db.models import Area as AreaModel
 from .schemas import Area as AreaSchema, Cell as CellSchema
 from .errors import AreaNotFoundError
 
-def get_area_by_id(db: Session, area_id: int) -> AreaSchema:
+def get_area_by_id(db: Session, area_id: uuid.UUID) -> AreaSchema:
     """
     Récupère une seule zone par son ID et construit sa hiérarchie.
     """

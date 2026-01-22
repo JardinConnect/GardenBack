@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Dict, List, Optional
+import uuid
 
 from db.models import AnalyticType
 from services.analytics.schemas import AnalyticSchema
@@ -13,10 +14,10 @@ class Cell(BaseModel):
 class AreaCreate(BaseModel):
     name: str
     color: Optional[str] = None
-    parent_id: Optional[int] = Field(default=None, gt=0)
+    parent_id: Optional[uuid.UUID] = Field(default=None)
 
 class Area(BaseModel):
-    id: int
+    id: uuid.UUID
     name: str
     color: Optional[str] = None
     areas: List['Area'] = Field(default_factory=list)
