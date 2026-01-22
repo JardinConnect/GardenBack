@@ -4,8 +4,6 @@ from typing import List
 
 # db
 from db.database import get_db
-# auth
-from services.auth.bearer import JWTBearer
 # user
 from services.user import repository
 from services.user.schemas import UserResponse, UserSchema, UserUpdate, MessageResponse

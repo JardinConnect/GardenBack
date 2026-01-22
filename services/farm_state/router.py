@@ -8,9 +8,8 @@ from services.farm_state.schemas import FarmStateSummary
 router = APIRouter()
 
 @router.get(
-    "/farm-stats/",
+    "/",
     response_model=FarmStateSummary,
-    tags=["Farm State"],
     summary="Get a summary of the farm's state"
 )
 def read_farm_summary(db: Session = Depends(get_db)):
