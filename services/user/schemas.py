@@ -69,3 +69,7 @@ class UserResponse(BaseModel):
     updated_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
+
+class MessageResponse(BaseModel):
+    """Modèle de réponse simple pour les messages de statut."""
+    message: str

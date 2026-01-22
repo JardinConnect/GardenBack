@@ -1,24 +1,32 @@
 from sqlalchemy.orm import Session
-import logging
+from collections import Counter
 
-from . import schemas, repository
-from .errors import FarmStatsError
+from db.models import Area, Cell, Sensor
+from db.models import User as UserModel
+from .schemas import FarmStateSummary
 
 
-def get_farm_stats(db: Session) -> schemas.FarmStats:
+def get_farm_summary(db: Session) -> FarmStateSummary:
     """
-    Récupère les statistiques de la ferme en appelant la couche repository
-    et gère les erreurs potentielles.
+    Calculates and returns a summary of the entire farm state.
+
+    This includes the total count of areas, cells, and sensors, and a
+    breakdown of sensors by their type.
     """
-    try:
-        total_users, total_areas, total_cells = repository.get_counts(db)
-        return schemas.FarmStats(
-            total_users=total_users,
-            total_areas=total_areas,
-            total_cells=total_cells,
-        )
-    except Exception as e:
-        # Il est bon de logger l'erreur réelle pour le débogage
-        logging.error(f"Erreur lors de la récupération des statistiques de la ferme : {e}")
-        # Lève une exception HTTP standard pour le client
-        raise FarmStatsError
+    total_areas = db.query(Area).count()
+    total_cells = db.query(Cell).count()
+    total_sensors = db.query(Sensor).count()
+    total_users = db.query(UserModel).count()
+
+    # Count sensors by type
+    sensor_types_query = db.query(Sensor.sensor_type).all()
+    sensor_type_counts = Counter(st[0] for st in sensor_types_query)
+
+
+    return FarmStateSummary(
+        total_users=total_users,
+        total_areas=total_areas,
+        total_cells=total_cells,
+        total_sensors=total_sensors,
+        sensor_types=dict(sensor_type_counts),
+    )

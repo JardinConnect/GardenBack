@@ -57,16 +57,12 @@ def test_token_response_returns_correct_dict(mock_user_schema):
 # --- Tests de la fonction `sign_jwt` ---
 
 # mock de get_userByEmail car sign_jwt l'appelle
-@patch('services.auth.auth.get_userByEmail')
-def test_sign_jwt_returns_valid_token_and_user(mock_get_userByEmail, mock_user_schema, mock_db_session):
+def test_sign_jwt_returns_valid_token_and_user(mock_user_schema):
     """Vérifie que sign_jwt encode un token et retourne la réponse complète."""
     user_email = "test@example.com"
-    mock_get_userByEmail.return_value = mock_user_schema
 
-    response = sign_jwt(user_email, mock_user_schema.role, mock_db_session)
-
-    # 1. Vérifie que le dépôt a été appelé correctement
-    mock_get_userByEmail.assert_called_once_with(mock_db_session, user_email)
+    # L'objet utilisateur est maintenant passé directement, plus d'appel à la DB à l'intérieur.
+    response = sign_jwt(mock_user_schema)
 
     # 2. Vérifie la structure de la réponse
     assert "access_token" in response

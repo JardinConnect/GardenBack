@@ -1,10 +1,9 @@
 import time
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from decouple import config
-from sqlalchemy.orm import Session
 
-from services.user.repository import get_userByEmail
-from services.user.schemas import RoleEnum, UserSchema
+from db.models import User
+from services.user.schemas import UserResponse
 
 import jwt
 
@@ -14,22 +13,20 @@ JWT_ALGORITHM = config("JWT_ALGORITHM")
 JWT_SECRET = config("JWT_SECRET")
 
 
-def token_response(token: str, user:UserSchema):
+def token_response(token: str, user: User) -> Dict[str, Any]:
     return {
         "access_token": token,
-        "user":user
+        "user": UserResponse.model_validate(user)
     }
 
-def sign_jwt(user_email: str, user_role: RoleEnum, db: Session) -> Dict[str, str]:
+def sign_jwt(user: User) -> Dict[str, Any]:
     payload = {
-        "user_id": user_email,
-        "role": user_role.value,
+        "user_id": user.email,
+        "role": user.role.value,
         "expires": time.time() + 600
     }
 
-
     token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    user = get_userByEmail(db, user_email)
 
     return token_response(token, user)
 

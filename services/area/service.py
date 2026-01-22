@@ -41,7 +41,7 @@ def create_area(db: Session, area_data: schemas.AreaCreate) -> schemas.Area:
     )
 
 
-def delete_area(db: Session, area_id: int) -> None:
+def delete_area(db: Session, area_id: int) -> bool:
     """
     Supprime une zone et toutes ses sous-zones de manière récursive.
 
@@ -78,6 +78,8 @@ def delete_area(db: Session, area_id: int) -> None:
         db.delete(area)
 
     db.commit()
+    
+    return True
 
 
 def _get_analytics_for_area(db: Session, area: AreaModel) -> List[AnalyticModel]:

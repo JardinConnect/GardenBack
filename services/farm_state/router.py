@@ -1,20 +1,21 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from . import service
-from .schemas import FarmStats
 from db.database import get_db
-from services.auth.bearer import JWTBearer
+from services.farm_state.service import get_farm_summary
+from services.farm_state.schemas import FarmStateSummary
 
 router = APIRouter()
 
-
-@router.get("/", response_model=FarmStats, dependencies=[Depends(JWTBearer())])
-def read_farm_stats(db: Session = Depends(get_db)) -> FarmStats:
+@router.get(
+    "/farm-stats/",
+    response_model=FarmStateSummary,
+    tags=["Farm State"],
+    summary="Get a summary of the farm's state"
+)
+def read_farm_summary(db: Session = Depends(get_db)):
     """
-    Récupère les statistiques globales de la ferme :
-    - Nombre total d'utilisateurs
-    - Nombre total d'espaces (areas)
-    - Nombre total de cellules (cells)
+    Retrieves a summary of the farm's state, including counts of areas,
+    cells, sensors, and a breakdown of sensor types.
     """
-    return service.get_farm_stats(db)
+    return get_farm_summary(db)

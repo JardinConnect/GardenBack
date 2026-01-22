@@ -1,12 +1,12 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.utils import get_openapi
 
 from services.alert.router import router as alert_router
 from services.api_gateway.router import router as gateway_router
 from services.auth.router import router as auth_router
+from services.auth.bearer import JWTBearer
 from services.analytics.router import router as data_router
 from services.lora_gpio.router import router as lora_router
 from services.area.router import router as area_router
@@ -45,51 +45,23 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
-# Register routers
-app.include_router(alert_router, prefix="/alert", tags=["Alert"])
-app.include_router(gateway_router, prefix="/gateway", tags=["API Gateway"])
+# --- Routers ---
+
+# Routeur public pour l'authentification (pas de protection ici)
 app.include_router(auth_router, tags=["Authentication"])
-app.include_router(data_router, prefix="/data", tags=["Data"])
-app.include_router(lora_router, prefix="/lora", tags=["Lora GPIO"])
-app.include_router(area_router, prefix="/area", tags=["Area"])
+
+# Routeurs protégés par JWT
+auth_dependency = Depends(JWTBearer())
+app.include_router(alert_router, prefix="/alert", tags=["Alert"], dependencies=[auth_dependency])
+app.include_router(gateway_router, prefix="/gateway", tags=["API Gateway"], dependencies=[auth_dependency])
+app.include_router(data_router, prefix="/data", tags=["Data"], dependencies=[auth_dependency])
+app.include_router(lora_router, prefix="/lora", tags=["Lora GPIO"], dependencies=[auth_dependency])
+app.include_router(area_router, prefix="/area", tags=["Area"], dependencies=[auth_dependency])
+app.include_router(user_router, tags=["User"], dependencies=[auth_dependency])
+app.include_router(farm_state_router, prefix="/farm-stats", tags=["Farm Stats"], dependencies=[auth_dependency])
+
+# Autres routeurs (par exemple, pour des webhooks internes)
 app.include_router(mqtt_router, tags=["MQTT"])
-app.include_router(user_router, tags=["User"])
-app.include_router(
-    farm_state_router,
-    prefix="/farm-stats",
-    tags=["Farm Stats"],
-)
-
-
-# Config OpenAPI
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-    
-    openapi_schema = get_openapi(
-        title="GardenConnect API",
-        version="1.0.0",
-        routes=app.routes,
-    )
-    
-    openapi_schema.setdefault("components", {})
-    openapi_schema["components"]["securitySchemes"] = {
-        "BearerAuth": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT",
-        }
-    }
-    
-    for path in openapi_schema["paths"].values():
-        for method in path.values():
-            if isinstance(method, dict):
-                method["security"] = [{"BearerAuth": []}]
-    
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
-
-app.openapi = custom_openapi
 
 
 @app.on_event("startup")

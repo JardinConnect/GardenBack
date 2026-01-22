@@ -46,7 +46,7 @@ class TestUserService:
             result = check_user(self.mock_db, login_data)
             
             # Assert
-            assert result is True
+            assert result == self.test_user
             self.mock_db.query.assert_called_once_with(User)
 
     def test_check_user_not_found(self):
@@ -56,10 +56,10 @@ class TestUserService:
         login_data = UserLoginSchema(email="nonexistent@example.com", password="password")
         
         # Act & Assert
-        with pytest.raises(UserNotFoundErrorEmail) as exc_info:
-            check_user(self.mock_db, login_data)
-        
-        assert "nonexistent@example.com" in str(exc_info.value)
+        # check_user retourne maintenant None si l'utilisateur n'est pas trouvé
+        result = check_user(self.mock_db, login_data)
+
+        assert result is None
 
     def test_check_user_wrong_password(self):
         """Test avec mot de passe incorrect"""
@@ -272,7 +272,7 @@ class TestUserService:
                     )
                     
                     check_result = check_user(self.mock_db, login_data)
-                    assert check_result is True
+                    assert check_result == self.test_user
 
     # Tests des cas limites
     def test_empty_users_list(self):

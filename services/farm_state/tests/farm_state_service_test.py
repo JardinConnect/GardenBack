@@ -1,39 +1,80 @@
 import pytest
-from unittest.mock import patch
-from services.farm_state.service import get_farm_stats
-from services.farm_state.errors import FarmStatsError
-from fastapi import HTTPException
+from unittest.mock import Mock
+from sqlalchemy.orm import Session
+
+from services.farm_state.service import get_farm_summary
+from services.farm_state.schemas import FarmStateSummary
+from db.models import Area, Cell, Sensor
 
 
-@patch('services.farm_state.repository.get_counts')
-def test_get_farm_stats_success(mock_get_counts):
-    """Vérifie que le service formate correctement les données du repository."""
+def test_get_farm_summary_success():
+    """
+    Tests that get_farm_summary correctly calculates and returns the farm summary.
+    """
     # Arrange
-    # Simule un retour réussi du repository
-    mock_get_counts.return_value = (5, 10, 20)  # (total_users, total_areas, total_cells)
-    mock_db = None  # La session DB n'est plus utilisée directement par le service
+    mock_db = Mock(spec=Session)
+    
+    # Mock the return value for the sensor types query
+    sensor_types_data = [
+        ('temperature',), ('temperature',), ('temperature',),
+        ('humidity',), ('humidity',),
+        ('light',)
+    ]
+
+    # Use a side_effect to return different mocks for different query arguments
+    def query_side_effect(model):
+        query_mock = Mock()
+        if getattr(model, 'name', None) == 'sensor_type':
+            query_mock.all.return_value = sensor_types_data
+        elif model == Area:
+            query_mock.count.return_value = 5
+        elif model == Cell:
+            query_mock.count.return_value = 15
+        elif model == Sensor:
+            query_mock.count.return_value = 30
+        return query_mock
+
+    mock_db.query.side_effect = query_side_effect
 
     # Act
-    stats = get_farm_stats(mock_db)
+    summary = get_farm_summary(mock_db)
 
     # Assert
-    mock_get_counts.assert_called_once_with(mock_db)
-    assert stats.total_users == 5
-    assert stats.total_areas == 10
-    assert stats.total_cells == 20
+    assert isinstance(summary, FarmStateSummary)
+    assert summary.total_areas == 5
+    assert summary.total_cells == 15
+    assert summary.total_sensors == 30
+    assert summary.sensor_types == {
+        'temperature': 3,
+        'humidity': 2,
+        'light': 1
+    }
 
+    assert mock_db.query.call_count == 4
 
-@patch('services.farm_state.repository.get_counts')
-def test_get_farm_stats_repository_error(mock_get_counts):
-    """Vérifie que le service lève une FarmStatsError si le repository échoue."""
+def test_get_farm_summary_no_data():
+    """
+    Tests that get_farm_summary handles the case where there is no data in the database.
+    """
     # Arrange
-    mock_get_counts.side_effect = Exception("Database connection failed")
-    mock_db = None
+    mock_db = Mock(spec=Session)
+    
+    # Use a side_effect to handle different query arguments correctly
+    def query_side_effect(model):
+        query_mock = Mock()
+        if getattr(model, 'name', None) == 'sensor_type':
+            query_mock.all.return_value = []
+        elif model in [Area, Cell, Sensor]:
+            query_mock.count.return_value = 0
+        return query_mock
 
-    # Act & Assert
-    with pytest.raises(HTTPException) as exc_info:
-        get_farm_stats(mock_db)
+    mock_db.query.side_effect = query_side_effect
 
-    assert exc_info.value == FarmStatsError
+    # Act
+    summary = get_farm_summary(mock_db)
 
-    mock_get_counts.assert_called_once_with(mock_db)
+    # Assert
+    assert summary.total_areas == 0
+    assert summary.total_cells == 0
+    assert summary.total_sensors == 0
+    assert summary.sensor_types == {}
