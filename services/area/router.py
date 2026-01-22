@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Path, status, HTTPException
+import uuid
 from sqlalchemy.orm import Session
 
 from .schemas import Area, AreaCreate
@@ -33,7 +34,7 @@ def create_area(
 
 @router.delete("/{area_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(JWTBearer())])
 def delete_area(
-    area_id: int = Path(..., title="The ID of the area to delete", gt=0),
+    area_id: uuid.UUID = Path(..., title="The ID of the area to delete"),
     db: Session = Depends(get_db),
 ) -> None:
     """
@@ -55,7 +56,7 @@ def delete_area(
 
 @router.get("/{area_id}", response_model=Area, dependencies=[Depends(JWTBearer())])
 def get_area(
-    area_id: int = Path(..., title="The ID of the area to get", gt=0),
+    area_id: uuid.UUID = Path(..., title="The ID of the area to get"),
     db: Session = Depends(get_db),
 ) -> Area:
     """

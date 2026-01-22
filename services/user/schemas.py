@@ -1,75 +1,40 @@
-from pydantic import BaseModel, EmailStr, ConfigDict, Field
-from datetime import datetime
+import uuid
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional
-from enum import Enum
+from db.models import RoleEnum
 
-class RoleEnum(str, Enum):
-    SUPERADMIN = "superadmin"
-    ADMIN = "admin"
-    EMPLOYEES = "employees"
-    TRAINEE = "trainee"
+class UserBase(BaseModel):
+    email: EmailStr = Field(..., description="Email de l'utilisateur")
 
-class UserSchema(BaseModel):
-    first_name: str = Field(...)
-    last_name: str = Field(...)
+class UserLoginSchema(UserBase):
+    password: str = Field(..., description="Mot de passe de l'utilisateur")
+
+class UserSchema(UserBase):
+    first_name: str
+    last_name: str
     phone_number: Optional[str] = None
-    email: EmailStr = Field(...)
-    password: str = Field(...)
-    role: RoleEnum = Field(..., description="Le nom du rôle (superadmin, admin, employees, trainee)")
-
-    model_config = ConfigDict(
-        json_schema_extra = {
-            "example": {
-                "first_name": "Sam",
-                "last_name": "Gardener",
-                "phone_number": "0612345678",
-                "email": "sam@x.com",
-                "password": "weakpassword",
-                "role": "employees"
-            }
-        }
-    )
-
-class UserLoginSchema(BaseModel):
-    email: EmailStr = Field(...)
-    password: str = Field(...)
-
-    model_config = ConfigDict(
-        json_schema_extra = {
-            "example": {
-                "email": "admin@garden.com",
-                "password": "admin123"
-            }
-        }
-    )
+    password: str = Field(..., min_length=8)
+    role: RoleEnum
 
 class UserUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone_number: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[RoleEnum] = None
 
-    model_config = ConfigDict(
-        json_schema_extra = {
-            "example": {
-                "first_name": "John",
-                "last_name": "Cena",
-                "phone_number": "0687654321"
-            }
-        }
-    )
+class UserPasswordUpdate(BaseModel):
+    current_password: str = Field(..., description="Mot de passe actuel de l'utilisateur.")
+    new_password: str = Field(..., min_length=8, description="Nouveau mot de passe (8 caractères minimum).")
 
-class UserResponse(BaseModel):
-    id: int
+class UserResponse(UserBase):
+    id: uuid.UUID
     first_name: str
     last_name: str
-    phone_number: Optional[str] = None
-    email: str
+    phone_number: Optional[str]
     role: RoleEnum
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 class MessageResponse(BaseModel):
-    """Modèle de réponse simple pour les messages de statut."""
     message: str

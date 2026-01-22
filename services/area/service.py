@@ -1,4 +1,5 @@
 from typing import List, Tuple, Optional, Dict
+import uuid
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
@@ -41,7 +42,7 @@ def create_area(db: Session, area_data: schemas.AreaCreate) -> schemas.Area:
     )
 
 
-def delete_area(db: Session, area_id: int) -> bool:
+def delete_area(db: Session, area_id: uuid.UUID) -> bool:
     """
     Supprime une zone et toutes ses sous-zones de manière récursive.
 
@@ -176,7 +177,7 @@ def _process_area_recursively(db: Session, area: AreaModel) -> Tuple[schemas.Are
     return area_schema, all_analytics
 
 
-def get_area_with_analytics(db: Session, area_id: int) -> Optional[schemas.Area]:
+def get_area_with_analytics(db: Session, area_id: uuid.UUID) -> Optional[schemas.Area]:
     """
     Fonction principale pour récupérer une zone par son ID, enrichie avec les moyennes analytiques.
     """

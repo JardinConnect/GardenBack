@@ -1,5 +1,6 @@
 import pytest
 from datetime import datetime, timedelta, UTC
+import uuid
 
 from fastapi import HTTPException
 from db.models import Area as AreaModel, Cell as CellModel, Sensor as SensorModel, Analytic as AnalyticModel, AnalyticType
@@ -57,7 +58,7 @@ def test_create_area_as_child_success(db_session):
 def test_create_area_with_nonexistent_parent_fails(db_session):
     """Vérifie qu'une erreur est levée si le parent n'existe pas."""
     # Arrange
-    area_data = AreaCreate(name="Orphan Area", parent_id=999)
+    area_data = AreaCreate(name="Orphan Area", parent_id=uuid.uuid4())
 
     # Act & Assert
     with pytest.raises(HTTPException) as exc_info:
@@ -76,7 +77,7 @@ def test_create_area_with_nonexistent_parent_fails(db_session):
 def test_delete_area_not_found(db_session):
     """Vérifie qu'une erreur est levée lors de la suppression d'une zone inexistante."""
     with pytest.raises(HTTPException) as exc_info:
-        delete_area(db_session, 999)
+        delete_area(db_session, uuid.uuid4())
 
     assert exc_info.value.status_code == AreaNotFoundError.status_code
     assert exc_info.value.detail == AreaNotFoundError.detail
@@ -232,7 +233,7 @@ def test_get_area_not_found(db_session):
     """
     Vérifie que la fonction retourne None si l'ID de la zone n'existe pas.
     """
-    area = get_area_with_analytics(db_session, 999)
+    area = get_area_with_analytics(db_session, uuid.uuid4())
     assert area is None
 
 
