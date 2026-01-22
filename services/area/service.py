@@ -1,6 +1,6 @@
 from typing import List, Tuple, Optional, Dict
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta, date, timezone
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 from . import schemas

@@ -1,7 +1,7 @@
 from enum import Enum as PyEnum
 from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import (
-    Integer, String, DateTime, Boolean, Float, ForeignKey
+    Integer, String, DateTime, Float, ForeignKey
 )
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column

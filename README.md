@@ -1,4 +1,4 @@
-🚀 GardenBack - Le Cœur de JardinConnect
+🚀 GardenBack - JardinConnect
 =========================================
 
 > Bienvenue dans le backend de JardinConnect ! 🌱 Ce projet, propulsé par FastAPI, est le moteur qui gère les données de vos jardins connectés, la communication avec les capteurs et l'authentification des utilisateurs.

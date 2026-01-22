@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 
 from db.database import get_db
+from db.models import RefreshToken, User
 
 from services.user import repository
 from services.user.errors import UserAlreadyExistsError
 from ..user.schemas import UserSchema, UserLoginSchema
 from .auth import sign_jwt
-from .schemas import TokenResponse
+from .schemas import TokenResponse, RefreshTokenSchema
 
 router = APIRouter()
 
@@ -32,7 +34,7 @@ async def signup(
     except UserAlreadyExistsError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    return sign_jwt(db_user)
+    return sign_jwt(db, db_user)
 
 @router.post("/login", status_code=200, response_model=TokenResponse)
 async def login(
@@ -53,8 +55,57 @@ async def login(
     # Cela fusionne la vérification des identifiants et la récupération de l'utilisateur en une seule requête.
     db_user = repository.check_user(db, user)
     if db_user:
-        return sign_jwt(db_user)
+        return sign_jwt(db, db_user)
     raise HTTPException(
         status_code=401,
         detail="Incorrect email or password",
     )
+
+@router.post("/refresh-token", response_model=TokenResponse)
+async def refresh_access_token(
+    body: RefreshTokenSchema,
+    db: Session = Depends(get_db)
+):
+    """
+    Génère une nouvelle paire de tokens (accès et rafraîchissement) à partir d'un refresh token valide.
+    L'ancien refresh token est invalidé (rotation).
+    """
+    refresh_token_str = body.refresh_token
+    
+    db_refresh_token = db.query(RefreshToken).filter(RefreshToken.token == refresh_token_str).first()
+
+    if not db_refresh_token:
+        raise HTTPException(status_code=404, detail="Refresh token not found or already used.")
+
+    if db_refresh_token.expires_at < datetime.now(timezone.utc):
+        db.delete(db_refresh_token)
+        db.commit()
+        raise HTTPException(status_code=401, detail="Refresh token has expired.")
+
+    user = db.query(User).filter(User.id == db_refresh_token.user_id).first()
+    if not user:
+        # Ce cas est peu probable si la DB est cohérente, mais c'est une sécurité.
+        raise HTTPException(status_code=404, detail="User associated with token not found.")
+
+    # Invalider l'ancien refresh token (rotation de token)
+    db.delete(db_refresh_token)
+    db.commit()
+
+    # Générer et retourner une nouvelle paire de tokens
+    return sign_jwt(db, user)
+
+@router.post("/logout", status_code=200)
+async def logout(
+    body: RefreshTokenSchema,
+    db: Session = Depends(get_db)
+):
+    """
+    Déconnecte l'utilisateur en invalidant son refresh token.
+    """
+    db_refresh_token = db.query(RefreshToken).filter(RefreshToken.token == body.refresh_token).first()
+
+    if db_refresh_token:
+        db.delete(db_refresh_token)
+        db.commit()
+    
+    return {"message": "Successfully logged out."}
