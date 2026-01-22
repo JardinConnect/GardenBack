@@ -1,24 +1,21 @@
 import uuid
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional
 from db.models import RoleEnum
 
-# Schema for user login
-class UserLoginSchema(BaseModel):
-    email: EmailStr
-    password: str
+class UserBase(BaseModel):
+    email: EmailStr = Field(..., description="Email de l'utilisateur")
 
-# This schema is used when creating a user. Password is required.
-# It was named UserCreate, renamed to UserSchema for consistency with imports.
-class UserSchema(BaseModel):
+class UserLoginSchema(UserBase):
+    password: str = Field(..., description="Mot de passe de l'utilisateur")
+
+class UserSchema(UserBase):
     first_name: str
     last_name: str
-    email: EmailStr
-    password: str
     phone_number: Optional[str] = None
-    role: RoleEnum = RoleEnum.EMPLOYEES
+    password: str = Field(..., min_length=8)
+    role: RoleEnum
 
-# This schema is for updating a user. All fields are optional.
 class UserUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -26,17 +23,18 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     role: Optional[RoleEnum] = None
 
-# This schema is used when returning a user from the API. Password should not be included.
-class UserResponse(BaseModel):
+class UserPasswordUpdate(BaseModel):
+    current_password: str = Field(..., description="Mot de passe actuel de l'utilisateur.")
+    new_password: str = Field(..., min_length=8, description="Nouveau mot de passe (8 caractères minimum).")
+
+class UserResponse(UserBase):
     id: uuid.UUID
     first_name: str
     last_name: str
-    email: EmailStr
-    phone_number: Optional[str] = None
+    phone_number: Optional[str]
     role: RoleEnum
 
     model_config = ConfigDict(from_attributes=True)
 
-# A generic message response for delete operations
 class MessageResponse(BaseModel):
     message: str

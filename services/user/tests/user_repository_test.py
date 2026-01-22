@@ -5,11 +5,11 @@ import uuid
 from sqlalchemy.orm import Session
 
 from services.user.repository import (
-    check_user, get_user, get_users, create_user, delete_user, update_user
+    check_user, get_user, get_users, create_user, delete_user, update_user, update_user_password
 )
 
-from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID
-from services.user.schemas import UserLoginSchema, UserSchema, UserUpdate
+from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID, InvalidPasswordError
+from services.user.schemas import UserLoginSchema, UserSchema, UserUpdate, UserPasswordUpdate
 from db.models import User, RoleEnum
 
 
@@ -228,7 +228,7 @@ class TestUserService:
             result = update_user(self.mock_db, self.test_user_id, update_data)
 
             # Assert
-            mock_get_user.assert_called_once_with(self.mock_db, self.test_user_id)
+            mock_get_user.assert_called_once_with(self.mock_db, user_id=self.test_user_id)
             assert result.first_name == "new_firstname"
             assert result.last_name == "new_lastname"
             assert result.updated_at == now
@@ -246,7 +246,62 @@ class TestUserService:
             # Act & Assert
             with pytest.raises(UserNotFoundErrorID):
                 update_user(self.mock_db, non_existent_id, update_data)
-            mock_get_user.assert_called_once_with(self.mock_db, non_existent_id)
+            mock_get_user.assert_called_once_with(self.mock_db, user_id=non_existent_id)
+
+    # Tests pour update_user_password
+    @patch('services.user.repository.get_password_hash')
+    @patch('services.user.repository.verify_password')
+    @patch('services.user.repository.get_user')
+    def test_update_user_password_success(self, mock_get_user, mock_verify_password, mock_get_password_hash):
+        """Test de la mise à jour réussie du mot de passe."""
+        # Arrange
+        mock_get_user.return_value = self.test_user
+        mock_verify_password.return_value = True
+        mock_get_password_hash.return_value = "new_hashed_password"
+        original_password = self.test_user.password
+        
+        password_data = UserPasswordUpdate(current_password="password", new_password="new_password")
+
+        # Act
+        result = update_user_password(self.mock_db, self.test_user_id, password_data) # current_user n'est plus passé
+
+        # Assert
+        assert result is True
+        mock_get_user.assert_called_once_with(self.mock_db, user_id=self.test_user_id)
+        mock_verify_password.assert_called_once_with("password", original_password)
+        mock_get_password_hash.assert_called_once_with("new_password")
+        assert self.test_user.password == "new_hashed_password"
+        self.mock_db.add.assert_called_once_with(self.test_user)
+        self.mock_db.commit.assert_called_once()
+
+    @patch('services.user.repository.verify_password')
+    @patch('services.user.repository.get_user')
+    def test_update_user_password_invalid_current_password(self, mock_get_user, mock_verify_password):
+        """Test de la mise à jour avec un mot de passe actuel incorrect."""
+        # Arrange
+        mock_get_user.return_value = self.test_user
+        mock_verify_password.return_value = False
+        
+        password_data = UserPasswordUpdate(current_password="wrong_password", new_password="new_password")
+
+        # Act & Assert
+        with pytest.raises(InvalidPasswordError):
+            update_user_password(self.mock_db, self.test_user_id, password_data)
+        
+        self.mock_db.commit.assert_not_called()
+
+    @patch('services.user.repository.get_user')
+    def test_update_user_password_user_not_found(self, mock_get_user):
+        """Test de la mise à jour pour un utilisateur non trouvé."""
+        # Arrange
+        non_existent_id = uuid.uuid4()
+        mock_get_user.side_effect = UserNotFoundErrorID(non_existent_id)
+        
+        password_data = UserPasswordUpdate(current_password="password", new_password="new_password")
+
+        # Act & Assert
+        with pytest.raises(UserNotFoundErrorID):
+            update_user_password(self.mock_db, non_existent_id, password_data)
 
     # Tests d'intégration
     def test_user_workflow(self):
