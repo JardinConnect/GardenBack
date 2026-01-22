@@ -2,7 +2,7 @@ import time
 import pytest
 from unittest.mock import patch, MagicMock
 from datetime import datetime
-from services.user.schemas import UserResponse, RoleNameEnum
+from services.user.schemas import UserResponse, RoleEnum
 from services.auth.auth import sign_jwt, decode_jwt, token_response 
 from services.user.repository import get_userByEmail
 
@@ -29,7 +29,7 @@ def mock_user_schema():
         last_name='User',
         phone_number='1234567890',
         email='test@example.com',
-        role=RoleNameEnum.EMPLOYEES,
+        role=RoleEnum.EMPLOYEES,
         created_at=datetime.now(),
         updated_at=datetime.now()
     )
@@ -63,7 +63,7 @@ def test_sign_jwt_returns_valid_token_and_user(mock_get_userByEmail, mock_user_s
     user_email = "test@example.com"
     mock_get_userByEmail.return_value = mock_user_schema
 
-    response = sign_jwt(user_email, mock_db_session)
+    response = sign_jwt(user_email, mock_user_schema.role, mock_db_session)
 
     # 1. Vérifie que le dépôt a été appelé correctement
     mock_get_userByEmail.assert_called_once_with(mock_db_session, user_email)
@@ -83,6 +83,7 @@ def test_sign_jwt_returns_valid_token_and_user(mock_get_userByEmail, mock_user_s
     
     assert decoded is not None
     assert decoded["user_id"] == user_email
+    assert decoded["role"] == mock_user_schema.role.value
     # Vérifie que la date d'expiration est dans le futur (600 secondes)
     assert decoded["expires"] > time.time()
     # Vérifie que l'expiration est proche de l'expiration prévue (dans une marge de 10 secondes)
@@ -98,7 +99,8 @@ def test_decode_jwt_valid_token_returns_payload(mock_jwt_decode):
     # Simule le temps actuel + 60s pour l'expiration (token valide)
     valid_payload = {
         "user_id": "test@example.com",
-        "expires": time.time() + 60 
+        "expires": time.time() + 60,
+        "role": "employees"
     }
     # Le mock de jwt.decode doit retourner le payload valide
     mock_jwt_decode.return_value = valid_payload
@@ -120,7 +122,8 @@ def test_decode_jwt_expired_token_returns_none(mock_jwt_decode):
     # Simule le temps actuel - 60s pour l'expiration (token expiré)
     expired_payload = {
         "user_id": "test@example.com",
-        "expires": time.time() - 60 
+        "expires": time.time() - 60,
+        "role": "employees"
     }
     mock_jwt_decode.return_value = expired_payload
     
@@ -143,7 +146,7 @@ def test_decode_jwt_invalid_token_returns_empty_dict(mock_print, mock_jwt_decode
     decoded = decode_jwt(token)
 
     # Vérifie le résultat: {} est retourné suite à l'exception
-    assert decoded == {}
+    assert decoded is None
     # Vérifie que l'erreur a été affichée (le print a été appelé)
     mock_print.assert_called_once() 
     assert "Erreur de décodage du token JWT" in mock_print.call_args[0][0]

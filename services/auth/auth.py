@@ -4,7 +4,7 @@ from decouple import config
 from sqlalchemy.orm import Session
 
 from services.user.repository import get_userByEmail
-from services.user.schemas import UserSchema
+from services.user.schemas import RoleEnum, UserSchema
 
 import jwt
 
@@ -20,9 +20,10 @@ def token_response(token: str, user:UserSchema):
         "user":user
     }
 
-def sign_jwt(user_email: str, db: Session) -> Dict[str, str]:
+def sign_jwt(user_email: str, user_role: RoleEnum, db: Session) -> Dict[str, str]:
     payload = {
         "user_id": user_email,
+        "role": user_role.value,
         "expires": time.time() + 600
     }
 
@@ -38,4 +39,4 @@ def decode_jwt(token: str) -> Optional[dict]:
         return decoded_token if decoded_token["expires"] >= time.time() else None
     except Exception as e:
         print("❌ Erreur de décodage du token JWT", e)
-        return {}
+        return None # Return None on decoding errors to indicate invalid token

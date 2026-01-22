@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 from enum import Enum
 
-class RoleNameEnum(str, Enum):
+class RoleEnum(str, Enum):
     SUPERADMIN = "superadmin"
     ADMIN = "admin"
     EMPLOYEES = "employees"
@@ -15,7 +15,7 @@ class UserSchema(BaseModel):
     phone_number: Optional[str] = None
     email: EmailStr = Field(...)
     password: str = Field(...)
-    role_name: RoleNameEnum = Field(..., description="Le nom du rôle (superadmin, admin, employees, trainee)")
+    role: RoleEnum = Field(..., description="Le nom du rôle (superadmin, admin, employees, trainee)")
 
     model_config = ConfigDict(
         json_schema_extra = {
@@ -25,7 +25,7 @@ class UserSchema(BaseModel):
                 "phone_number": "0612345678",
                 "email": "sam@x.com",
                 "password": "weakpassword",
-                "role_name": "employees"
+                "role": "employees"
             }
         }
     )
@@ -64,7 +64,7 @@ class UserResponse(BaseModel):
     last_name: str
     phone_number: Optional[str] = None
     email: str
-    role: RoleNameEnum
+    role: RoleEnum
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     

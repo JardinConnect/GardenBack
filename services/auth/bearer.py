@@ -32,11 +32,7 @@ class JWTBearer(HTTPBearer):
     def verify_jwt(self, jwtoken: str) -> bool:
         isTokenValid: bool = False
 
-        try:
-            payload = decode_jwt(jwtoken)
-        except Exception as e:
-            print("❌ Erreur de vérification du token JWT", e)
-            payload = None
+        payload = decode_jwt(jwtoken) # decode_jwt now returns None on error or expiration
         if payload:
             isTokenValid = True
 

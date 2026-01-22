@@ -52,7 +52,7 @@ def create_user(db: Session, user: UserSchema):
         phone_number=user.phone_number,
         email=user.email,
         password=get_password_hash(user.password),
-        role=user.role_name,
+        role=user.role,
         created_at=now,
         updated_at=now
     )
