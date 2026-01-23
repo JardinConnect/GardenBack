@@ -1,6 +1,13 @@
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from datetime import datetime
 from typing import Optional
+from enum import Enum
+
+class RoleEnum(str, Enum):
+    SUPERADMIN = "superadmin"
+    ADMIN = "admin"
+    EMPLOYEES = "employees"
+    TRAINEE = "trainee"
 
 class UserSchema(BaseModel):
     first_name: str = Field(...)
@@ -8,6 +15,7 @@ class UserSchema(BaseModel):
     phone_number: Optional[str] = None
     email: EmailStr = Field(...)
     password: str = Field(...)
+    role: RoleEnum = Field(..., description="Le nom du rôle (superadmin, admin, employees, trainee)")
 
     model_config = ConfigDict(
         json_schema_extra = {
@@ -16,7 +24,8 @@ class UserSchema(BaseModel):
                 "last_name": "Gardener",
                 "phone_number": "0612345678",
                 "email": "sam@x.com",
-                "password": "weakpassword"
+                "password": "weakpassword",
+                "role": "employees"
             }
         }
     )
@@ -55,8 +64,12 @@ class UserResponse(BaseModel):
     last_name: str
     phone_number: Optional[str] = None
     email: str
-    isAdmin: bool
+    role: RoleEnum
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
+
+class MessageResponse(BaseModel):
+    """Modèle de réponse simple pour les messages de statut."""
+    message: str

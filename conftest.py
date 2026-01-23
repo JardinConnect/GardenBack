@@ -8,8 +8,13 @@ from db.models import Base
 @pytest.fixture(scope="function")
 def db_session():
     """
-    Fixture Pytest pour fournir une session de base de données SQLite en mémoire pour chaque test.
+    Fixture Pytest globale pour fournir une session de base de données SQLite 
+    en mémoire pour chaque fonction de test.
+    
+    Cette fixture est définie au niveau racine et est donc disponible
+    pour tous les tests du projet.
     """
+    # Utilise une base de données en mémoire pour l'isolation des tests
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

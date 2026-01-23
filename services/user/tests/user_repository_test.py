@@ -8,8 +8,8 @@ from services.user.repository import (
 )
 
 from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorEmail, UserNotFoundErrorID
-from services.user.schemas import UserLoginSchema, UserSchema, UserUpdate
-from db.models import User
+from services.user.schemas import UserLoginSchema, UserSchema, UserUpdate, RoleEnum
+from db.models import User, RoleEnum
 
 
 class TestUserService:
@@ -20,7 +20,7 @@ class TestUserService:
         self.mock_db = Mock(spec=Session)
         self.mock_query = Mock()
         self.mock_db.query.return_value = self.mock_query
-        
+
         # Utilisateur de test
         self.test_user = User(
             id=1,
@@ -29,7 +29,7 @@ class TestUserService:
             phone_number="0102030405",
             email="test@example.com",
             password="hashed_password",
-            isAdmin=False,
+            role=RoleEnum.EMPLOYEES,
             created_at=datetime(2024, 1, 1),
             updated_at=datetime(2024, 1, 1)
         )
@@ -46,7 +46,7 @@ class TestUserService:
             result = check_user(self.mock_db, login_data)
             
             # Assert
-            assert result is True
+            assert result == self.test_user
             self.mock_db.query.assert_called_once_with(User)
 
     def test_check_user_not_found(self):
@@ -56,10 +56,10 @@ class TestUserService:
         login_data = UserLoginSchema(email="nonexistent@example.com", password="password")
         
         # Act & Assert
-        with pytest.raises(UserNotFoundErrorEmail) as exc_info:
-            check_user(self.mock_db, login_data)
-        
-        assert "nonexistent@example.com" in str(exc_info.value)
+        # check_user retourne maintenant None si l'utilisateur n'est pas trouvé
+        result = check_user(self.mock_db, login_data)
+
+        assert result is None
 
     def test_check_user_wrong_password(self):
         """Test avec mot de passe incorrect"""
@@ -135,24 +135,32 @@ class TestUserService:
         # Arrange
         mock_datetime.now.return_value = datetime(2024, 1, 1)
         mock_hash.return_value = "hashed_password"
-        self.mock_query.filter.return_value.first.return_value = None  # Pas d'utilisateur existant
+        # Simule que l'utilisateur n'existe pas et que le rôle n'est plus recherché
+        self.mock_db.query.return_value.filter.return_value.first.return_value = None
         
         user_data = UserSchema(
             first_name="new",
             last_name="user",
             phone_number="0601020304",
             email="new@example.com",
-            password="password123"
+            password="password123", 
+            role=RoleEnum.EMPLOYEES
         )
         
         # Act
-        result = create_user(self.mock_db, user_data)
+        create_user(self.mock_db, user_data)
         
         # Assert
         self.mock_db.add.assert_called_once()
         self.mock_db.commit.assert_called_once()
         self.mock_db.refresh.assert_called_once()
         mock_hash.assert_called_once_with("password123")
+
+        # Vérifier que l'objet passé à add() a les bonnes valeurs
+        added_user = self.mock_db.add.call_args[0][0]
+        assert isinstance(added_user, User)
+        assert added_user.email == "new@example.com"
+        assert added_user.role == RoleEnum.EMPLOYEES
 
     def test_create_user_already_exists(self):
         """Test création d'utilisateur déjà existant"""
@@ -163,7 +171,8 @@ class TestUserService:
             first_name="test",
             last_name="user",
             email="test@example.com",
-            password="password123"
+            password="password123",
+            role=RoleEnum.EMPLOYEES
         )
         
         # Act & Assert
@@ -244,25 +253,26 @@ class TestUserService:
                     mock_dt.now.return_value = datetime(2024, 1, 1)
                     
                     # 1. Créer un utilisateur
-                    self.mock_query.filter.return_value.first.return_value = None
+                    self.mock_db.query.return_value.filter.return_value.first.return_value = None
                     user_data = UserSchema(
                         first_name="workflow",
                         last_name="user",
                         email="workflow@example.com",
-                        password="password123"
+                        password="password123",
+                        role=RoleEnum.EMPLOYEES
                     )
                     
                     create_user(self.mock_db, user_data)
                     
                     # 2. Vérifier l'utilisateur
-                    self.mock_query.filter.return_value.first.return_value = self.test_user
+                    self.mock_db.query.return_value.filter.return_value.first.return_value = self.test_user
                     login_data = UserLoginSchema(
                         email="workflow@example.com",
                         password="password123"
                     )
                     
                     check_result = check_user(self.mock_db, login_data)
-                    assert check_result is True
+                    assert check_result == self.test_user
 
     # Tests des cas limites
     def test_empty_users_list(self):

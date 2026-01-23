@@ -1,22 +1,8 @@
 import pytest
-from sqlalchemy import create_engine
 from fastapi import HTTPException
-from sqlalchemy.orm import sessionmaker
-from db.models import Base, Area, Cell, Sensor, Analytic, AnalyticType, User
+from db.models import Area, Cell, Sensor, Analytic, AnalyticType
 from services.area.repository import get_area_by_id
 from datetime import datetime
-
-@pytest.fixture(scope="function")
-def db_session():
-    """Crée une base de données SQLite en mémoire pour les tests."""
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    yield session
-    session.close()
-    Base.metadata.drop_all(engine)
-    engine.dispose()
 
 @pytest.fixture(scope="function")
 def setup_hierarchy(db_session):

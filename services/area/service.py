@@ -1,6 +1,7 @@
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta, date, timezone
+from datetime import datetime, timedelta, timezone
+from collections import defaultdict
 
 from . import schemas
 from .errors import ParentAreaNotFoundError, AreaNotFoundError
@@ -40,7 +41,7 @@ def create_area(db: Session, area_data: schemas.AreaCreate) -> schemas.Area:
     )
 
 
-def delete_area(db: Session, area_id: int) -> None:
+def delete_area(db: Session, area_id: int) -> bool:
     """
     Supprime une zone et toutes ses sous-zones de manière récursive.
 
@@ -77,6 +78,61 @@ def delete_area(db: Session, area_id: int) -> None:
         db.delete(area)
 
     db.commit()
+    
+    return True
+
+
+def _get_analytics_for_area(db: Session, area: AreaModel) -> List[AnalyticModel]:
+    """
+    Récupère les analytiques des 7 derniers jours pour tous les capteurs d'une zone
+    en une seule requête pour éviter le problème N+1.
+    """
+    sensor_ids = [sensor.id for cell in area.cells for sensor in cell.sensors]
+    if not sensor_ids:
+        return []
+
+    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    return db.query(AnalyticModel).filter(
+        AnalyticModel.sensor_id.in_(sensor_ids),
+        AnalyticModel.occured_at >= seven_days_ago
+    ).all()
+
+
+def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[AnalyticType, List[schemas.AnalyticSchema]]:
+    """
+    Calcule les moyennes journalières pour chaque type d'analytique sur les 7 derniers jours.
+    Retourne toujours une liste de 7 jours pour chaque type, avec une valeur de 0.0 si aucune donnée n'est disponible.
+    """
+    # 1. Regrouper les valeurs par (jour, type) pour un calcul efficace
+    analytics_by_day_and_type = defaultdict(list)
+    for analytic in all_analytics:
+        day = analytic.occured_at.date()
+        key = (day, analytic.analytic_type)
+        analytics_by_day_and_type[key].append(analytic.value)
+
+    # 2. Pour chaque type, calculer les moyennes des 7 derniers jours
+    analytics_averages_by_type = {}
+    today = datetime.now(timezone.utc).date()
+    
+    for analytic_type in AnalyticType:
+        daily_averages_for_type = []
+        for i in range(7):
+            current_day = today - timedelta(days=i)
+            daily_values = analytics_by_day_and_type.get((current_day, analytic_type))
+
+            average_value = 0.0
+            if daily_values:
+                average_value = sum(daily_values) / len(daily_values)
+
+            daily_average_analytic = schemas.AnalyticSchema(
+                value=round(average_value, 2),
+                occured_at=datetime.combine(current_day, datetime.min.time()),
+            )
+            daily_averages_for_type.append(daily_average_analytic)
+        
+        analytics_averages_by_type[analytic_type] = daily_averages_for_type
+    
+    return analytics_averages_by_type
 
 
 def _process_area_recursively(db: Session, area: AreaModel) -> Tuple[schemas.Area, List[AnalyticModel]]:
@@ -94,55 +150,18 @@ def _process_area_recursively(db: Session, area: AreaModel) -> Tuple[schemas.Are
     - L'objet schéma Area traité.
     - Une liste de tous les modèles Analytic trouvés dans cette zone et ses sous-zones.
     """
-    # 1. Récupérer les dernières données analytiques des cellules directes de cette zone
-    all_analytics: List[AnalyticModel] = []
-    for cell in area.cells:
-        for sensor in cell.sensors:
-            # On ne prend que les analytiques des 7 derniers jours
-            seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-            analytics_for_sensor = db.query(AnalyticModel)\
-                .filter(AnalyticModel.sensor_id == sensor.id, AnalyticModel.occured_at >= seven_days_ago)\
-                .all()
-            all_analytics.extend(analytics_for_sensor)
+    # 1. Récupérer les dernières données analytiques des cellules directes de cette zone (optimisé)
+    all_analytics: List[AnalyticModel] = _get_analytics_for_area(db, area)
 
     # 2. Traiter récursivement les sous-zones et agréger leurs données
     processed_sub_areas: List[schemas.Area] = []
-    # On itère sur `area.children` qui est la relation définie dans le modèle SQLAlchemy
     for sub_area in area.children:
         processed_sub_area_schema, sub_area_analytics = _process_area_recursively(db, sub_area)
         processed_sub_areas.append(processed_sub_area_schema)
         all_analytics.extend(sub_area_analytics)
 
-    # 3. Calculer les moyennes pour la zone actuelle (incluant tous les enfants)
-    analytics_averages_by_type: dict[AnalyticType, list[schemas.AnalyticSchema]] = {analytic_type: [] for analytic_type in AnalyticType}
-    if all_analytics:
-        # Regrouper les analytiques par jour
-        analytics_by_day_and_type: dict[tuple[date, AnalyticType], list[float]] = {}
-        for analytic in all_analytics:
-            day = analytic.occured_at.date()
-            key = (day, analytic.analytic_type)
-            analytics_by_day_and_type.setdefault(key, []).append(analytic.value)
-
-        # Pour chaque type d'analytique, calculer les moyennes des 7 derniers jours
-        for analytic_type in AnalyticType:
-            daily_averages_for_type = []
-            today = datetime.now(timezone.utc).date()
-            for i in range(7):
-                current_day = today - timedelta(days=i)
-                daily_values = analytics_by_day_and_type.get((current_day, analytic_type))
-
-                average_value = 0.0
-                if daily_values:
-                    average_value = sum(daily_values) / len(daily_values)
-
-                daily_average_analytic = schemas.AnalyticSchema(
-                    value=average_value,
-                    occured_at=datetime.combine(current_day, datetime.min.time()),
-                )
-                daily_averages_for_type.append(daily_average_analytic)
-            
-            # Ajouter la liste des 7 moyennes pour ce type au dictionnaire principal
-            analytics_averages_by_type[analytic_type] = daily_averages_for_type
+    # 3. Calculer les moyennes pour la zone actuelle (logique extraite)
+    analytics_averages_by_type = _calculate_daily_averages(all_analytics)
 
     # 4. Construire l'objet schéma Pydantic final pour cette zone
     area_schema = schemas.Area(

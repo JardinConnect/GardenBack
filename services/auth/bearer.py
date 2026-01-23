@@ -1,43 +1,32 @@
 
 from fastapi import Request, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Optional
 
 from .auth import decode_jwt
 
-# the JWTBearer class is a subclass of FastAPI's HTTPBearer class that will be used to persist authentication on our routes
 class JWTBearer(HTTPBearer):
-    # we enabled automatic error reporting by setting the boolean auto_error to True
+    """
+    Dépendance FastAPI pour la vérification des tokens JWT.
+
+    Hérite de `HTTPBearer` pour extraire le token de l'en-tête `Authorization`.
+    Vérifie que le schéma est "Bearer" et que le token est valide et non expiré.
+
+    En cas de succès, retourne le payload décodé du token.
+    En cas d'échec, lève une `HTTPException` avec le code de statut 403.
+    """
     def __init__(self, auto_error: bool = True):
-        super(JWTBearer, self).__init__(auto_error=auto_error)
+        super().__init__(auto_error=auto_error)
 
-    # we defined a variable called credentials of type HTTPAuthorizationCredentials, 
-    # which is created when the JWTBearer class is invoked. 
-    # We then proceeded to check if the credentials passed in during the course of invoking the class are valid:
-    # If the credential scheme isn't a bearer scheme, we raised an exception for an invalid token scheme.
-    # If a bearer token was passed, we verified that the JWT is valid.
-    # If no credentials were received, we raised an invalid authorization error.
-    async def __call__(self, request: Request):
-        credentials: HTTPAuthorizationCredentials = await super(JWTBearer, self).__call__(request)
+    async def __call__(self, request: Request) -> Optional[dict]:
+        credentials: Optional[HTTPAuthorizationCredentials] = await super().__call__(request)
         if credentials:
-            if not credentials.scheme == "Bearer":
+            if credentials.scheme != "Bearer":
                 raise HTTPException(status_code=403, detail="Invalid authentication scheme.")
-            if not self.verify_jwt(credentials.credentials):
-                raise HTTPException(status_code=403, detail="Invalid token or expired token.")
-            return credentials.credentials
-        else:
-            raise HTTPException(status_code=403, detail="Invalid authorization code.")
-        
-    # The verify_jwt method verifies whether a token is valid. 
-    # The method takes a jwtoken string which it then passes to the decode_jwt function and returns a boolean value based on the outcome from decode_jwt
-    def verify_jwt(self, jwtoken: str) -> bool:
-        isTokenValid: bool = False
-
-        try:
-            payload = decode_jwt(jwtoken)
-        except Exception as e:
-            print("❌ Erreur de vérification du token JWT", e)
-            payload = None
-        if payload:
-            isTokenValid = True
-
-        return isTokenValid
+            payload = decode_jwt(credentials.credentials)
+            if payload is None:
+                raise HTTPException(status_code=403, detail="Invalid or expired token.")
+            return payload
+        # Si auto_error=True, super().__call__ lèvera une exception avant d'arriver ici.
+        # Cette exception est une sécurité supplémentaire si auto_error=False.
+        raise HTTPException(status_code=403, detail="Invalid authorization code.")

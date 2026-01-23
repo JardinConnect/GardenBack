@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from sqlalchemy.orm import Session
 
 from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID, UserNotFoundErrorEmail
@@ -8,14 +9,16 @@ from services.user.schemas import UserLoginSchema, UserSchema, UserUpdate
 from services.auth.utils.security import get_password_hash, verify_password
 
 
-def check_user(db: Session, data: UserLoginSchema):
+def check_user(db: Session, data: UserLoginSchema) -> Optional[User]:
     user = db.query(User).filter(User.email == data.email).first()
 
     if not user: 
-        raise UserNotFoundErrorEmail(data.email)
+        return None
     
     if verify_password(data.password, user.password):
-        return True
+        return user
+    
+    return None
 
 def get_user(db: Session, user_id: int):
     user = db.query(User).filter(User.id == user_id).first()
@@ -52,7 +55,7 @@ def create_user(db: Session, user: UserSchema):
         phone_number=user.phone_number,
         email=user.email,
         password=get_password_hash(user.password),
-        isAdmin=False,
+        role=user.role,
         created_at=now,
         updated_at=now
     )
