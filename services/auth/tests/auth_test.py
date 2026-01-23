@@ -1,5 +1,6 @@
 import time
 import pytest
+import uuid
 from unittest.mock import patch, MagicMock
 from datetime import datetime
 from datetime import timedelta, timezone
@@ -24,8 +25,8 @@ def mock_config():
 def mock_user_model():
     """Crée un objet User (modèle SQLAlchemy) concret mockant le retour du dépôt."""
     # Créer une instance concrète de User
-    return User(
-        id=1,
+    return User( # L'ID est maintenant un UUID
+        id=uuid.uuid4(),
         first_name='Test',
         last_name='User',
         phone_number='1234567890',
@@ -59,7 +60,7 @@ def test_create_refresh_token_success(mock_datetime_module, mock_uuid4, mock_db_
     mock_datetime_module.timedelta = timedelta # Assure que timedelta fonctionne
     mock_datetime_module.timezone = timezone # Assure que timezone est disponible
 
-    user_id = 123
+    user_id = uuid.uuid4()
 
     # Act
     token = create_refresh_token(mock_db_session, user_id)
