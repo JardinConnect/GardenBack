@@ -2,7 +2,7 @@ from enum import Enum as PyEnum
 from typing import Optional, List, TYPE_CHECKING
 import uuid
 from sqlalchemy import (
-    Integer, String, DateTime, Float, ForeignKey, UUID
+    String, DateTime, Float, ForeignKey, UUID
 ) 
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
@@ -66,7 +66,6 @@ class Area(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     color: Mapped[Optional[str]] = mapped_column(String)
-    level: Mapped[int] = mapped_column(Integer, default=1)  # Niveau de profondeur
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
