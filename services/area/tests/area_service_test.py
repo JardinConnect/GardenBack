@@ -76,7 +76,7 @@ def test_create_area_with_nonexistent_parent_fails(db_session):
 
 def test_delete_area_not_found(db_session):
     """Vérifie qu'une erreur est levée lors de la suppression d'une zone inexistante."""
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(AreaNotFoundError):
         delete_area(db_session, uuid.uuid4())
 
 

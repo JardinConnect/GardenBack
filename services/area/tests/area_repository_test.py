@@ -36,7 +36,7 @@ def setup_hierarchy(db_session):
 
 def test_get_by_id_not_found(db_session):
     """Teste que get_by_id retourne None si l'ID n'existe pas."""
-    result = get_by_id(db_session, 999)
+    result = get_by_id(db_session, uuid.uuid4())
     assert result is None
 
 def test_get_by_id_success(db_session, setup_hierarchy):

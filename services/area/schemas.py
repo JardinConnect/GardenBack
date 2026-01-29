@@ -7,6 +7,7 @@ from services.analytics.schemas import AnalyticSchema
 
 
 class Cell(BaseModel):
+    id: uuid.UUID
     name: str
 
     model_config = ConfigDict(from_attributes=True)
@@ -14,7 +15,7 @@ class Cell(BaseModel):
 class AreaCreate(BaseModel):
     name: str
     color: Optional[str] = None
-    parent_id: Optional[uuid.UUID] = Field(default=None)
+    parent_id: Optional[uuid.UUID] = None
 
 class Area(BaseModel):
     id: uuid.UUID

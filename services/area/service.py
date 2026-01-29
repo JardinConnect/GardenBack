@@ -93,7 +93,7 @@ def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[Analyt
 def _build_area_schema_recursively(
     area: AreaModel, 
     level: int, 
-    analytics_by_area: Dict[int, List[AnalyticModel]]
+    analytics_by_area: Dict[uuid.UUID, List[AnalyticModel]]
 ) -> Tuple[schemas.Area, List[AnalyticModel]]:
     """
     Construit récursivement le schéma Pydantic pour une zone et ses sous-zones

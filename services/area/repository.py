@@ -1,6 +1,7 @@
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session, aliased, selectinload
 from sqlalchemy import select, literal
+import uuid
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
@@ -9,7 +10,7 @@ from db.models import Area as AreaModel, Analytic as AnalyticModel, Cell as Cell
 
 # --- Read Operations ---
 
-def get_by_id(db: Session, area_id: int) -> Optional[AreaModel]:
+def get_by_id(db: Session, area_id: uuid.UUID) -> Optional[AreaModel]:
     """Récupère une zone par son ID."""
     return db.query(AreaModel).filter(AreaModel.id == area_id).first()
 
@@ -25,7 +26,7 @@ def get_all_areas_with_relations(db: Session) -> List[AreaModel]:
     ).all()
 
 
-def get_areas_by_ids_with_relations(db: Session, area_ids: List[int]) -> List[AreaModel]:
+def get_areas_by_ids_with_relations(db: Session, area_ids: List[uuid.UUID]) -> List[AreaModel]:
     """
     Charge tous les objets Area pour une liste d'IDs, en pré-chargeant leurs cellules
     et enfants pour éviter des requêtes ultérieures.
@@ -36,7 +37,7 @@ def get_areas_by_ids_with_relations(db: Session, area_ids: List[int]) -> List[Ar
     ).filter(AreaModel.id.in_(area_ids)).all()
 
 
-def get_area_level(db: Session, area_id: int) -> int:
+def get_area_level(db: Session, area_id: uuid.UUID) -> int:
     """
     Calcule le niveau d'une zone en utilisant une CTE récursive SQL pour l'efficacité.
     """
@@ -57,7 +58,7 @@ def get_area_level(db: Session, area_id: int) -> int:
     return level
 
 
-def get_descendant_area_ids(db: Session, area_id: int) -> List[int]:
+def get_descendant_area_ids(db: Session, area_id: uuid.UUID) -> List[uuid.UUID]:
     """
     Récupère l'ID de la zone donnée et tous ses descendants en utilisant une CTE récursive.
     """
@@ -72,7 +73,7 @@ def get_descendant_area_ids(db: Session, area_id: int) -> List[int]:
     return result
 
 
-def get_analytics_for_areas(db: Session, area_ids: List[int]) -> Dict[int, List[AnalyticModel]]:
+def get_analytics_for_areas(db: Session, area_ids: List[uuid.UUID]) -> Dict[uuid.UUID, List[AnalyticModel]]:
     """
     Récupère les analytiques des 7 derniers jours pour une liste de zones
     et les regroupe par area_id pour un accès rapide.
