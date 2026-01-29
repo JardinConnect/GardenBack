@@ -40,6 +40,47 @@ def create_area(db: Session, area_data: schemas.AreaCreate) -> schemas.Area:
     )
 
 
+def update_area(db: Session, area_id: uuid.UUID, area_data: schemas.AreaUpdate) -> schemas.Area:
+    """
+    Met à jour une zone.
+    Valide les changements (notamment le parent_id pour éviter les cycles)
+    et délègue la persistance au repository.
+    """
+    # 1. Récupérer l'objet à mettre à jour
+    area_to_update = repository.get_by_id(db, area_id)
+    if not area_to_update:
+        raise AreaNotFoundError()
+
+    # 2. Obtenir les données de mise à jour, en excluant les champs non définis
+    update_data = area_data.model_dump(exclude_unset=True)
+
+    # 3. Gérer la validation complexe du changement de parent
+    if "parent_id" in update_data:
+        new_parent_id = update_data["parent_id"]
+
+        # Un objet ne peut pas être son propre parent
+        if new_parent_id == area_id:
+            raise ValueError("An area cannot be its own parent.")
+
+        if new_parent_id is not None:
+            # Vérifier que le nouveau parent existe
+            if not repository.get_by_id(db, new_parent_id):
+                raise ParentAreaNotFoundError("The new parent area was not found.")
+
+            # Vérifier la dépendance cyclique : on ne peut pas déplacer une zone dans un de ses enfants
+            descendant_ids = repository.get_descendant_area_ids(db, area_id)
+            if new_parent_id in descendant_ids:
+                raise ValueError("Cannot move an area into one of its own descendants (cyclic dependency).")
+
+    # 4. Appliquer les mises à jour sur le modèle SQLAlchemy
+    for key, value in update_data.items():
+        setattr(area_to_update, key, value)
+
+    # 5. Persister les changements et retourner le schéma mis à jour
+    repository.update(db, area_to_update)
+    return get_area_with_analytics(db, area_id)
+
+
 def delete_area(db: Session, area_id: uuid.UUID) -> bool:
     """
     Supprime une zone et toutes ses sous-zones.

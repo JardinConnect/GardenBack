@@ -129,3 +129,10 @@ def delete_hierarchy(db: Session, area_to_delete: AreaModel):
         db.delete(area)
 
     db.commit()
+
+
+def update(db: Session, area: AreaModel) -> AreaModel:
+    """Commit et refresh une zone mise à jour."""
+    db.commit()
+    db.refresh(area)
+    return area

@@ -3,7 +3,7 @@ import uuid
 from typing import List
 from sqlalchemy.orm import Session
 
-from .schemas import Area, AreaCreate
+from .schemas import Area, AreaCreate, AreaUpdate
 from . import service
 from .errors import AreaNotFoundError, ParentAreaNotFoundError
 from db.database import get_db
@@ -42,6 +42,35 @@ def create_area(
         return service.create_area(db, area_data)
     except ParentAreaNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.put("/{area_id}", response_model=Area, dependencies=[Depends(JWTBearer())])
+def update_area(
+    area_data: AreaUpdate,
+    area_id: uuid.UUID = Path(..., title="The ID of the area to update"),
+    db: Session = Depends(get_db),
+) -> Area:
+    """
+    Met à jour une zone.
+
+    - **area_id**: L'ID de la zone à mettre à jour.
+    - **area_data**: Données à mettre à jour. Seuls les champs fournis seront modifiés.
+        - `name`: Nouveau nom de la zone.
+        - `color`: Nouvelle couleur hexadécimale.
+        - `parent_id`: Nouvel ID de la zone parente. Mettre à `null` pour la déplacer à la racine.
+
+    **Erreurs possibles :**
+    - `404 Not Found`: Si l'ID de la zone ou le `parent_id` fourni n'existe pas.
+    - `400 Bad Request`: Si une tentative de créer une dépendance cyclique est détectée (ex: déplacer une zone dans un de ses propres enfants).
+    """
+    try:
+        updated_area = service.update_area(db, area_id, area_data)
+        return updated_area
+    except (AreaNotFoundError, ParentAreaNotFoundError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        # Capturer les erreurs de validation de la logique métier (ex: dépendance cyclique)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.delete("/{area_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(JWTBearer())])

@@ -4,8 +4,8 @@ import uuid
 
 from fastapi import HTTPException
 from db.models import Area as AreaModel, Cell as CellModel, Sensor as SensorModel, Analytic as AnalyticModel, AnalyticType
-from services.area.service import get_area_with_analytics, create_area, delete_area, _calculate_daily_averages
-from services.area.schemas import AreaCreate
+from services.area.service import get_area_with_analytics, create_area, delete_area, update_area, _calculate_daily_averages
+from services.area.schemas import AreaCreate, AreaUpdate
 from services.area.errors import ParentAreaNotFoundError, AreaNotFoundError
 
 
@@ -374,3 +374,88 @@ def test_get_area_uses_latest_analytic_only(db_session):
     # La moyenne pour aujourd'hui doit être 50.0
     today_avg = next((avg.value for avg in result_area.analytics[AnalyticType.AIR_TEMPERATURE] if avg.occured_at.date() == now.date()), None)
     assert today_avg == 50.0
+
+# === Tests for update_area ===
+
+def test_update_area_not_found(db_session):
+    """Vérifie qu'une AreaNotFoundError est levée si la zone à mettre à jour n'existe pas."""
+    update_data = AreaUpdate(name="New Name")
+    with pytest.raises(AreaNotFoundError):
+        update_area(db_session, uuid.uuid4(), update_data)
+
+def test_update_area_name_and_color(db_session):
+    """Vérifie la mise à jour simple du nom et de la couleur."""
+    area = AreaModel(name="Old Name", color="#000000")
+    db_session.add(area)
+    db_session.commit()
+
+    update_data = AreaUpdate(name="New Name", color="#FFFFFF")
+    updated_area_schema = update_area(db_session, area.id, update_data)
+
+    assert updated_area_schema.name == "New Name"
+    assert updated_area_schema.color == "#FFFFFF"
+
+    db_session.refresh(area)
+    assert area.name == "New Name"
+    assert area.color == "#FFFFFF"
+
+def test_update_area_change_parent(db_session):
+    """Vérifie le changement de parent d'une zone."""
+    root1 = AreaModel(name="Root 1")
+    root2 = AreaModel(name="Root 2")
+    db_session.add_all([root1, root2])
+    db_session.commit()
+    child = AreaModel(name="Child", parent_id=root1.id)
+    db_session.add(child)
+    db_session.commit()
+
+    # Move child from root1 to root2
+    update_data = AreaUpdate(parent_id=root2.id)
+    updated_area_schema = update_area(db_session, child.id, update_data)
+
+    assert updated_area_schema.level == 2
+    
+    db_session.refresh(child)
+    assert child.parent_id == root2.id
+
+def test_update_area_move_to_root(db_session):
+    """Vérifie le déplacement d'une zone enfant vers la racine."""
+    parent = AreaModel(name="Parent")
+    db_session.add(parent)
+    db_session.commit()
+    child = AreaModel(name="Child", parent_id=parent.id)
+    db_session.add(child)
+    db_session.commit()
+
+    # Move child to root by setting parent_id to None
+    update_data = AreaUpdate(parent_id=None)
+    updated_area_schema = update_area(db_session, child.id, update_data)
+
+    assert updated_area_schema.level == 1
+    
+    db_session.refresh(child)
+    assert child.parent_id is None
+
+def test_update_area_self_parent_error(db_session):
+    """Vérifie qu'une erreur est levée si une zone est définie comme son propre parent."""
+    area = AreaModel(name="Area")
+    db_session.add(area)
+    db_session.commit()
+
+    update_data = AreaUpdate(parent_id=area.id)
+    with pytest.raises(ValueError, match="An area cannot be its own parent."):
+        update_area(db_session, area.id, update_data)
+
+def test_update_area_cyclic_dependency_error(db_session):
+    """Vérifie qu'une erreur est levée si on déplace un parent dans son propre enfant."""
+    parent = AreaModel(name="Parent")
+    db_session.add(parent)
+    db_session.commit()
+    child = AreaModel(name="Child", parent_id=parent.id)
+    db_session.add(child)
+    db_session.commit()
+
+    # Try to move parent into child
+    update_data = AreaUpdate(parent_id=child.id)
+    with pytest.raises(ValueError, match="Cannot move an area into one of its own descendants"):
+        update_area(db_session, parent.id, update_data)

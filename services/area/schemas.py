@@ -17,6 +17,11 @@ class AreaCreate(BaseModel):
     color: Optional[str] = None
     parent_id: Optional[uuid.UUID] = None
 
+class AreaUpdate(BaseModel):
+    name: Optional[str] = None
+    color: Optional[str] = None
+    parent_id: Optional[uuid.UUID] = None
+
 class Area(BaseModel):
     id: uuid.UUID
     name: str

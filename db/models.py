@@ -2,7 +2,7 @@ from enum import Enum as PyEnum
 from typing import Optional, List, TYPE_CHECKING
 import uuid
 from sqlalchemy import (
-    Integer, String, DateTime, Float, ForeignKey, UUID
+    String, DateTime, Float, ForeignKey, UUID
 ) 
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
