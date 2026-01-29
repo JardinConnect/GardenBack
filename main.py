@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.middleware.cors import CORSMiddleware
 
 from services.alert.router import router as alert_router
 from services.auth.router import router as auth_router
@@ -18,13 +18,13 @@ from services.mqtt.client import connect_mqtt
 
 app = FastAPI(title="GardenConnect API", version="1.0.0")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_credentials=True,
+#     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+#     allow_headers=["*"],
+# )
 
 
 @app.exception_handler(HTTPException)
