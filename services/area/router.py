@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Path, status, HTTPException
 import uuid
+from typing import List
 from sqlalchemy.orm import Session
 
 from .schemas import Area, AreaCreate
@@ -9,6 +10,17 @@ from db.database import get_db
 from services.auth.bearer import JWTBearer
 
 router = APIRouter()
+
+@router.get("/", response_model=List[Area], dependencies=[Depends(JWTBearer())])
+def get_all_areas(db: Session = Depends(get_db)) -> List[Area]:
+    """
+    Récupère toutes les zones de jardin sous forme d'arborescence.
+
+    Retourne une liste des zones racines (celles sans parent), chacune contenant
+    ses sous-zones, cellules et analytiques agrégées.
+    """
+    return service.get_all_areas_with_analytics(db)
+
 
 @router.post("/", response_model=Area, status_code=status.HTTP_201_CREATED, dependencies=[Depends(JWTBearer())])
 def create_area(

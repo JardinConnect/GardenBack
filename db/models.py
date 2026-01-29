@@ -66,7 +66,6 @@ class Area(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     color: Mapped[Optional[str]] = mapped_column(String)
-    level: Mapped[int] = mapped_column(Integer, default=1)  # Niveau de profondeur
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 

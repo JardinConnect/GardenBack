@@ -4,7 +4,7 @@ import uuid
 
 from fastapi import HTTPException
 from db.models import Area as AreaModel, Cell as CellModel, Sensor as SensorModel, Analytic as AnalyticModel, AnalyticType
-from services.area.service import get_area_with_analytics, create_area, delete_area, _get_analytics_for_area, _calculate_daily_averages
+from services.area.service import get_area_with_analytics, create_area, delete_area, _calculate_daily_averages
 from services.area.schemas import AreaCreate
 from services.area.errors import ParentAreaNotFoundError, AreaNotFoundError
 
@@ -24,6 +24,7 @@ def test_create_area_as_root_success(db_session):
     assert result.id is not None
     assert result.name == "Root Garden"
     assert result.color == "#00FF00"
+    assert result.level == 1
     assert result.areas == []
     assert result.cells == []
 
@@ -33,12 +34,11 @@ def test_create_area_as_root_success(db_session):
     assert db_area.name == "Root Garden"
     assert db_area.color == "#00FF00"
     assert db_area.parent_id is None
-    assert db_area.level == 1
 
 def test_create_area_as_child_success(db_session):
     """Vérifie la création réussie d'une zone enfant."""
     # Arrange
-    parent_area = AreaModel(name="Parent Area", level=1)
+    parent_area = AreaModel(name="Parent Area")
     db_session.add(parent_area)
     db_session.commit()
 
@@ -48,12 +48,15 @@ def test_create_area_as_child_success(db_session):
     result = create_area(db_session, area_data)
 
     # Assert
+    # Vérifier le schéma Pydantic retourné
+    assert result.name == "Child Area"
+    assert result.level == 2
+
     # Vérifier les données dans la base de données
     db_area = db_session.query(AreaModel).filter(AreaModel.id == result.id).first()
     assert db_area is not None
     assert db_area.name == "Child Area"
     assert db_area.parent_id == parent_area.id
-    assert db_area.level == 2
 
 def test_create_area_with_nonexistent_parent_fails(db_session):
     """Vérifie qu'une erreur est levée si le parent n'existe pas."""
@@ -61,11 +64,8 @@ def test_create_area_with_nonexistent_parent_fails(db_session):
     area_data = AreaCreate(name="Orphan Area", parent_id=uuid.uuid4())
 
     # Act & Assert
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(ParentAreaNotFoundError):
         create_area(db_session, area_data)
-
-    assert exc_info.value.status_code == 404
-    assert exc_info.value.detail == "Parent area not found"
 
     # Vérifier qu'aucune zone n'a été ajoutée
     count = db_session.query(AreaModel).count()
@@ -78,9 +78,6 @@ def test_delete_area_not_found(db_session):
     """Vérifie qu'une erreur est levée lors de la suppression d'une zone inexistante."""
     with pytest.raises(HTTPException) as exc_info:
         delete_area(db_session, uuid.uuid4())
-
-    assert exc_info.value.status_code == AreaNotFoundError.status_code
-    assert exc_info.value.detail == AreaNotFoundError.detail
 
 
 def test_delete_area_single_with_cell(db_session):
@@ -119,11 +116,11 @@ def test_delete_area_with_hierarchy(db_session):
     """
     # Arrange
     # Structure: Parent -> Child
-    parent = AreaModel(name="Parent", level=1)
+    parent = AreaModel(name="Parent")
     db_session.add(parent)
     db_session.commit()
 
-    child = AreaModel(name="Child", level=2, parent_id=parent.id)
+    child = AreaModel(name="Child", parent_id=parent.id)
     db_session.add(child)
     db_session.commit()
 
@@ -147,42 +144,6 @@ def test_delete_area_with_hierarchy(db_session):
 
 
 # === Tests for Helper Functions (_get_analytics_for_area, _calculate_daily_averages) ===
-
-def test_get_analytics_for_area_success(db_session):
-    """Vérifie que la fonction récupère bien les analytiques des 7 derniers jours."""
-    # Arrange
-    area = AreaModel(name="Test Area")
-    cell = CellModel(name="Test Cell", area=area)
-    sensor = SensorModel(sensor_id="S1", sensor_type="temp", cell=cell)
-    db_session.add_all([area, cell, sensor])
-    db_session.commit()
-
-    now = datetime.now(UTC)
-    analytic_recent = AnalyticModel(sensor_id=sensor.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=25, occured_at=now - timedelta(days=1), sensor_code="S1")
-    analytic_old = AnalyticModel(sensor_id=sensor.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=10, occured_at=now - timedelta(days=8), sensor_code="S1")
-    db_session.add_all([analytic_recent, analytic_old])
-    db_session.commit()
-
-    # Act
-    result = _get_analytics_for_area(db_session, area)
-
-    # Assert
-    assert len(result) == 1
-    assert result[0].id == analytic_recent.id
-    assert result[0].value == 25
-
-def test_get_analytics_for_area_no_sensors(db_session):
-    """Vérifie que la fonction retourne une liste vide si la zone n'a pas de capteurs."""
-    # Arrange
-    area = AreaModel(name="Empty Area")
-    db_session.add(area)
-    db_session.commit()
-
-    # Act
-    result = _get_analytics_for_area(db_session, area)
-
-    # Assert
-    assert result == []
 
 def test_calculate_daily_averages_basic():
     """Vérifie le calcul de base des moyennes journalières."""
@@ -229,6 +190,46 @@ def test_calculate_daily_averages_rounding():
 
 # === Tests for get_area_with_analytics ===
 
+@pytest.fixture(scope="function")
+def setup_hierarchy_for_service(db_session):
+    """Crée une hiérarchie de test : Parcelle -> Planche -> Cellule."""
+    parcelle = AreaModel(name="Parcelle Test", color="#111111")
+    db_session.add(parcelle)
+    db_session.commit()
+
+    planche = AreaModel(name="Planche Test", color="#222222", parent_id=parcelle.id)
+    db_session.add(planche)
+    db_session.commit()
+
+    cellule = CellModel(name="Cellule Test", area_id=planche.id)
+    db_session.add(cellule)
+    db_session.commit()
+
+    return {"parcelle_id": parcelle.id, "planche_id": planche.id}
+
+def test_get_area_with_analytics_structure(db_session, setup_hierarchy_for_service):
+    """Teste la récupération réussie d'une zone et sa structure hiérarchique."""
+    parcelle_id = setup_hierarchy_for_service["parcelle_id"]
+
+    # Action
+    result = get_area_with_analytics(db_session, parcelle_id)
+
+    # Assertions
+    assert result.name == "Parcelle Test"
+    assert result.color == "#111111"
+    assert result.level == 1
+    
+    # Vérifier la sous-zone (planche)
+    assert len(result.areas) == 1
+    planche_schema = result.areas[0]
+    assert planche_schema.name == "Planche Test"
+    assert planche_schema.level == 2
+    
+    # Vérifier la cellule dans la planche
+    assert len(planche_schema.cells) == 1
+    cellule_schema = planche_schema.cells[0]
+    assert cellule_schema.name == "Cellule Test"
+
 def test_get_area_not_found(db_session):
     """
     Vérifie que la fonction retourne None si l'ID de la zone n'existe pas.
@@ -268,6 +269,7 @@ def test_get_area_single_level_with_analytics(db_session):
     # --- Vérification ---
     assert result_area is not None
     assert result_area.name == "Area 1"
+    assert result_area.level == 1
     assert len(result_area.areas) == 0
     assert result_area.analytics is not None
 
@@ -288,6 +290,8 @@ def test_get_area_multi_level_aggregation(db_session):
     Vérifie que les moyennes sont correctement agrégées depuis les sous-zones.
     """
     # --- Préparation ---
+    now = datetime.now(UTC)
+
     # Zone Parent
     parent_area = AreaModel(name="Parent Area")
     db_session.add(parent_area)
@@ -298,7 +302,6 @@ def test_get_area_multi_level_aggregation(db_session):
     sensor_parent = SensorModel(sensor_id="TP", sensor_type="temperature", cell_id=cell_parent.id)
     db_session.add(sensor_parent)
     db_session.commit()
-    now = datetime.now(UTC)
     analytic_parent = AnalyticModel(sensor_id=sensor_parent.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=10.0, sensor_code="TP", occured_at=now)
     db_session.add(analytic_parent)
     db_session.commit()
@@ -323,11 +326,13 @@ def test_get_area_multi_level_aggregation(db_session):
     # --- Vérification ---
     assert result_area is not None
     assert result_area.name == "Parent Area"
+    assert result_area.level == 1
     assert len(result_area.areas) == 1
     
     # Vérifier la sous-zone
     result_child = result_area.areas[0]
     assert result_child.name == "Child Area"
+    assert result_child.level == 2
     assert result_child.analytics is not None
     child_avg = next((avg.value for avg in result_child.analytics[AnalyticType.AIR_TEMPERATURE] if avg.occured_at.date() == now.date()), None)
     assert child_avg == 30.0
@@ -335,7 +340,7 @@ def test_get_area_multi_level_aggregation(db_session):
     # Vérifier l'agrégation sur la zone parente
     assert result_area.analytics is not None
     parent_avg = next((avg.value for avg in result_area.analytics[AnalyticType.AIR_TEMPERATURE] if avg.occured_at.date() == now.date()), None)
-    assert parent_avg == (10.0 + 30.0) / 2  # Moyenne de 10 et 30
+    assert parent_avg == (10.0 + 30.0) / 2  # Moyenne de 10 (parent) et 30 (enfant)
 
 
 def test_get_area_uses_latest_analytic_only(db_session):

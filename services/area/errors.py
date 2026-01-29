@@ -1,11 +1,9 @@
-from fastapi import HTTPException, status
+class AreaNotFoundError(Exception):
+    def __init__(self, message: str = "Area not found"):
+        self.message = message
+        super().__init__(self.message)
 
-AreaNotFoundError = HTTPException(
-    status_code=status.HTTP_404_NOT_FOUND,
-    detail="Area not found",
-)
-
-ParentAreaNotFoundError = HTTPException(
-    status_code=status.HTTP_404_NOT_FOUND,
-    detail="Parent area not found",
-)
+class ParentAreaNotFoundError(Exception):
+    def __init__(self, message: str = "Parent area not found"):
+        self.message = message
+        super().__init__(self.message)

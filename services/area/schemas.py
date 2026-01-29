@@ -20,8 +20,9 @@ class Area(BaseModel):
     id: uuid.UUID
     name: str
     color: Optional[str] = None
+    level: int
     areas: List['Area'] = Field(default_factory=list)
-    cells: Optional[List[Cell]] = None
+    cells: List[Cell] = Field(default_factory=list)
     analytics: Dict[AnalyticType, List[AnalyticSchema]]
 
 

@@ -114,13 +114,11 @@ def seed_garden_hierarchy(db):
     parcelle_nord = Area(
         name="Parcelle Nord",
         color="#2E8B57",
-        level=1,
         parent_id=None
     )
     parcelle_sud = Area(
         name="Parcelle Sud", 
         color="#228B22",
-        level=1,
         parent_id=None
     )
     
@@ -138,13 +136,11 @@ def seed_garden_hierarchy(db):
     planche_tomates = Area(
         name="Planche Tomates",
         color="#FF6347",
-        level=2,
         parent_id=parcelle_nord.id
     )
     planche_salades = Area(
         name="Planche Salades",
         color="#90EE90",
-        level=2,
         parent_id=parcelle_nord.id
     )
     
@@ -152,13 +148,11 @@ def seed_garden_hierarchy(db):
     planche_carottes = Area(
         name="Planche Carottes",
         color="#FFA500",
-        level=2,
         parent_id=parcelle_sud.id
     )
     planche_herbes = Area(
         name="Planche Herbes Aromatiques",
         color="#9ACD32",
-        level=2,
         parent_id=parcelle_sud.id
     )
     
@@ -175,13 +169,11 @@ def seed_garden_hierarchy(db):
     sous_planche_tomates_cerises = Area(
         name="Section Tomates Cerises",
         color="#FF4500",
-        level=3,
         parent_id=planche_tomates.id
     )
     sous_planche_tomates_coeur = Area(
         name="Section Tomates Coeur de Boeuf",
         color="#DC143C",
-        level=3,
         parent_id=planche_tomates.id
     )
     

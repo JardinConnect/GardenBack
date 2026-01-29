@@ -4,38 +4,36 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
-from . import schemas
+from . import schemas, repository
 from .errors import ParentAreaNotFoundError, AreaNotFoundError
 from db.models import Area as AreaModel, Analytic as AnalyticModel, AnalyticType
 
 
 def create_area(db: Session, area_data: schemas.AreaCreate) -> schemas.Area:
     """
-    Crée une nouvelle zone (Area) dans la base de données.
-
-    - Si un `parent_id` est fourni, la nouvelle zone devient un enfant de cette zone parente
-      et son niveau hiérarchique est calculé en conséquence.
-    - Si aucun `parent_id` n'est fourni, la zone est créée au niveau racine (niveau 1).
-    - Lève une `ParentAreaNotFoundError` si le `parent_id` ne correspond à aucune zone existante.
+    Crée une nouvelle zone (Area).
+    La logique métier est de valider le parent et de calculer le niveau.
+    L'enregistrement en base de données est délégué au repository.
     """
     level = 1
     if area_data.parent_id:
-        parent_area = db.query(AreaModel).filter(AreaModel.id == area_data.parent_id).first()
+        parent_area = repository.get_by_id(db, area_data.parent_id)
         if not parent_area:
             raise ParentAreaNotFoundError
-        level = parent_area.level + 1
+        level = repository.get_area_level(db, parent_area.id) + 1
 
-    db_area = AreaModel(**area_data.model_dump(), level=level)
-    db.add(db_area)
-    db.commit()
-    db.refresh(db_area)
+    db_area_model = AreaModel(**area_data.model_dump())
+    
+    # Délégation de la création au repository
+    created_area = repository.create(db, db_area_model)
 
     # Une nouvelle zone n'a pas encore d'enfants, de cellules ou d'historique analytique.
     # On retourne un schéma Area complet mais vide pour la cohérence de l'API.
     return schemas.Area(
-        id=db_area.id,
-        name=db_area.name,
-        color=db_area.color,
+        id=created_area.id,
+        name=created_area.name,
+        color=created_area.color,
+        level=level,
         areas=[],
         cells=[],
         analytics={analytic_type: [] for analytic_type in AnalyticType}
@@ -44,74 +42,30 @@ def create_area(db: Session, area_data: schemas.AreaCreate) -> schemas.Area:
 
 def delete_area(db: Session, area_id: uuid.UUID) -> bool:
     """
-    Supprime une zone et toutes ses sous-zones de manière récursive.
-
-    - les cellules attachées aux zones supprimées ne sont pas supprimées, mais leur `area_id` est mis à None
-    - Lève une `AreaNotFoundError` si l'ID de la zone n'existe pas.
+    Supprime une zone et toutes ses sous-zones.
+    Vérifie d'abord l'existence de la zone, puis délègue la suppression au repository.
     """
-    area_to_delete = db.query(AreaModel).filter(AreaModel.id == area_id).first()
+    area_to_delete = repository.get_by_id(db, area_id)
     if not area_to_delete:
         raise AreaNotFoundError
 
-    # 1. Collecter la zone principale et toutes ses descendantes (parcours en largeur)
-    areas_to_delete = []
-    queue = [area_to_delete]
-    while queue:
-        current_area = queue.pop(0)
-        areas_to_delete.append(current_area)
-        # On charge explicitement les enfants pour le parcours
-        db.refresh(current_area, ['children'])
-        queue.extend(current_area.children)
-
-    # 2. Détacher toutes les cellules de toutes les zones à supprimer
-    for area in areas_to_delete:
-        # On charge explicitement les cellules pour les détacher
-        db.refresh(area, ['cells'])
-        for cell in area.cells:
-            cell.area_id = None
-    
-    # Le flush permet d'envoyer les UPDATE (cell.area_id = None) à la DB
-    # avant les DELETE, pour éviter les conflits de contraintes.
-    db.flush()
-
-    # 3. Supprimer les zones en partant des plus profondes (ordre inverse de la collecte)
-    for area in reversed(areas_to_delete):
-        db.delete(area)
-
-    db.commit()
-    
+    repository.delete_hierarchy(db, area_to_delete)
     return True
 
 
-def _get_analytics_for_area(db: Session, area: AreaModel) -> List[AnalyticModel]:
-    """
-    Récupère les analytiques des 7 derniers jours pour tous les capteurs d'une zone
-    en une seule requête pour éviter le problème N+1.
-    """
-    sensor_ids = [sensor.id for cell in area.cells for sensor in cell.sensors]
-    if not sensor_ids:
-        return []
-
-    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-    return db.query(AnalyticModel).filter(
-        AnalyticModel.sensor_id.in_(sensor_ids),
-        AnalyticModel.occured_at >= seven_days_ago
-    ).all()
-
+# --- Fonctions de logique métier (privées, pas d'accès DB) ---
 
 def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[AnalyticType, List[schemas.AnalyticSchema]]:
     """
     Calcule les moyennes journalières pour chaque type d'analytique sur les 7 derniers jours.
     Retourne toujours une liste de 7 jours pour chaque type, avec une valeur de 0.0 si aucune donnée n'est disponible.
     """
-    # 1. Regrouper les valeurs par (jour, type) pour un calcul efficace
     analytics_by_day_and_type = defaultdict(list)
     for analytic in all_analytics:
         day = analytic.occured_at.date()
         key = (day, analytic.analytic_type)
         analytics_by_day_and_type[key].append(analytic.value)
 
-    # 2. Pour chaque type, calculer les moyennes des 7 derniers jours
     analytics_averages_by_type = {}
     today = datetime.now(timezone.utc).date()
     
@@ -136,39 +90,33 @@ def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[Analyt
     return analytics_averages_by_type
 
 
-def _process_area_recursively(db: Session, area: AreaModel) -> Tuple[schemas.Area, List[AnalyticModel]]:
+def _build_area_schema_recursively(
+    area: AreaModel, 
+    level: int, 
+    analytics_by_area: Dict[int, List[AnalyticModel]]
+) -> Tuple[schemas.Area, List[AnalyticModel]]:
     """
-    Traite récursivement une zone et ses sous-zones pour calculer les moyennes analytiques.
-
-    Cette fonction effectue un parcours de l'arbre des zones. Pour chaque zone, elle :
-    1. Récupère les dernières données analytiques des capteurs de ses propres cellules.
-    2. S'appelle récursivement sur toutes les sous-zones et collecte leurs résultats.
-    3. Agrège toutes les données analytiques (les siennes et celles de tous ses descendants).
-    4. Calcule la moyenne des analytiques pour les données agrégées.
-    5. Construit le schéma Pydantic pour la zone actuelle, en y incluant la moyenne calculée.
-
-    Retourne un tuple contenant :
-    - L'objet schéma Area traité.
-    - Une liste de tous les modèles Analytic trouvés dans cette zone et ses sous-zones.
+    Construit récursivement le schéma Pydantic pour une zone et ses sous-zones
+    en utilisant des données analytiques pré-chargées.
     """
-    # 1. Récupérer les dernières données analytiques des cellules directes de cette zone (optimisé)
-    all_analytics: List[AnalyticModel] = _get_analytics_for_area(db, area)
+    direct_analytics: List[AnalyticModel] = analytics_by_area.get(area.id, [])
+    all_analytics = list(direct_analytics)
 
-    # 2. Traiter récursivement les sous-zones et agréger leurs données
     processed_sub_areas: List[schemas.Area] = []
     for sub_area in area.children:
-        processed_sub_area_schema, sub_area_analytics = _process_area_recursively(db, sub_area)
+        processed_sub_area_schema, sub_area_analytics = _build_area_schema_recursively(
+            sub_area, level + 1, analytics_by_area
+        )
         processed_sub_areas.append(processed_sub_area_schema)
         all_analytics.extend(sub_area_analytics)
 
-    # 3. Calculer les moyennes pour la zone actuelle (logique extraite)
     analytics_averages_by_type = _calculate_daily_averages(all_analytics)
 
-    # 4. Construire l'objet schéma Pydantic final pour cette zone
     area_schema = schemas.Area(
         id=area.id,
         name=area.name,
         color=area.color,
+        level=level,
         areas=processed_sub_areas,
         cells=[schemas.Cell.model_validate(cell) for cell in area.cells],
         analytics=analytics_averages_by_type
@@ -176,14 +124,58 @@ def _process_area_recursively(db: Session, area: AreaModel) -> Tuple[schemas.Are
 
     return area_schema, all_analytics
 
+def get_all_areas_with_analytics(db: Session) -> List[schemas.Area]:
+    """
+    Récupère toutes les zones racines et leur hiérarchie complète
+    avec les analytiques agrégées, de manière optimisée.
+    """
+    # 1. Récupérer toutes les zones et leurs relations via le repository.
+    all_areas = repository.get_all_areas_with_relations(db)
+    if not all_areas:
+        return []
+
+    # 2. Créer des dictionnaires pour un accès rapide et identifier les racines (logique métier)
+    areas_by_id = {area.id: area for area in all_areas}
+    root_areas = [area for area in all_areas if area.parent_id is None]
+    
+    # 3. Récupérer toutes les analytiques pertinentes en une seule requête via le repository
+    all_area_ids = list(areas_by_id.keys())
+    analytics_by_area = repository.get_analytics_for_areas(db, all_area_ids)
+
+    # 4. Construire l'arborescence pour chaque zone racine (logique métier)
+    processed_areas = []
+    for root_area in root_areas:
+        # Le niveau de la racine est toujours 1
+        processed_area, _ = _build_area_schema_recursively(root_area, 1, analytics_by_area)
+        processed_areas.append(processed_area)
+        
+    return processed_areas
 
 def get_area_with_analytics(db: Session, area_id: uuid.UUID) -> Optional[schemas.Area]:
     """
-    Fonction principale pour récupérer une zone par son ID, enrichie avec les moyennes analytiques.
+    Récupère une zone par son ID et sa hiérarchie complète avec les analytiques
+    agrégées, de manière optimisée.
     """
-    area_db = db.query(AreaModel).filter(AreaModel.id == area_id).first()
+    # 1. Récupérer tous les IDs de la sous-arborescence via le repository
+    descendant_ids = repository.get_descendant_area_ids(db, area_id)
+    if not descendant_ids:
+        return None  # La zone n'existe pas
+
+    # 2. Charger tous les objets Area de la sous-arborescence via le repository
+    all_areas_in_subtree = repository.get_areas_by_ids_with_relations(db, descendant_ids)
+    
+    areas_by_id = {area.id: area for area in all_areas_in_subtree}
+    area_db = areas_by_id.get(area_id)
+    
     if not area_db:
         return None
 
-    processed_area, _ = _process_area_recursively(db, area_db)
+    # 3. Récupérer toutes les analytiques pour cette sous-arborescence via le repository
+    analytics_by_area = repository.get_analytics_for_areas(db, descendant_ids)
+
+    # 4. Calculer le niveau de départ de la zone demandée via le repository
+    start_level = repository.get_area_level(db, area_db.id)
+
+    # 5. Construire l'arborescence de schémas récursivement (logique métier)
+    processed_area, _ = _build_area_schema_recursively(area_db, start_level, analytics_by_area)
     return processed_area
