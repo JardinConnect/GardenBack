@@ -1,16 +1,16 @@
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Dict, List, Optional
 import uuid
-
+from services.cell.schemas import Cell
 from db.models import AnalyticType
 from services.analytics.schemas import AnalyticSchema
 
 
-class Cell(BaseModel):
-    id: uuid.UUID
-    name: str
+# class Cell(BaseModel):
+#     id: uuid.UUID
+#     name: str
 
-    model_config = ConfigDict(from_attributes=True)
+#     model_config = ConfigDict(from_attributes=True)
 
 class AreaCreate(BaseModel):
     name: str

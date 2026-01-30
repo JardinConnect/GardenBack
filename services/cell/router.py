@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Path, status, HTTPException
 import uuid
 from sqlalchemy.orm import Session
 
-from .schemas import Cell, CellCreate
+from .schemas import CellCreate, CellUpdate, CellDTO
 from . import service
 from .errors import CellNotFoundError, ParentCellNotFoundError
 from db.database import get_db
@@ -10,38 +10,41 @@ from services.auth.bearer import JWTBearer
 
 router = APIRouter()
 
-@router.get("/", response_model=list[Cell], dependencies=[Depends(JWTBearer())])
+@router.get("/", response_model=list[CellDTO], dependencies=[Depends(JWTBearer())])
 def get_cells(
     db: Session = Depends(get_db),
-) -> list[Cell]:
+) -> list[CellDTO]:
     """
     Récupère toutes les cellules.
     """
-    return service.get_cells(db)
+    cells = service.get_cells(db)
+    return [CellDTO.from_cell(cell) for cell in cells]
 
-@router.get("/{cell_id}", response_model=Cell, dependencies=[Depends(JWTBearer())])
+@router.get("/{cell_id}", response_model=CellDTO, dependencies=[Depends(JWTBearer())])
 def get_cell(
     cell_id: uuid.UUID = Path(..., title="The ID of the cell to get"),
     db: Session = Depends(get_db),
-) -> Cell:
+) -> CellDTO:
     """
     Récupère une cellule spécifique par son ID.
     """
     try:
-        return service.get_cell(db, cell_id)
+        cell = service.get_cell(db, cell_id)
+        return CellDTO.from_cell(cell)
     except CellNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Cell with id {cell_id} not found")
 
-@router.post("/", response_model=Cell, status_code=status.HTTP_201_CREATED, dependencies=[Depends(JWTBearer())])
+@router.post("/", response_model=CellDTO, status_code=status.HTTP_201_CREATED, dependencies=[Depends(JWTBearer())])
 def create_cell(
     cell_data: CellCreate,
     db: Session = Depends(get_db),
-) -> Cell:
+) -> CellDTO:
     """
     Crée une nouvelle cellule.
     """
     try:
-        return service.create_cell(db, cell_data)
+        cell = service.create_cell(db, cell_data)
+        return CellDTO.from_cell(cell)
     except ParentCellNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
@@ -59,4 +62,15 @@ def delete_cell(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     return None
 
+@router.put("/{cell_id}", response_model=CellDTO, dependencies=[Depends(JWTBearer())])
+def update_cell(
+    cell_data: CellUpdate,
+    cell_id: uuid.UUID = Path(..., title="The ID of the cell to update"),
+    db: Session = Depends(get_db),
+) -> CellDTO:
+    try:
+        cell = service.update_cell(db, cell_id, cell_data)
+        return CellDTO.from_cell(cell)
+    except CellNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
