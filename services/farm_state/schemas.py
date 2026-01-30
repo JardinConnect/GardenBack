@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Dict
+from typing import Dict, Optional
 
 
 class FarmStateSummary(BaseModel):
@@ -9,3 +9,10 @@ class FarmStateSummary(BaseModel):
     total_cells: int
     total_sensors: int
     sensor_types: Dict[str, int]
+
+
+class FarmDetails(BaseModel):
+    """Represents detailed information about a specific farm."""
+    name: str
+    summary: FarmStateSummary
+    average_analytics: Optional[Dict[str, float]] = None

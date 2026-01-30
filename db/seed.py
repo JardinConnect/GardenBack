@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timedelta, UTC
 from sqlalchemy import create_engine, inspect 
 from sqlalchemy.orm import sessionmaker, Session
-from models import AnalyticType, User, Area, Analytic, RefreshToken, Cell, Sensor, RoleEnum
+from models import AnalyticType, User, Area, Analytic, RefreshToken, Cell, Sensor, RoleEnum, Farm
 import bcrypt
 import random
 
@@ -44,9 +44,19 @@ def seed():
         db.query(Sensor).delete()
         db.query(Cell).delete()
         db.query(Area).delete()
-        db.query(User).delete() # On supprime les users pour repartir de zéro
+        db.query(User).delete()  # On supprime les users pour repartir de zéro
         db.query(RefreshToken).delete()
+        db.query(Farm).delete()
         db.commit()
+
+        # Seed de la ferme
+        print("\n🏡 Seeding Ferme...")
+        if not db.query(Farm).first():
+            db.add(Farm(name="Ferme de test"))
+            db.commit()
+            print("  ✓ Ferme 'Ferme de test' créée.")
+        else:
+            print("  - La ferme existe déjà, ignoré.")
 
         # Seed des utilisateurs
         seed_users(db)

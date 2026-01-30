@@ -38,7 +38,7 @@ async def signup(
 
 @router.post("/login", status_code=200, response_model=TokenResponse)
 async def login(
-    user: UserLoginSchema = Body(..., example={"email": "admin@garden.com", "password": "admin123"}),
+    user: UserLoginSchema = Body(..., examples=[{"email": "admin@garden.com", "password": "admin123"}]),
     db: Session = Depends(get_db)
 ): 
     """
