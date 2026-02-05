@@ -1,5 +1,4 @@
 from enum import Enum as PyEnum
-import json
 from typing import Optional, List, TYPE_CHECKING
 import uuid
 from sqlalchemy import (
