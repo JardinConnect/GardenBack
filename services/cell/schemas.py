@@ -31,6 +31,7 @@ class Cell(BaseModel):
     area_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime
+    is_tracked: bool
     sensors: List[Sensor] = Field(default_factory=list)
     analytics: Dict[AnalyticType, List[AnalyticSchema]] = Field(default_factory=dict)
     
@@ -44,8 +45,9 @@ class CellDTO(BaseModel):
     """Schéma exposé au frontend avec les informations essentielles."""
     id: uuid.UUID
     name: str
-    location: Optional[str] = None
+    parent_id: Optional[uuid.UUID] = None
     updated_at: datetime
+    is_tracked: bool
     analytics: Dict[AnalyticType, List[AnalyticSchema]] = Field(default_factory=dict)
     
     model_config = ConfigDict(from_attributes=True)
@@ -56,9 +58,9 @@ class CellDTO(BaseModel):
         return cls(
             id=cell.id,
             name=cell.name,
-            location="location",
-            # location=cell.area_id,
+            parent_id=cell.area_id,
             updated_at=cell.updated_at,
+            is_tracked=cell.is_tracked,
             analytics=cell.analytics
         )
 
@@ -76,5 +78,5 @@ class CellUpdate(BaseModel):
     """Schéma pour mettre à jour une cellule."""
     name: Optional[str] = Field(None, min_length=1, description="Nom de la cellule")
     area_id: Optional[uuid.UUID] = Field(None, description="ID de la zone parente")
-    
+    is_tracked: Optional[bool] = Field(None, description="Si la cellule est suivie")
     model_config = ConfigDict(from_attributes=True)
