@@ -179,7 +179,7 @@ def test_delete_cell_with_sensors(db_session, setup_cell):
 
 def test_update_cell_name(db_session, setup_cell):
     """Teste la mise à jour du nom d'une cellule."""
-    update_data = CellUpdate(name="Updated Cell Name")
+    update_data = CellUpdate(name="Updated Cell Name") # type: ignore
     
     result = update_cell(db_session, setup_cell.id, update_data)
     
@@ -195,7 +195,7 @@ def test_update_cell_area(db_session, setup_cell):
     db_session.add(new_area)
     db_session.commit()
     
-    update_data = CellUpdate(area_id=new_area.id)
+    update_data = CellUpdate(area_id=new_area.id) # type: ignore
     
     result = update_cell(db_session, setup_cell.id, update_data)
     
@@ -207,7 +207,7 @@ def test_update_cell_area(db_session, setup_cell):
 
 def test_update_cell_is_tracked(db_session, setup_cell):
     """Teste la mise à jour du statut is_tracked."""
-    update_data = CellUpdate(is_tracked=False)
+    update_data = CellUpdate(is_tracked=False) # type: ignore
     
     result = update_cell(db_session, setup_cell.id, update_data)
     
@@ -238,7 +238,7 @@ def test_update_cell_multiple_fields(db_session, setup_cell):
 
 def test_update_cell_not_found(db_session):
     """Teste que update_cell lève une erreur si la cellule n'existe pas."""
-    update_data = CellUpdate(name="Ghost Cell")
+    update_data = CellUpdate(name="Ghost Cell") # type: ignore
     
     with pytest.raises(CellNotFoundError):
         update_cell(db_session, uuid.uuid4(), update_data)
@@ -246,7 +246,7 @@ def test_update_cell_not_found(db_session):
 
 def test_update_cell_remove_area(db_session, setup_cell):
     """Teste le détachement d'une cellule de son area."""
-    update_data = CellUpdate(area_id=None)
+    update_data = CellUpdate(area_id=None) # type: ignore
     
     result = update_cell(db_session, setup_cell.id, update_data)
     
