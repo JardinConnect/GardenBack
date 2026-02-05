@@ -25,11 +25,6 @@ def get_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db), cur
     
     Cette route est protégée et nécessite une authentification JWT et un rôle Administrateur.
     """
-    if current_user.role not in [RoleEnum.ADMIN, RoleEnum.SUPERADMIN]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Vous n'avez pas la permission de voir la liste des utilisateurs."
-        )
     users = repository.get_users(db, skip=skip, limit=limit)
     return users
 
