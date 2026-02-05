@@ -94,13 +94,9 @@ up:
 
 up-seed:
 	@echo "🌱 $(YELLOW)Lancement avec seeding initial...$(NO_COLOR)"
-	# Étape 0 : Nettoyage de l'ancienne base de données pour repartir de zéro
 	$(MAKE) delete-db
-	# Étape 1 : appliquer les migrations
 	docker compose run --build --rm fastapi-backend sh -c "python -m alembic upgrade head"
-	# Étape 2 : exécuter le seed
 	docker compose run --build --rm seed-db
-	# Étape 3 : lancer le backend et mosquitto
 	docker compose up --build fastapi-backend mosquitto
 
 # Stoppe et supprime les conteneurs, réseaux, volumes anonymes

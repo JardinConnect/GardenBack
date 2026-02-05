@@ -177,3 +177,12 @@ class Analytic(Base):
         sensor: Mapped["Sensor"] = relationship("Sensor", back_populates="analytics")
     else:
         sensor = relationship("Sensor", back_populates="analytics")
+
+# =========================================================
+# FARM
+# =========================================================
+class Farm(Base):
+    __tablename__ = 'farms'
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String, nullable=False)
