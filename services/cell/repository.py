@@ -29,7 +29,8 @@ def create_cell(db: Session, cell_data: CellSchema) -> CellSchema:
     """
     Crée une nouvelle cellule.
     """
-    cell = CellModel(**cell_data.model_dump())
+    # Exclude fields from the schema that are not columns in the DB model.
+    cell = CellModel(**cell_data.model_dump(exclude={'sensors', 'analytics'}))
     db.add(cell)
     db.commit()
     db.refresh(cell)
@@ -54,8 +55,9 @@ def update_cell(db: Session, cell_id: uuid.UUID, cell_data: CellUpdate) -> CellS
     if not cell:
         raise CellNotFoundError
     
-    # Update all fields from the complete data
-    for field, value in cell_data.model_dump(exclude={'sensors', 'analytics'}).items():
+    # Update only the fields that were explicitly set in the request data.
+    # This prevents accidentally setting non-nullable fields to None.
+    for field, value in cell_data.model_dump(exclude_unset=True).items():
         setattr(cell, field, value)
     
     db.commit()

@@ -138,7 +138,7 @@ def test_update_cell_name(db_session, setup_area):
     db_session.add(cell)
     db_session.commit()
     
-    update_data = CellUpdate(name="New Name")
+    update_data = CellUpdate(name="New Name") # type: ignore
     
     result = update_cell(db_session, cell.id, update_data)
     
@@ -155,7 +155,7 @@ def test_update_cell_change_area(db_session, setup_area):
     db_session.add(new_area)
     db_session.commit()
     
-    update_data = CellUpdate(area_id=new_area.id)
+    update_data = CellUpdate(area_id=new_area.id) # type: ignore
     
     result = update_cell(db_session, cell.id, update_data)
     
@@ -168,7 +168,7 @@ def test_update_cell_with_invalid_area(db_session, setup_area):
     db_session.add(cell)
     db_session.commit()
     
-    update_data = CellUpdate(area_id=uuid.uuid4())
+    update_data = CellUpdate(area_id=uuid.uuid4()) # type: ignore
     
     with pytest.raises(ParentCellNotFoundError):
         update_cell(db_session, cell.id, update_data)
@@ -176,7 +176,7 @@ def test_update_cell_with_invalid_area(db_session, setup_area):
 
 def test_update_cell_not_found(db_session):
     """Teste que update_cell lève une erreur si la cellule n'existe pas."""
-    update_data = CellUpdate(name="Ghost Cell")
+    update_data = CellUpdate(name="Ghost Cell") # type: ignore
     
     with pytest.raises(CellNotFoundError):
         update_cell(db_session, uuid.uuid4(), update_data)
@@ -260,8 +260,8 @@ def test_get_analytics_for_cell_latest_only(db_session, setup_cell_with_sensors)
     result = get_analytics_for_cell(db_session, cell.id)
     
     assert AnalyticType.AIR_TEMPERATURE in result
-    assert len(result[AnalyticType.AIR_TEMPERATURE]) == 1
-    assert result[AnalyticType.AIR_TEMPERATURE][0].value == 25.5
+    assert len(result[AnalyticType.AIR_TEMPERATURE]) == 1 # type: ignore
+    assert result[AnalyticType.AIR_TEMPERATURE][0].value == 25.5 # type: ignore
 
 
 def test_get_analytics_for_cell_no_sensors(db_session, setup_area):
