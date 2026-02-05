@@ -11,6 +11,7 @@ from services.area.router import router as area_router
 from services.mqtt.router import router as mqtt_router
 from services.user.router import router as user_router
 from services.farm_state.router import router as farm_state_router
+from services.cell.router import router as cell_router
 
 # Import du client MQTT
 from services.mqtt.client import connect_mqtt
@@ -55,6 +56,7 @@ app.include_router(data_router, prefix="/data", tags=["Data"], dependencies=[aut
 app.include_router(area_router, prefix="/area", tags=["Area"], dependencies=[auth_dependency])
 app.include_router(user_router, tags=["User"], dependencies=[auth_dependency])
 app.include_router(farm_state_router, prefix="/farm-stats", tags=["Farm Stats"], dependencies=[auth_dependency])
+app.include_router(cell_router, prefix="/cell", tags=["Cell"], dependencies=[auth_dependency])
 
 # Autres routeurs (par exemple, pour des webhooks internes)
 app.include_router(mqtt_router, tags=["MQTT"])
