@@ -32,7 +32,10 @@ class AnalyticsFilter(BaseModel):
 class AnalyticSchema(BaseModel):
     value: float
     occured_at: datetime
-    sensorCode: Optional[str] = None
+    sensorCode: Optional[str] = Field(None, alias='sensor_code')
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
 
 
 class AnalyticResult(BaseModel):

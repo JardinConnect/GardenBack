@@ -2,7 +2,7 @@ from enum import Enum as PyEnum
 from typing import Optional, List, TYPE_CHECKING
 import uuid
 from sqlalchemy import (
-    String, DateTime, Float, ForeignKey, UUID
+    String, DateTime, Float, ForeignKey, UUID, JSON, Boolean
 ) 
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
@@ -93,6 +93,8 @@ class Cell(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    is_tracked: Mapped[bool] = mapped_column(Boolean, default=True)
+    settings: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # Relation vers l'area parent
     area_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("areas.id"), nullable=True)
@@ -118,6 +120,7 @@ class Sensor(Base):
     status: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 'active', 'inactive', 'error'
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    settings: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # Relation vers la cellule
     cell_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cells.id"), nullable=False)
