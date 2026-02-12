@@ -104,7 +104,7 @@ def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[Analyt
     """
     analytics_by_day_and_type = defaultdict(list)
     for analytic in all_analytics:
-        day = analytic.occured_at.date()
+        day = analytic.occurred_at.date()
         key = (day, analytic.analytic_type)
         analytics_by_day_and_type[key].append(analytic.value)
 
@@ -123,7 +123,7 @@ def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[Analyt
 
             daily_average_analytic = schemas.AnalyticSchema(
                 value=round(average_value, 2),
-                occured_at=datetime.combine(current_day, datetime.min.time()),
+                occurred_at=datetime.combine(current_day, datetime.min.time()),
             )
             daily_averages_for_type.append(daily_average_analytic)
         

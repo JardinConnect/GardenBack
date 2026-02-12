@@ -71,7 +71,7 @@ def test_get_analytics_success(db_session, setup_sensor):
         sensor_code="TA-1",
         analytic_type=AnalyticType.AIR_TEMPERATURE,
         value=22.5,
-        occured_at=now,
+        occurred_at=now,
         sensor_id=setup_sensor.id
     )
     db_session.add(analytic)
@@ -98,7 +98,7 @@ def test_get_analytics_success(db_session, setup_sensor):
     data = result.data[AnalyticType.AIR_TEMPERATURE][0]
     assert data.value == 22.5
     assert data.sensorCode == "TA-1"
-    assert isinstance(data.occured_at, datetime)
+    assert isinstance(data.occurred_at, datetime)
 
 
 def test_get_analytics_filters_work(db_session, setup_sensor):
@@ -115,14 +115,14 @@ def test_get_analytics_filters_work(db_session, setup_sensor):
             sensor_code="TA-1",
             analytic_type=AnalyticType.AIR_TEMPERATURE,
             value=21.7,
-            occured_at=now,
+            occurred_at=now,
             sensor_id=setup_sensor.id
         ),
         Analytic(
             sensor_code="HS-1",
             analytic_type=AnalyticType.SOIL_HUMIDITY,
             value=61.3,
-            occured_at=now,
+            occurred_at=now,
             sensor_id=other_sensor.id
         ),
     ]

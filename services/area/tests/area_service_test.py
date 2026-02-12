@@ -150,9 +150,9 @@ def test_calculate_daily_averages_basic():
     # Arrange
     now = datetime.now(UTC)
     analytics = [
-        AnalyticModel(analytic_type=AnalyticType.AIR_TEMPERATURE, value=20, occured_at=now),
-        AnalyticModel(analytic_type=AnalyticType.AIR_TEMPERATURE, value=30, occured_at=now),
-        AnalyticModel(analytic_type=AnalyticType.AIR_HUMIDITY, value=60, occured_at=now - timedelta(days=1)),
+        AnalyticModel(analytic_type=AnalyticType.AIR_TEMPERATURE, value=20, occurred_at=now),
+        AnalyticModel(analytic_type=AnalyticType.AIR_TEMPERATURE, value=30, occurred_at=now),
+        AnalyticModel(analytic_type=AnalyticType.AIR_HUMIDITY, value=60, occurred_at=now - timedelta(days=1)),
     ]
 
     # Act
@@ -162,13 +162,13 @@ def test_calculate_daily_averages_basic():
     assert AnalyticType.AIR_TEMPERATURE in result
     assert len(result[AnalyticType.AIR_TEMPERATURE]) == 7
 
-    today_avg_temp = next((a.value for a in result[AnalyticType.AIR_TEMPERATURE] if a.occured_at.date() == now.date()), None)
+    today_avg_temp = next((a.value for a in result[AnalyticType.AIR_TEMPERATURE] if a.occurred_at.date() == now.date()), None)
     assert today_avg_temp == 25.0
 
-    yesterday_avg_hum = next((a.value for a in result[AnalyticType.AIR_HUMIDITY] if a.occured_at.date() == (now - timedelta(days=1)).date()), None)
+    yesterday_avg_hum = next((a.value for a in result[AnalyticType.AIR_HUMIDITY] if a.occurred_at.date() == (now - timedelta(days=1)).date()), None)
     assert yesterday_avg_hum == 60.0
 
-    two_days_ago_avg_temp = next((a.value for a in result[AnalyticType.AIR_TEMPERATURE] if a.occured_at.date() == (now - timedelta(days=2)).date()), None)
+    two_days_ago_avg_temp = next((a.value for a in result[AnalyticType.AIR_TEMPERATURE] if a.occurred_at.date() == (now - timedelta(days=2)).date()), None)
     assert two_days_ago_avg_temp == 0.0
 
 def test_calculate_daily_averages_empty_input():
@@ -181,11 +181,11 @@ def test_calculate_daily_averages_empty_input():
 def test_calculate_daily_averages_rounding():
     """Vérifie que les valeurs moyennes sont bien arrondies à 2 décimales."""
     now = datetime.now(UTC)
-    analytics = [AnalyticModel(analytic_type=AnalyticType.LIGHT, value=v, occured_at=now) for v in [10, 15, 12]] # Moyenne = 12.333...
+    analytics = [AnalyticModel(analytic_type=AnalyticType.LIGHT, value=v, occurred_at=now) for v in [10, 15, 12]] # Moyenne = 12.333...
 
     result = _calculate_daily_averages(analytics)
 
-    today_avg_light = next((a.value for a in result[AnalyticType.LIGHT] if a.occured_at.date() == now.date()), None)
+    today_avg_light = next((a.value for a in result[AnalyticType.LIGHT] if a.occurred_at.date() == now.date()), None)
     assert today_avg_light == 12.33
 
 # === Tests for get_area_with_analytics ===
@@ -277,9 +277,9 @@ def test_get_area_single_level_with_analytics(db_session):
     today = datetime.now(UTC).date()
     
     # La valeur doit être présente dans la liste pour le bon type et le bon jour
-    air_temp_avg = next((avg.value for avg in result_area.analytics[AnalyticType.AIR_TEMPERATURE] if avg.occured_at.date() == today), None)
-    air_hum_avg = next((avg.value for avg in result_area.analytics[AnalyticType.AIR_HUMIDITY] if avg.occured_at.date() == today), None)
-    soil_hum_avg = next((avg.value for avg in result_area.analytics[AnalyticType.SOIL_HUMIDITY] if avg.occured_at.date() == today), None)
+    air_temp_avg = next((avg.value for avg in result_area.analytics[AnalyticType.AIR_TEMPERATURE] if avg.occurred_at.date() == today), None)
+    air_hum_avg = next((avg.value for avg in result_area.analytics[AnalyticType.AIR_HUMIDITY] if avg.occurred_at.date() == today), None)
+    soil_hum_avg = next((avg.value for avg in result_area.analytics[AnalyticType.SOIL_HUMIDITY] if avg.occurred_at.date() == today), None)
 
     assert air_temp_avg == 25.5
     assert air_hum_avg == 60.0
@@ -302,7 +302,7 @@ def test_get_area_multi_level_aggregation(db_session):
     sensor_parent = SensorModel(sensor_id="TP", sensor_type="temperature", cell_id=cell_parent.id)
     db_session.add(sensor_parent)
     db_session.commit()
-    analytic_parent = AnalyticModel(sensor_id=sensor_parent.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=10.0, sensor_code="TP", occured_at=now)
+    analytic_parent = AnalyticModel(sensor_id=sensor_parent.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=10.0, sensor_code="TP", occurred_at=now)
     db_session.add(analytic_parent)
     db_session.commit()
 
@@ -316,7 +316,7 @@ def test_get_area_multi_level_aggregation(db_session):
     sensor_child = SensorModel(sensor_id="TC", sensor_type="temperature", cell_id=cell_child.id)
     db_session.add(sensor_child)
     db_session.commit()
-    analytic_child = AnalyticModel(sensor_id=sensor_child.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=30.0, sensor_code="TC", occured_at=now)
+    analytic_child = AnalyticModel(sensor_id=sensor_child.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=30.0, sensor_code="TC", occurred_at=now)
     db_session.add(analytic_child)
     db_session.commit()
 
@@ -334,12 +334,12 @@ def test_get_area_multi_level_aggregation(db_session):
     assert result_child.name == "Child Area"
     assert result_child.level == 2
     assert result_child.analytics is not None
-    child_avg = next((avg.value for avg in result_child.analytics[AnalyticType.AIR_TEMPERATURE] if avg.occured_at.date() == now.date()), None)
+    child_avg = next((avg.value for avg in result_child.analytics[AnalyticType.AIR_TEMPERATURE] if avg.occurred_at.date() == now.date()), None)
     assert child_avg == 30.0
 
     # Vérifier l'agrégation sur la zone parente
     assert result_area.analytics is not None
-    parent_avg = next((avg.value for avg in result_area.analytics[AnalyticType.AIR_TEMPERATURE] if avg.occured_at.date() == now.date()), None)
+    parent_avg = next((avg.value for avg in result_area.analytics[AnalyticType.AIR_TEMPERATURE] if avg.occurred_at.date() == now.date()), None)
     assert parent_avg == (10.0 + 30.0) / 2  # Moyenne de 10 (parent) et 30 (enfant)
 
 
@@ -360,8 +360,8 @@ def test_get_area_uses_latest_analytic_only(db_session):
 
     # Données anciennes et récentes
     now = datetime.now(UTC)
-    analytic_old = AnalyticModel(sensor_id=sensor1.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=10.0, occured_at=now - timedelta(days=1), sensor_code="T1")
-    analytic_new = AnalyticModel(sensor_id=sensor1.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=50.0, occured_at=now, sensor_code="T1") # Cette donnée est pour aujourd'hui
+    analytic_old = AnalyticModel(sensor_id=sensor1.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=10.0, occurred_at=now - timedelta(days=1), sensor_code="T1")
+    analytic_new = AnalyticModel(sensor_id=sensor1.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=50.0, occurred_at=now, sensor_code="T1") # Cette donnée est pour aujourd'hui
     db_session.add_all([analytic_old, analytic_new])
     db_session.commit()
 
@@ -372,7 +372,7 @@ def test_get_area_uses_latest_analytic_only(db_session):
     assert result_area is not None
     assert result_area.analytics is not None
     # La moyenne pour aujourd'hui doit être 50.0
-    today_avg = next((avg.value for avg in result_area.analytics[AnalyticType.AIR_TEMPERATURE] if avg.occured_at.date() == now.date()), None)
+    today_avg = next((avg.value for avg in result_area.analytics[AnalyticType.AIR_TEMPERATURE] if avg.occurred_at.date() == now.date()), None)
     assert today_avg == 50.0
 
 # === Tests for update_area ===

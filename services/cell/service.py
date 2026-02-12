@@ -73,7 +73,7 @@ def get_analytics_for_cell(db: Session, cell_id: uuid.UUID) -> List[Dict[Analyti
     # Sous-requête pour trouver la dernière analytique de chaque type
     subquery = db.query(
         AnalyticModel.analytic_type,
-        func.max(AnalyticModel.occured_at).label('last_date')
+        func.max(AnalyticModel.occurred_at).label('last_date')
     ).filter(
         AnalyticModel.sensor_id.in_(sensor_ids)
     ).group_by(AnalyticModel.analytic_type).subquery()
@@ -83,7 +83,7 @@ def get_analytics_for_cell(db: Session, cell_id: uuid.UUID) -> List[Dict[Analyti
         subquery,
         and_(
             AnalyticModel.analytic_type == subquery.c.analytic_type,
-            AnalyticModel.occured_at == subquery.c.last_date
+            AnalyticModel.occurred_at == subquery.c.last_date
         )
     ).filter(
         AnalyticModel.sensor_id.in_(sensor_ids)

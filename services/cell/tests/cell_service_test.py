@@ -51,14 +51,14 @@ def setup_cell_with_sensors(db_session, setup_area):
         sensor_code="TEMP-01",
         analytic_type=AnalyticType.AIR_TEMPERATURE,
         value=25.5,
-        occured_at=datetime.now(UTC)
+        occurred_at=datetime.now(UTC)
     )
     analytic_hum = AnalyticModel(
         sensor_id=sensor_hum.id,
         sensor_code="HUM-01",
         analytic_type=AnalyticType.AIR_HUMIDITY,
         value=60.0,
-        occured_at=datetime.now(UTC)
+        occurred_at=datetime.now(UTC)
     )
     db_session.add_all([analytic_temp, analytic_hum])
     db_session.commit()
@@ -252,7 +252,7 @@ def test_get_analytics_for_cell_latest_only(db_session, setup_cell_with_sensors)
         sensor_code="TEMP-01",
         analytic_type=AnalyticType.AIR_TEMPERATURE,
         value=10.0,
-        occured_at=datetime(2020, 1, 1, tzinfo=UTC)
+        occurred_at=datetime(2020, 1, 1, tzinfo=UTC)
     )
     db_session.add(old_analytic)
     db_session.commit()
@@ -295,7 +295,7 @@ def test_get_all_analytics_for_cell(db_session, setup_cell_with_sensors):
         sensor_code="TEMP-01",
         analytic_type=AnalyticType.AIR_TEMPERATURE,
         value=10.0,
-        occured_at=datetime(2020, 1, 1, tzinfo=UTC)
+        occurred_at=datetime(2020, 1, 1, tzinfo=UTC)
     )
     db_session.add(old_analytic)
     db_session.commit()

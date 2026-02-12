@@ -168,7 +168,7 @@ class Analytic(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     value: Mapped[float] = mapped_column(Float, nullable=False)
-    occured_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     analytic_type: Mapped[AnalyticType] = mapped_column(SqlEnum(AnalyticType), nullable=False)
     sensor_code: Mapped[str] = mapped_column(String, nullable=False)
 
