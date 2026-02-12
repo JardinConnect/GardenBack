@@ -124,7 +124,7 @@ erDiagram
     Analytic {
         int id PK
         float value
-        datetime occured_at
+        datetime occurred_at
         string analytic_type "Enum"
         int sensor_id FK
     }

@@ -84,8 +84,8 @@ def test_get_farm_details_with_analytics(db_session):
     
     assert details.average_analytics is not None
     assert len(details.average_analytics) == 2
-    assert details.average_analytics["AIR_TEMPERATURE"] == 25.5
-    assert details.average_analytics["AIR_HUMIDITY"] == 60.0
+    assert details.average_analytics["air_temperature"] == 25.5
+    assert details.average_analytics["air_humidity"] == 60.0
 
 
 def test_get_farm_details_with_analytics_rounding(db_session):
@@ -110,4 +110,4 @@ def test_get_farm_details_with_analytics_rounding(db_session):
 
     # Assert
     assert details.average_analytics is not None
-    assert details.average_analytics["LIGHT"] == 12.33
+    assert details.average_analytics["light"] == 12.33

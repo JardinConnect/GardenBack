@@ -26,7 +26,7 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> PaginatedAnalyticRes
     # 2. Base query
     query = db.query(
         Analytic.value,
-        Analytic.occured_at,
+        Analytic.occurred_at,
         Analytic.sensor_code,
         Analytic.analytic_type
     )
@@ -40,9 +40,9 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> PaginatedAnalyticRes
     if request.analytic_type:
         filters.append(Analytic.analytic_type == request.analytic_type)
     if request.start_date:
-        filters.append(Analytic.occured_at >= request.start_date)
+        filters.append(Analytic.occurred_at >= request.start_date)
     if request.end_date:
-        filters.append(Analytic.occured_at <= request.end_date)
+        filters.append(Analytic.occurred_at <= request.end_date)
 
     if filters:
         query = query.filter(and_(*filters))
@@ -60,10 +60,10 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> PaginatedAnalyticRes
 
     # 7. Mapping -> Dict[AnalyticType, List[Analytic]]
     result: Dict[AnalyticType, List[AnalyticSchema]] = {}
-    for value, occured_at, sensor_code, analytic_type in rows:
+    for value, occurred_at, sensor_code, analytic_type in rows:
         analytic = AnalyticSchema(
             value=value,
-            occured_at=occured_at,
+            occurred_at=occurred_at,
             sensorCode=sensor_code
         )
         result.setdefault(analytic_type, []).append(analytic)
@@ -88,7 +88,7 @@ def create_analytic(db: Session, analytic_input: AnalyticCreate) -> AnalyticSche
 
     db_analytic = Analytic(
         value=analytic_input.value,
-        occured_at=analytic_input.timestamp,
+        occurred_at=analytic_input.timestamp,
         sensor_code=analytic_input.sensor_code,
         analytic_type=analytic_type,
         sensor_id=analytic_input.sensor_id
@@ -99,6 +99,6 @@ def create_analytic(db: Session, analytic_input: AnalyticCreate) -> AnalyticSche
 
     return AnalyticSchema(
         value=cast(float, db_analytic.value),
-        occured_at=cast(datetime, db_analytic.occured_at),
+        occurred_at=cast(datetime, db_analytic.occurred_at),
         sensorCode=cast(str, db_analytic.sensor_code)
     )

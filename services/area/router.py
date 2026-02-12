@@ -34,6 +34,7 @@ def create_area(
         - `name`: Nom de la zone (obligatoire).
         - `color`: Couleur hexadécimale pour l'affichage (ex: "#FF5733").
         - `parent_id`: (Optionnel) ID de la zone parente.
+        - `is_tracked`: (Optionnel) Indique si la zone doit être suivie pour les analyses. Par défaut à `false`.
 
     **Erreurs possibles :**
     - `404 Not Found`: Si le `parent_id` fourni ne correspond à aucune zone existante.
@@ -58,6 +59,7 @@ def update_area(
         - `name`: Nouveau nom de la zone.
         - `color`: Nouvelle couleur hexadécimale.
         - `parent_id`: Nouvel ID de la zone parente. Mettre à `null` pour la déplacer à la racine.
+        - `is_tracked`: Indique si la zone doit être suivie pour les analyses.
 
     **Erreurs possibles :**
     - `404 Not Found`: Si l'ID de la zone ou le `parent_id` fourni n'existe pas.

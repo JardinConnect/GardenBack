@@ -23,7 +23,7 @@ def get_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db), cur
     - **skip**: Nombre d'utilisateurs à sauter (pour la pagination).
     - **limit**: Nombre maximum d'utilisateurs à retourner.
     
-    Cette route est protégée et nécessite une authentification JWT et un rôle Administrateur.
+    Cette route est protégée et nécessite une authentification JWT.
     """
     users = repository.get_users(db, skip=skip, limit=limit)
     return users

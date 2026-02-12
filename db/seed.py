@@ -383,7 +383,7 @@ def seed_analytics(db):
         # On génère des données pour aujourd'hui (day=0) et les 6 jours précédents.
         for day in range(total_days):
             for hour in range(24):
-                occured_at = datetime.now(UTC) - timedelta(days=day, hours=hour)
+                occurred_at = datetime.now(UTC) - timedelta(days=day, hours=hour)
                 
                 # Simulation d'un cycle journalier (sinusoïdal) sur 24h
                 # Pic vers 14h, creux vers 4h du matin
@@ -400,7 +400,7 @@ def seed_analytics(db):
                     sensor_code=sensor.sensor_id,
                     analytic_type=analytic_type,
                     value=round(value, 2),
-                    occured_at=occured_at
+                    occurred_at=occurred_at
                 )
                 analytics_to_add.append(analytic)
     

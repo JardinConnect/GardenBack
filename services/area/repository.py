@@ -87,7 +87,7 @@ def get_analytics_for_areas(db: Session, area_ids: List[uuid.UUID]) -> Dict[uuid
         .join(CellModel.sensors)
         .join(SensorModel.analytics)
         .where(CellModel.area_id.in_(area_ids))
-        .where(AnalyticModel.occured_at >= seven_days_ago)
+        .where(AnalyticModel.occurred_at >= seven_days_ago)
     )
     results = db.execute(query).all()
     analytics_by_area = defaultdict(list)

@@ -68,6 +68,8 @@ class Area(Base):
     color: Mapped[Optional[str]] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    is_tracked: Mapped[bool] = mapped_column(Boolean, default=False)
+
 
     # Auto-référence pour la hiérarchie
     parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("areas.id"), nullable=True)
@@ -93,7 +95,7 @@ class Cell(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
-    is_tracked: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_tracked: Mapped[bool] = mapped_column(Boolean, default=False)
     settings: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # Relation vers l'area parent
@@ -138,12 +140,12 @@ class Sensor(Base):
 # ANALYTICS
 # =========================================================
 class AnalyticType(str, PyEnum):
-    SOIL_TEMPERATURE = "SOIL_TEMPERATURE"
-    AIR_TEMPERATURE = "AIR_TEMPERATURE"
-    LIGHT = "LIGHT"
-    SOIL_HUMIDITY = "SOIL_HUMIDITY"
-    AIR_HUMIDITY = "AIR_HUMIDITY"
-    BATTERY = "BATTERY"
+    SOIL_TEMPERATURE = "soil_temperature"
+    AIR_TEMPERATURE = "air_temperature"
+    LIGHT = "light"
+    SOIL_HUMIDITY = "soil_humidity"
+    AIR_HUMIDITY = "air_humidity"
+    BATTERY = "battery"
 
     @classmethod
     def from_prefix(cls, prefix: str) -> "AnalyticType":
@@ -166,7 +168,7 @@ class Analytic(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     value: Mapped[float] = mapped_column(Float, nullable=False)
-    occured_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     analytic_type: Mapped[AnalyticType] = mapped_column(SqlEnum(AnalyticType), nullable=False)
     sensor_code: Mapped[str] = mapped_column(String, nullable=False)
 

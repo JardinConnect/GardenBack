@@ -40,7 +40,7 @@ def setup_hierarchy(db_session):
         sensor_code="TEST-01",
         analytic_type=AnalyticType.AIR_TEMPERATURE,
         value=25.5,
-        occured_at=datetime.now(UTC),
+        occurred_at=datetime.now(UTC),
     )
     db_session.add(analytic)
     db_session.commit()
@@ -89,8 +89,8 @@ def test_get_analytics_for_areas_success(db_session):
     db_session.commit()
 
     now = datetime.now(UTC)
-    analytic_recent = Analytic(sensor_id=sensor.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=25, occured_at=now - timedelta(days=1), sensor_code="S1")
-    analytic_old = Analytic(sensor_id=sensor.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=10, occured_at=now - timedelta(days=8), sensor_code="S1")
+    analytic_recent = Analytic(sensor_id=sensor.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=25, occurred_at=now - timedelta(days=1), sensor_code="S1")
+    analytic_old = Analytic(sensor_id=sensor.id, analytic_type=AnalyticType.AIR_TEMPERATURE, value=10, occurred_at=now - timedelta(days=8), sensor_code="S1")
     db_session.add_all([analytic_recent, analytic_old])
     db_session.commit()
 

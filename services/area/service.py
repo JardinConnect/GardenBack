@@ -33,6 +33,7 @@ def create_area(db: Session, area_data: schemas.AreaCreate) -> schemas.Area:
         id=created_area.id,
         name=created_area.name,
         color=created_area.color,
+        is_tracked=created_area.is_tracked,
         level=level,
         areas=[],
         cells=[],
@@ -103,7 +104,7 @@ def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[Analyt
     """
     analytics_by_day_and_type = defaultdict(list)
     for analytic in all_analytics:
-        day = analytic.occured_at.date()
+        day = analytic.occurred_at.date()
         key = (day, analytic.analytic_type)
         analytics_by_day_and_type[key].append(analytic.value)
 
@@ -122,7 +123,7 @@ def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[Analyt
 
             daily_average_analytic = schemas.AnalyticSchema(
                 value=round(average_value, 2),
-                occured_at=datetime.combine(current_day, datetime.min.time()),
+                occurred_at=datetime.combine(current_day, datetime.min.time()),
             )
             daily_averages_for_type.append(daily_average_analytic)
         
@@ -157,6 +158,7 @@ def _build_area_schema_recursively(
         id=area.id,
         name=area.name,
         color=area.color,
+        is_tracked=area.is_tracked,
         level=level,
         areas=processed_sub_areas,
         cells=[schemas.Cell.model_validate(cell) for cell in area.cells],

@@ -106,7 +106,7 @@ def upgrade() -> None:
     op.create_table('analytic',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('value', sa.Float(), nullable=False),
-    sa.Column('occured_at', sa.DateTime(), nullable=False),
+    sa.Column('occurred_at', sa.DateTime(), nullable=False),
     sa.Column('analytic_type', sa.Enum('SOIL_TEMPERATURE', 'AIR_TEMPERATURE', 'LIGHT', 'SOIL_HUMIDITY', 'AIR_HUMIDITY', 'BATTERY', name='analytictype'), nullable=False),
     sa.Column('sensor_code', sa.String(), nullable=False),
     sa.Column('sensor_id', sa.Integer(), nullable=False),

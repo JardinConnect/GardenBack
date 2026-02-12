@@ -31,7 +31,7 @@ class AnalyticsFilter(BaseModel):
 
 class AnalyticSchema(BaseModel):
     value: float
-    occured_at: datetime
+    occurred_at: datetime
     sensorCode: Optional[str] = Field(None, alias='sensor_code')
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
@@ -48,19 +48,19 @@ class AnalyticResult(BaseModel):
                     "AIR_TEMPERATURE": [
                         {
                             "value": 22.5,
-                            "occured_at": "2025-09-19T14:30:00",
+                            "occurred_at": "2025-09-19T14:30:00",
                             "sensorCode": "AT-1"
                         },
                         {
                             "value": 23.1,
-                            "occured_at": "2025-09-19T15:00:00",
+                            "occurred_at": "2025-09-19T15:00:00",
                             "sensorCode": "AT-2"
                         }
                     ],
                     "SOIL_HUMIDITY": [
                         {
                             "value": 61.2,
-                            "occured_at": "2025-09-19T14:30:00",
+                            "occurred_at": "2025-09-19T14:30:00",
                             "sensorCode": "SH-1"
                         }
                     ]
