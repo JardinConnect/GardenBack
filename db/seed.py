@@ -393,13 +393,13 @@ def seed_analytics(db):
                 value = base_value + (amplitude * cycle_value) + random.uniform(-noise, noise)
                 
                 # Éviter les valeurs négatives
-                value = max(0, value)
+                value = max(0.0, value)
                 
                 analytic = Analytic(
                     sensor_id=sensor.id,
                     sensor_code=sensor.sensor_id,
                     analytic_type=analytic_type,
-                    value=round(value, 2),
+                    value=float(round(value, 2)),
                     occured_at=occured_at
                 )
                 analytics_to_add.append(analytic)

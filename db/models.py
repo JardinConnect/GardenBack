@@ -138,12 +138,12 @@ class Sensor(Base):
 # ANALYTICS
 # =========================================================
 class AnalyticType(str, PyEnum):
-    SOIL_TEMPERATURE = "SOIL_TEMPERATURE"
-    AIR_TEMPERATURE = "AIR_TEMPERATURE"
-    LIGHT = "LIGHT"
-    SOIL_HUMIDITY = "SOIL_HUMIDITY"
-    AIR_HUMIDITY = "AIR_HUMIDITY"
-    BATTERY = "BATTERY"
+    SOIL_TEMPERATURE = "soil_temperature"
+    AIR_TEMPERATURE = "air_temperature"
+    LIGHT = "light"
+    SOIL_HUMIDITY = "soil_humidity"
+    AIR_HUMIDITY = "air_humidity"
+    BATTERY = "battery"
 
     @classmethod
     def from_prefix(cls, prefix: str) -> "AnalyticType":
