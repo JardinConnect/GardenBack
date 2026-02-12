@@ -68,6 +68,8 @@ class Area(Base):
     color: Mapped[Optional[str]] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    is_tracked: Mapped[bool] = mapped_column(Boolean, default=False)
+
 
     # Auto-référence pour la hiérarchie
     parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("areas.id"), nullable=True)
@@ -93,7 +95,7 @@ class Cell(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
-    is_tracked: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_tracked: Mapped[bool] = mapped_column(Boolean, default=False)
     settings: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # Relation vers l'area parent
