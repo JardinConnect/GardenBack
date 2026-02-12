@@ -76,8 +76,13 @@ async def refresh_access_token(
 
     if not db_refresh_token:
         raise HTTPException(status_code=404, detail="Refresh token not found or already used.")
+    
+    token_expires_at = db_refresh_token.expires_at
 
-    if db_refresh_token.expires_at < datetime.now(timezone.utc):
+    if token_expires_at.tzinfo is None:
+        token_expires_at = token_expires_at.replace(tzinfo=timezone.utc)
+
+    if token_expires_at < datetime.now(timezone.utc):
         db.delete(db_refresh_token)
         db.commit()
         raise HTTPException(status_code=401, detail="Refresh token has expired.")
