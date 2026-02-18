@@ -18,6 +18,8 @@ class Settings():
     MQTT_KEEPALIVE: int = 60
     MQTT_TOPIC: str = "test/topic"
 
+    NETWORK_PROVIDER: str = "linux"
+
     class Config:
         env_file = ".env" 
 
