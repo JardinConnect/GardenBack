@@ -1,6 +1,5 @@
 from services.network.providers import LinuxNmcliProvider
 from services.network.schemas import CurrentNetwork, NetworkInfo, ConnectResponse
-from services.network.errors import ConnectFailedError
 
 _provider = LinuxNmcliProvider()
 
