@@ -1,8 +1,8 @@
-"""fix occurred_at
+"""add analytic type DEEP_SOIL_HUMIDITY
 
-Revision ID: 6eb680c99386
-Revises: 909f58aa3e62
-Create Date: 2026-02-12 16:55:06.441030
+Revision ID: b59f2b02d770
+Revises: 6eb680c99386
+Create Date: 2026-02-13 17:21:21.234452
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '6eb680c99386'
-down_revision: Union[str, Sequence[str], None] = '909f58aa3e62'
+revision: str = 'b59f2b02d770'
+down_revision: Union[str, Sequence[str], None] = '6eb680c99386'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -25,6 +25,10 @@ def upgrade() -> None:
         batch_op.alter_column('id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
+               existing_nullable=False)
+        batch_op.alter_column('analytic_type',
+               existing_type=sa.VARCHAR(length=16),
+               type_=sa.Enum('SOIL_TEMPERATURE', 'AIR_TEMPERATURE', 'LIGHT', 'SOIL_HUMIDITY', 'AIR_HUMIDITY', 'DEEP_SOIL_HUMIDITY', 'BATTERY', name='analytictype'),
                existing_nullable=False)
         batch_op.alter_column('sensor_id',
                existing_type=sa.NUMERIC(),
@@ -145,6 +149,10 @@ def downgrade() -> None:
         batch_op.alter_column('sensor_id',
                existing_type=sa.UUID(),
                type_=sa.NUMERIC(),
+               existing_nullable=False)
+        batch_op.alter_column('analytic_type',
+               existing_type=sa.Enum('SOIL_TEMPERATURE', 'AIR_TEMPERATURE', 'LIGHT', 'SOIL_HUMIDITY', 'AIR_HUMIDITY', 'DEEP_SOIL_HUMIDITY', 'BATTERY', name='analytictype'),
+               type_=sa.VARCHAR(length=16),
                existing_nullable=False)
         batch_op.alter_column('id',
                existing_type=sa.UUID(),

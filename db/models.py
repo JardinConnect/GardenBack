@@ -145,6 +145,7 @@ class AnalyticType(str, PyEnum):
     LIGHT = "light"
     SOIL_HUMIDITY = "soil_humidity"
     AIR_HUMIDITY = "air_humidity"
+    DEEP_SOIL_HUMIDITY = "deep_soil_humidity"
     BATTERY = "battery"
 
     @classmethod
@@ -154,6 +155,7 @@ class AnalyticType(str, PyEnum):
             "TS": cls.SOIL_TEMPERATURE,
             "HA": cls.AIR_HUMIDITY,
             "HS": cls.SOIL_HUMIDITY,
+            "DHS": cls.DEEP_SOIL_HUMIDITY,
             "L": cls.LIGHT,
             "B": cls.BATTERY,
         }

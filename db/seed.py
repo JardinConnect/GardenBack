@@ -196,7 +196,7 @@ def seed_garden_hierarchy(db):
 
     # === COMPTEURS POUR LES SENSOR_ID UNIQUES ===
     sensor_counters = {
-        "TA": 1, "TS": 1, "HA": 1, "HS": 1, "L": 1, "B": 1
+        "TA": 1, "TS": 1, "HA": 1, "HS": 1, "DHS": 1, "L": 1, "B": 1
     }
     def get_sensor_id(prefix: str) -> str:
         num = sensor_counters[prefix]
@@ -220,6 +220,7 @@ def seed_garden_hierarchy(db):
                         {"prefix": "L", "type": "light"},
                         {"prefix": "TS", "type": "soil_temperature"},
                         {"prefix": "HS", "type": "soil_humidity"},
+                        {"prefix": "DHS", "type": "deep_soil_humidity"},
                         {"prefix": "B", "type": "battery"},
                     ]
                 },
@@ -364,7 +365,7 @@ def seed_analytics(db):
             base_value = 22.0
             amplitude = 6.0
             noise = 0.5
-        elif analytic_type in [AnalyticType.AIR_HUMIDITY, AnalyticType.SOIL_HUMIDITY]:
+        elif analytic_type in [AnalyticType.AIR_HUMIDITY, AnalyticType.SOIL_HUMIDITY, AnalyticType.DEEP_SOIL_HUMIDITY]:
             base_value = 65.0
             amplitude = -10.0  # Inverse de la température (quand il fait chaud, moins humide)
             noise = 2.0
