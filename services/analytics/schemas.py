@@ -9,6 +9,7 @@ class AnalyticsFilter(BaseModel):
     analytic_type: Optional[AnalyticType] = Field(None, description="Type d'analytique")
     sensor_id: Optional[uuid.UUID] = Field(None, description="Identifiant du capteur")
     sensor_code: Optional[str] = Field(None, description="Code du capteur")
+    area_id: Optional[uuid.UUID] = Field(None, description="Identifiant de l'area (filtre sur la cellule parente)")
     start_date: datetime = Field(description="Date de début")
     end_date: datetime = Field(description="Date de fin")
     skip: int = Field(0, description="Nombre d'éléments à sauter (pour la pagination)")
@@ -20,10 +21,11 @@ class AnalyticsFilter(BaseModel):
                 "analytic_type": AnalyticType.AIR_TEMPERATURE,
                 "sensor_code": "AT-1",
                 "sensor_id": "13fe605f-a3bd-4e66-8615-cb7ff99ba017",
+                "area_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
                 "start_date": "2025-11-03T00:00:00",
                 "end_date": "2025-11-06T23:59:59",
-                "skip": 0,     
-                "limit": 50   
+                "skip": 0,
+                "limit": 50
             }
         }
     )
