@@ -14,7 +14,7 @@ from .schemas import (
     AlertResponseSchema,
     CellInfoSchema,
 )
-from .errors import AlertNotFoundError, AlertEventNotFoundError, AlertConflictError, CellNotFoundError
+from .errors import AlertNotFoundError, AlertEventNotFoundError, AlertConflictError
 
 
 # ---------------------------------------------------------------------------
