@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
 
-from services.alert.router import router as alert_router
+from services.alerts.router import router as alert_router
 from services.auth.router import router as auth_router
 from services.auth.bearer import JWTBearer
 from services.analytics.router import router as data_router

@@ -182,6 +182,7 @@ class Analytic(Base):
     else:
         sensor = relationship("Sensor", back_populates="analytics")
 
+
 # =========================================================
 # FARM
 # =========================================================
@@ -190,3 +191,67 @@ class Farm(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
+
+
+# =========================================================
+# ALERT
+# =========================================================
+class Alert(Base):
+    __tablename__ = "alerts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    warning_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Stockés en JSON : liste de strings (UUIDs sérialisés)
+    cell_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    # Stockés en JSON : liste de dicts {type, index, criticalRange, warningRange}
+    sensors: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+    if TYPE_CHECKING:
+        events: Mapped[List["AlertEvent"]] = relationship("AlertEvent", back_populates="alert")
+    else:
+        events = relationship("AlertEvent", back_populates="alert", cascade="all, delete-orphan")
+
+
+# =========================================================
+# ALERT EVENT - Historique des déclenchements d'alertes
+# =========================================================
+class SeverityEnum(str, PyEnum):
+    CRITICAL = "critical"
+    WARNING = "warning"
+
+
+class AlertEvent(Base):
+    __tablename__ = "alert_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    alert_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("alerts.id"), index=True)
+    alert_title: Mapped[str] = mapped_column(String, nullable=False)
+
+    cell_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    cell_name: Mapped[str] = mapped_column(String, nullable=False)
+    cell_location: Mapped[str] = mapped_column(String, nullable=False, default="")
+
+    sensor_type: Mapped[str] = mapped_column(String, nullable=False)
+    severity: Mapped[SeverityEnum] = mapped_column(SqlEnum(SeverityEnum), nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    threshold_min: Mapped[float] = mapped_column(Float, nullable=False)
+    threshold_max: Mapped[float] = mapped_column(Float, nullable=False)
+
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    if TYPE_CHECKING:
+        alert: Mapped["Alert"] = relationship("Alert", back_populates="events")
+    else:
+        alert = relationship("Alert", back_populates="events")
