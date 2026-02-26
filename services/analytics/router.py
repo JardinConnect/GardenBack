@@ -21,12 +21,10 @@ async def get_analytics(
     """
     Récupère les analytics filtrés via le repository.
     """
-
     try:
-        analytics_data = repository.get_analytics(db, request)
-        return analytics_data
-
-
+        return repository.get_analytics(db, request)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
