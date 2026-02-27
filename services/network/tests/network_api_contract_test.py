@@ -7,7 +7,7 @@ from services.network.schemas import CurrentNetwork, NetworkInfo, ConnectRespons
 class TestGetCurrentNetworkContract:
     @patch("services.network.service.get_current_network")
     def test_returns_200_and_valid_schema_when_connected(
-        self, mock_get_current, client, headers_admin
+        self, mock_get_current, client
     ):
         mock_get_current.return_value = CurrentNetwork(
             connected=True,
@@ -19,7 +19,7 @@ class TestGetCurrentNetworkContract:
             gateway="192.168.1.1",
             mac_address="AA:BB:CC:DD:EE:FF",
         )
-        response = client.get("/network/current", headers=headers_admin)
+        response = client.get("/network/current")
         assert response.status_code == 200
         data = response.json()
         assert data["connected"] is True
@@ -30,13 +30,13 @@ class TestGetCurrentNetworkContract:
 
     @patch("services.network.service.get_current_network")
     def test_returns_200_and_valid_schema_when_not_connected(
-        self, mock_get_current, client, headers_admin
+        self, mock_get_current, client
     ):
         mock_get_current.return_value = CurrentNetwork(
             connected=False,
             interface="wlan0",
         )
-        response = client.get("/network/current", headers=headers_admin)
+        response = client.get("/network/current")
         assert response.status_code == 200
         data = response.json()
         assert data["connected"] is False
@@ -48,13 +48,13 @@ class TestGetCurrentNetworkContract:
 class TestGetListContract:
     @patch("services.network.service.list_networks")
     def test_returns_200_and_valid_schema_list(
-        self, mock_list, client, headers_admin
+        self, mock_list, client
     ):
         mock_list.return_value = [
             NetworkInfo(ssid="Net1", signal=80, security="WPA2"),
             NetworkInfo(ssid="Net2", signal=50, security="open", frequency=2437),
         ]
-        response = client.get("/network/list", headers=headers_admin)
+        response = client.get("/network/list")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -63,9 +63,9 @@ class TestGetListContract:
             NetworkInfo(**item)
 
     @patch("services.network.service.list_networks")
-    def test_returns_200_empty_list(self, mock_list, client, headers_admin):
+    def test_returns_200_empty_list(self, mock_list, client):
         mock_list.return_value = []
-        response = client.get("/network/list", headers=headers_admin)
+        response = client.get("/network/list")
         assert response.status_code == 200
         assert response.json() == []
 
@@ -73,7 +73,7 @@ class TestGetListContract:
 class TestPostConnectContract:
     @patch("services.network.service.connect")
     def test_returns_200_and_valid_schema_on_success(
-        self, mock_connect, client, headers_admin
+        self, mock_connect, client
     ):
         mock_connect.return_value = ConnectResponse(
             success=True,
@@ -83,7 +83,6 @@ class TestPostConnectContract:
         response = client.post(
             "/network/connect",
             json={"ssid": "MyWiFi", "password": "secret"},
-            headers=headers_admin,
         )
         assert response.status_code == 200
         data = response.json()
@@ -93,7 +92,7 @@ class TestPostConnectContract:
         ConnectResponse(**data)
 
     @patch("services.network.service.connect")
-    def test_accepts_hidden_flag(self, mock_connect, client, headers_superadmin):
+    def test_accepts_hidden_flag(self, mock_connect, client):
         mock_connect.return_value = ConnectResponse(
             success=True,
             message="Connecté",
@@ -102,7 +101,6 @@ class TestPostConnectContract:
         response = client.post(
             "/network/connect",
             json={"ssid": "HiddenNet", "hidden": True},
-            headers=headers_superadmin,
         )
         assert response.status_code == 200
         mock_connect.assert_called_once()
