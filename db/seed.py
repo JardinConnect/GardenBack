@@ -251,7 +251,7 @@ def seed_analytics(db: Session):
         return
 
     analytics_to_add = []
-    total_days = 7
+    total_days = 365
 
     for sensor in sensors:
         try:
