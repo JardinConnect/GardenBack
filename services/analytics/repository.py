@@ -83,8 +83,12 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> PaginatedAnalyticRes
     # 5. Compter le nombre total de résultats avant la pagination
     total_count = query.count()
 
-    # 6. Appliquer la pagination
-    paginated_query = query.offset(request.skip).limit(request.limit)
+    # 6. Appliquer l'ordre et la pagination
+    paginated_query = query.order_by(Analytic.occurred_at.desc()).offset(request.skip)
+
+    # Appliquer la limite seulement si elle est spécifiée
+    if request.limit is not None:
+        paginated_query = paginated_query.limit(request.limit)
 
     # 7. Exécution
     rows = paginated_query.all()
