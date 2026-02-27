@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
 
-from services.alert.router import router as alert_router
+from services.alerts.router import router as alert_router
 from services.auth.router import router as auth_router
 from services.auth.bearer import JWTBearer
 from services.analytics.router import router as data_router
@@ -42,9 +42,9 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         },
     )
 
+app.include_router(auth_router, tags=["Authentication"])
 
 auth_dependency = Depends(JWTBearer())
-app.include_router(auth_router, tags=["Authentication"])
 app.include_router(alert_router, prefix="/alert", tags=["Alert"], dependencies=[auth_dependency])
 app.include_router(data_router, prefix="/data", tags=["Data"], dependencies=[auth_dependency])
 app.include_router(area_router, prefix="/area", tags=["Area"], dependencies=[auth_dependency])
