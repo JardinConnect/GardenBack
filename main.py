@@ -43,6 +43,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 app.include_router(auth_router, tags=["Authentication"])
+app.include_router(mqtt_router, tags=["MQTT"])
+app.include_router(network_router, prefix="/network", tags=["Network"])
 
 auth_dependency = Depends(JWTBearer())
 app.include_router(alert_router, prefix="/alert", tags=["Alert"], dependencies=[auth_dependency])
@@ -51,5 +53,3 @@ app.include_router(area_router, prefix="/area", tags=["Area"], dependencies=[aut
 app.include_router(user_router, tags=["User"], dependencies=[auth_dependency])
 app.include_router(farm_state_router, prefix="/farm-stats", tags=["Farm Stats"], dependencies=[auth_dependency])
 app.include_router(cell_router, prefix="/cell", tags=["Cell"], dependencies=[auth_dependency])
-app.include_router(network_router, prefix="/network", tags=["Network"], dependencies=[auth_dependency])
-app.include_router(mqtt_router, tags=["MQTT"])
