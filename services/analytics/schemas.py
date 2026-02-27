@@ -13,7 +13,7 @@ class AnalyticsFilter(BaseModel):
     start_date: datetime = Field(description="Date de début")
     end_date: datetime = Field(description="Date de fin")
     skip: int = Field(0, description="Nombre d'éléments à sauter (pour la pagination)")
-    limit: int = Field(100, description="Nombre maximum d'éléments à retourner (pour la pagination)")
+    limit: Optional[int] = Field(None, ge=1, description="Nombre maximum d'éléments à retourner (pour la pagination)")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -75,7 +75,7 @@ class PaginatedAnalyticResult(BaseModel):
     """Schéma pour une réponse analytique paginée."""
     total: int
     skip: int
-    limit: int
+    limit: Optional[int]
     data: Dict[AnalyticType, List[AnalyticSchema]]
 
 

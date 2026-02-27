@@ -362,6 +362,34 @@ def test_get_analytics_pagination(db_session, setup_sensor):
     assert len(result_p2.data[AnalyticType.AIR_TEMPERATURE]) == 2
 
 
+def test_get_analytics_no_limit(db_session, setup_sensor):
+    """Vérifie que limit=None retourne tous les résultats."""
+    now = datetime.now()
+
+    # Ajouter plus de données qu'une limite habituelle
+    for i in range(25):
+        db_session.add(Analytic(
+            sensor_code="TA-1",
+            analytic_type=AnalyticType.AIR_TEMPERATURE,
+            value=float(20 + i),
+            occurred_at=now - timedelta(minutes=i),
+            sensor_id=setup_sensor.id,
+        ))
+    db_session.commit()
+
+    request = AnalyticsFilter(
+        sensor_code="TA-1",
+        start_date=now - timedelta(hours=1),
+        end_date=now + timedelta(hours=1),
+        sensor_id=None, analytic_type=None, area_id=None,
+        skip=0,
+        limit=None  # Test avec aucune limite
+    )
+    result = get_analytics(db_session, request)
+    assert result.total == 25
+    assert len(result.data[AnalyticType.AIR_TEMPERATURE]) == 25
+
+
 # =========================================================
 # TESTS — create_analytic
 # =========================================================
