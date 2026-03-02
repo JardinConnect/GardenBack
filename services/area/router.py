@@ -7,7 +7,10 @@ from .schemas import Area, AreaCreate, AreaUpdate
 from . import service
 from .errors import AreaNotFoundError, ParentAreaNotFoundError
 from db.database import get_db
+from db.models import User
 from services.auth.bearer import JWTBearer
+from services.auth.dependencies import get_current_user
+from services.audit.service import log_action
 
 router = APIRouter()
 
@@ -26,6 +29,7 @@ def get_all_areas(db: Session = Depends(get_db)) -> List[Area]:
 def create_area(
     area_data: AreaCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Area:
     """
     Crée une nouvelle zone de jardin.
@@ -40,7 +44,9 @@ def create_area(
     - `404 Not Found`: Si le `parent_id` fourni ne correspond à aucune zone existante.
     """
     try:
-        return service.create_area(db, area_data)
+        area = service.create_area(db, area_data)
+        log_action(db, current_user, "create", "area", area.id, details={"name": area.name})
+        return area
     except ParentAreaNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
@@ -50,6 +56,7 @@ def update_area(
     area_data: AreaUpdate,
     area_id: uuid.UUID = Path(..., title="The ID of the area to update"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Area:
     """
     Met à jour une zone.
@@ -67,6 +74,7 @@ def update_area(
     """
     try:
         updated_area = service.update_area(db, area_id, area_data)
+        log_action(db, current_user, "update", "area", area_id, details=area_data.model_dump(exclude_unset=True))
         return updated_area
     except (AreaNotFoundError, ParentAreaNotFoundError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -79,6 +87,7 @@ def update_area(
 def delete_area(
     area_id: uuid.UUID = Path(..., title="The ID of the area to delete"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> None:
     """
     Supprime une zone de jardin et toutes ses sous-zones.
@@ -93,6 +102,7 @@ def delete_area(
     """
     try:
         service.delete_area(db, area_id)
+        log_action(db, current_user, "delete", "area", area_id)
     except AreaNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     return None

@@ -10,6 +10,7 @@ from services.user import repository
 from services.user.schemas import UserResponse, UserSchema, UserUpdate, MessageResponse, UserPasswordUpdate
 from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID, InvalidPasswordError
 from services.auth.dependencies import get_current_user
+from services.audit.service import log_action
 from db.models import User, RoleEnum
 
 router = APIRouter()
@@ -88,6 +89,7 @@ def create_user(user: UserSchema, db: Session = Depends(get_db), current_user: U
         )
     try:
         new_user = repository.create_user(db, user=user)
+        log_action(db, current_user, "create", "user", new_user.id, details={"email": new_user.email})
         return new_user
     except UserAlreadyExistsError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -122,6 +124,7 @@ def update_user(user_id: uuid.UUID, user_data: UserUpdate, db: Session = Depends
 
     try:
         updated_user = repository.update_user(db, user_id=user_id, user_data=user_data)
+        log_action(db, current_user, "update", "user", user_id, details=user_data.model_dump(exclude_unset=True))
         return updated_user
     except UserNotFoundErrorID as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -161,6 +164,7 @@ def update_user_password( # Ajout de Path pour user_id pour une meilleure docume
 
     try:
         repository.update_user_password(db, user_id=user_id, password_data=password_data)
+        log_action(db, current_user, "update", "user", user_id, details={"field": "password"})
         return {"message": "Mot de passe mis à jour avec succès"}
     except InvalidPasswordError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -189,6 +193,7 @@ def delete_user(user_id: uuid.UUID, db: Session = Depends(get_db), current_user:
         )
     try:
         repository.delete_user(db, user_id=user_id)
+        log_action(db, current_user, "delete", "user", user_id)
         return {"message": f"Utilisateur {user_id} supprimé avec succès"}
     except UserNotFoundErrorID as e:
         raise HTTPException(status_code=404, detail=str(e))

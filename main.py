@@ -5,6 +5,8 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
 
 from services.alerts.router import router as alert_router
+from services.audit.router import router as audit_router
+from services.audit.purge import create_purge_task, cancel_purge_task
 from services.auth.router import router as auth_router
 from services.auth.bearer import JWTBearer
 from services.analytics.router import router as data_router
@@ -21,7 +23,11 @@ from services.mqtt.client import connect_mqtt
 async def lifespan(app: FastAPI):
     print("[FASTAPI] Démarrage de l'application...")
     connect_mqtt()
-    yield
+    purge_task = create_purge_task()
+    try:
+        yield
+    finally:
+        await cancel_purge_task(purge_task)
 
 
 app = FastAPI(title="GardenConnect API", version="1.0.0", lifespan=lifespan)
@@ -48,6 +54,7 @@ app.include_router(network_router, prefix="/network", tags=["Network"])
 
 auth_dependency = Depends(JWTBearer())
 app.include_router(alert_router, prefix="/alert", tags=["Alert"], dependencies=[auth_dependency])
+app.include_router(audit_router, prefix="/action-logs", tags=["Audit"], dependencies=[auth_dependency])
 app.include_router(data_router, prefix="/data", tags=["Data"], dependencies=[auth_dependency])
 app.include_router(area_router, prefix="/area", tags=["Area"], dependencies=[auth_dependency])
 app.include_router(user_router, tags=["User"], dependencies=[auth_dependency])

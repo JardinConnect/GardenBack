@@ -3,7 +3,8 @@ from typing import Optional, List, TYPE_CHECKING
 import uuid
 from sqlalchemy import (
     String, DateTime, Float, ForeignKey, UUID, JSON, Boolean
-) 
+)
+from sqlalchemy.types import TypeDecorator
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
 from datetime import datetime, UTC
@@ -35,8 +36,10 @@ class User(Base):
 
     if TYPE_CHECKING:
         refresh_tokens: Mapped[List["RefreshToken"]] = relationship("RefreshToken", back_populates="user")
+        action_logs: Mapped[List["ActionLog"]] = relationship("ActionLog", back_populates="user")
     else:
         refresh_tokens = relationship("RefreshToken", back_populates="user")
+        action_logs = relationship("ActionLog", back_populates="user")
 
 
 # =========================================================
@@ -255,3 +258,51 @@ class AlertEvent(Base):
         alert: Mapped["Alert"] = relationship("Alert", back_populates="events")
     else:
         alert = relationship("Alert", back_populates="events")
+
+
+# =========================================================
+# ACTION LOG
+# =========================================================
+class ActionEnum(str, PyEnum):
+    CREATE = "create"
+    UPDATE = "update"
+    DELETE = "delete"
+    TOGGLE = "toggle"
+    ARCHIVE = "archive"
+    ARCHIVE_ALL = "archive_all"
+    ARCHIVE_BY_CELL = "archive_by_cell"
+
+
+class ResourceTypeEnum(str, PyEnum):
+    AREA = "area"
+    CELL = "cell"
+    USER = "user"
+    ALERT = "alert"
+    NETWORK = "network"
+
+
+class UTCDateTime(TypeDecorator):
+    impl = DateTime
+    cache_ok = True
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
+
+
+class ActionLog(Base):
+    __tablename__ = "action_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    resource_type: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    entity_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=lambda: datetime.now(UTC))
+
+    if TYPE_CHECKING:
+        user: Mapped[Optional["User"]] = relationship("User", back_populates="action_logs")
+    else:
+        user = relationship("User", back_populates="action_logs")
