@@ -8,6 +8,9 @@ from sqlalchemy.orm import Session
 import uuid
 
 from db.database import get_db
+from db.models import User
+from services.auth.dependencies import get_current_user
+from services.audit.service import log_action
 from .schemas import (
     # Alerts
     AlertResponseSchema,
@@ -94,6 +97,7 @@ def get_alert(
 def create_alert(
     alert_data: AlertCreateSchema,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Crée une nouvelle alerte.
@@ -101,7 +105,9 @@ def create_alert(
     - Si des conflits existent et que **overwriteExisting** est `false`, retourne `409 Conflict`.
     - Si **overwriteExisting** est `true`, les alertes en conflit sont supprimées avant création.
     """
-    return service.create_alert(db, alert_data)
+    result = service.create_alert(db, alert_data)
+    log_action(db, current_user, "create", "alert", result["id"], details={"title": result["title"]})
+    return result
 
 
 @router.put(
@@ -113,11 +119,14 @@ def update_alert(
     alert_id: uuid.UUID,
     alert_data: AlertUpdatedResponseSchema,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Met à jour une alerte existante (titre, cellules, capteurs, plages).
     """
-    return service.update_alert(db, alert_id, alert_data)
+    result = service.update_alert(db, alert_id, alert_data)
+    log_action(db, current_user, "update", "alert", alert_id)
+    return result
 
 
 @router.patch(
@@ -130,11 +139,14 @@ def toggle_alert(
     alert_id: uuid.UUID,
     payload: AlertToggleSchema,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Active ou désactive une alerte depuis la vue cards.
     """
-    return service.toggle_alert(db, alert_id, payload)
+    result = service.toggle_alert(db, alert_id, payload)
+    log_action(db, current_user, "toggle", "alert", alert_id, details={"is_active": payload.is_active})
+    return result
 
 
 @router.delete(
@@ -145,11 +157,13 @@ def toggle_alert(
 def delete_alert(
     alert_id: uuid.UUID,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Supprime définitivement une alerte (zone de danger en mode édition).
     """
     service.delete_alert(db, alert_id)
+    log_action(db, current_user, "delete", "alert", alert_id)
     return {"message": "Alerte supprimée avec succès."}
 
 
@@ -181,11 +195,16 @@ def get_alert_events(
     response_model_by_alias=True,
     summary="Archiver tous les événements",
 )
-def archive_all_events(db: Session = Depends(get_db)):
+def archive_all_events(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
     Archive tous les événements d'alerte non encore archivés.
     """
-    return service.archive_all_events(db)
+    result = service.archive_all_events(db)
+    log_action(db, current_user, "archive_all", "alert", details={"archived_count": result.get("archivedCount", 0)})
+    return result
 
 
 @router.post(
@@ -197,11 +216,14 @@ def archive_all_events(db: Session = Depends(get_db)):
 def archive_events_by_cell(
     payload: AlertEventsArchiveByCellInputSchema,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Archive tous les événements non archivés d'une cellule spécifique.
     """
-    return service.archive_events_by_cell(db, payload.cell_id)
+    result = service.archive_events_by_cell(db, payload.cell_id)
+    log_action(db, current_user, "archive_by_cell", "alert", entity_id=payload.cell_id, details={"archived_count": result.get("archivedCount", 0)})
+    return result
 
 
 @router.patch(
@@ -212,8 +234,11 @@ def archive_events_by_cell(
 def archive_event(
     event_id: uuid.UUID,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Archive un événement d'alerte spécifique.
     """
-    return service.archive_event(db, event_id)
+    result = service.archive_event(db, event_id)
+    log_action(db, current_user, "archive", "alert", entity_id=event_id)
+    return result

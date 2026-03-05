@@ -6,7 +6,10 @@ from .schemas import CellCreate, CellUpdate, CellDTO
 from . import service
 from .errors import CellNotFoundError, ParentCellNotFoundError
 from db.database import get_db
+from db.models import User
 from services.auth.bearer import JWTBearer
+from services.auth.dependencies import get_current_user
+from services.audit.service import log_action
 
 router = APIRouter()
 
@@ -38,12 +41,14 @@ def get_cell(
 def create_cell(
     cell_data: CellCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> CellDTO:
     """
     Crée une nouvelle cellule.
     """
     try:
         cell = service.create_cell(db, cell_data)
+        log_action(db, current_user, "create", "cell", cell.id, details={"name": cell.name})
         return CellDTO.from_cell(cell)
     except ParentCellNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -52,12 +57,14 @@ def create_cell(
 def delete_cell(
     cell_id: uuid.UUID = Path(..., title="The ID of the cell to delete"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> None:
     """
     Supprime une cellule.
     """
     try:
         service.delete_cell(db, cell_id)
+        log_action(db, current_user, "delete", "cell", cell_id)
     except CellNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     return None
@@ -67,9 +74,11 @@ def update_cell(
     cell_data: CellUpdate,
     cell_id: uuid.UUID = Path(..., title="The ID of the cell to update"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> CellDTO:
     try:
         cell = service.update_cell(db, cell_id, cell_data)
+        log_action(db, current_user, "update", "cell", cell_id, details=cell_data.model_dump(exclude_unset=True))
         return CellDTO.from_cell(cell)
     except CellNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

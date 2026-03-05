@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 class Settings():
     # Infos API
@@ -19,6 +20,11 @@ class Settings():
     MQTT_TOPIC: str = "test/topic"
 
     NETWORK_PROVIDER: str = "linux"
+
+    _retention = os.environ.get("ACTION_LOGS_RETENTION_DAYS")
+    ACTION_LOGS_RETENTION_DAYS: Optional[int] = (
+        int(_retention) if _retention and str(_retention).isdigit() else None
+    )
 
     class Config:
         env_file = ".env" 
