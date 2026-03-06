@@ -6,10 +6,10 @@ from collections import defaultdict
 
 from . import schemas, repository
 from .errors import ParentAreaNotFoundError, AreaNotFoundError
-from db.models import Area as AreaModel, Analytic as AnalyticModel, AnalyticType
+from db.models import Area as AreaModel, Cell as CellModel, Analytic as AnalyticModel, AnalyticType, User
 
 
-def create_area(db: Session, area_data: schemas.AreaCreate) -> schemas.Area:
+def create_area(db: Session, area_data: schemas.AreaCreate, current_user: User) -> schemas.Area:
     """
     Crée une nouvelle zone (Area).
     La logique métier est de valider le parent et de calculer le niveau.
@@ -22,26 +22,35 @@ def create_area(db: Session, area_data: schemas.AreaCreate) -> schemas.Area:
             raise ParentAreaNotFoundError
         level = repository.get_area_level(db, parent_area.id) + 1
 
-    db_area_model = AreaModel(**area_data.model_dump())
+    db_area_model = AreaModel(
+        **area_data.model_dump(),
+        originator_id=current_user.id,
+        updater_id=current_user.id
+    )
     
     # Délégation de la création au repository
     created_area = repository.create(db, db_area_model)
 
-    # Une nouvelle zone n'a pas encore d'enfants, de cellules ou d'historique analytique.
-    # On retourne un schéma Area complet mais vide pour la cohérence de l'API.
-    return schemas.Area(
-        id=created_area.id,
-        name=created_area.name,
-        color=created_area.color,
-        is_tracked=created_area.is_tracked,
-        level=level,
-        areas=[],
-        cells=[],
-        analytics={analytic_type: [] for analytic_type in AnalyticType}
-    )
+    # Utiliser model_validate est plus robuste pour l'analyse statique avec des schémas complexes (alias, etc.).
+    # Pydantic gère automatiquement la conversion de `current_user` en `UserInfo`.
+    area_dict = {
+        "id": created_area.id,
+        "name": created_area.name,
+        "color": created_area.color,
+        "is_tracked": created_area.is_tracked,
+        "level": level,
+        "created_at": created_area.created_at,
+        "updated_at": created_area.updated_at,
+        "originator": current_user,
+        "updater": current_user,
+        "areas": [],
+        "cells": [],
+        "analytics": {analytic_type: [] for analytic_type in AnalyticType},
+    }
+    return schemas.Area.model_validate(area_dict)
 
 
-def update_area(db: Session, area_id: uuid.UUID, area_data: schemas.AreaUpdate) -> schemas.Area:
+def update_area(db: Session, area_id: uuid.UUID, area_data: schemas.AreaUpdate, current_user: User) -> schemas.Area:
     """
     Met à jour une zone.
     Valide les changements (notamment le parent_id pour éviter les cycles)
@@ -76,10 +85,14 @@ def update_area(db: Session, area_id: uuid.UUID, area_data: schemas.AreaUpdate) 
     # 4. Appliquer les mises à jour sur le modèle SQLAlchemy
     for key, value in update_data.items():
         setattr(area_to_update, key, value)
+    area_to_update.updater_id = current_user.id
 
     # 5. Persister les changements et retourner le schéma mis à jour
     repository.update(db, area_to_update)
-    return get_area_with_analytics(db, area_id)
+    updated_area_schema = get_area_with_analytics(db, area_id)
+    if updated_area_schema is None:
+        raise AreaNotFoundError(f"Area with ID {area_id} not found after update.")
+    return updated_area_schema
 
 
 def delete_area(db: Session, area_id: uuid.UUID) -> bool:
@@ -93,6 +106,20 @@ def delete_area(db: Session, area_id: uuid.UUID) -> bool:
 
     repository.delete_hierarchy(db, area_to_delete)
     return True
+
+
+def get_full_location_path_for_cell(cell: CellModel) -> str:
+    """Construit le chemin hiérarchique complet pour une cellule (fil d'Ariane)."""
+    if not cell.area:
+        return ""
+
+    path_parts = []
+    current_area = cell.area
+    while current_area:
+        path_parts.append(current_area.name)
+        current_area = current_area.parent
+
+    return " > ".join(reversed(path_parts))
 
 
 # --- Fonctions de logique métier (privées, pas d'accès DB) ---
@@ -124,7 +151,7 @@ def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[Analyt
             daily_average_analytic = schemas.AnalyticSchema(
                 value=round(average_value, 2),
                 occurred_at=datetime.combine(current_day, datetime.min.time()),
-            )
+            ) # type: ignore
             daily_averages_for_type.append(daily_average_analytic)
         
         analytics_averages_by_type[analytic_type] = daily_averages_for_type
@@ -154,16 +181,31 @@ def _build_area_schema_recursively(
 
     analytics_averages_by_type = _calculate_daily_averages(all_analytics)
 
-    area_schema = schemas.Area(
-        id=area.id,
-        name=area.name,
-        color=area.color,
-        is_tracked=area.is_tracked,
-        level=level,
-        areas=processed_sub_areas,
-        cells=[schemas.Cell.model_validate(cell) for cell in area.cells],
-        analytics=analytics_averages_by_type
-    )
+    # Manually process cells to include their location path
+    processed_cells = []
+    for cell_model in area.cells:
+        # We need to import the Cell schema from the cell service
+        from services.cell.schemas import Cell as CellSchema
+        cell_schema = CellSchema.model_validate(cell_model)
+        cell_schema.location = get_full_location_path_for_cell(cell_model)
+        processed_cells.append(cell_schema)
+
+    # Utilisation de model_validate pour une meilleure robustesse avec l'analyse statique.
+    area_dict = {
+        "id": area.id,
+        "name": area.name,
+        "color": area.color,
+        "is_tracked": area.is_tracked,
+        "level": level,
+        "created_at": area.created_at,
+        "updated_at": area.updated_at,
+        "originator": area.originator,
+        "updater": area.updater,
+        "areas": processed_sub_areas,
+        "cells": processed_cells,
+        "analytics": analytics_averages_by_type,
+    }
+    area_schema = schemas.Area.model_validate(area_dict)
 
     return area_schema, all_analytics
 

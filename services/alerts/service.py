@@ -1,20 +1,16 @@
 from __future__ import annotations
 
 from typing import List, Optional
+from collections import defaultdict
 from sqlalchemy.orm import Session
 import uuid
 
 from db.models import Alert, AlertEvent, Cell
 from .schemas import (
-    AlertCreateSchema,
-    AlertUpdateSchema,
-    AlertToggleSchema,
-    AlertValidateInputSchema,
-    AlertSensorSchema,
-    AlertResponseSchema,
-    CellInfoSchema,
+    AlertCreateUpdateSchema, AlertSensorSchema, AlertToggleSchema, AlertValidateInputSchema, AlertResponseSchema, CellInfoSchema
 )
 from .errors import AlertNotFoundError, AlertEventNotFoundError, AlertConflictError
+from services.area.service import get_full_location_path_for_cell
 
 
 # ---------------------------------------------------------------------------
@@ -22,19 +18,25 @@ from .errors import AlertNotFoundError, AlertEventNotFoundError, AlertConflictEr
 # ---------------------------------------------------------------------------
 
 def _build_alert_response(alert: Alert, db: Session) -> AlertResponseSchema:
-    """Construit une AlertResponseSchema en enrichissant cells depuis la DB."""
+    """
+    Construit un schéma de réponse `AlertResponseSchema` à partir d'un modèle `Alert`.
+
+    Cette fonction enrichit l'objet en :
+    - Résolvant les `cell_ids` pour récupérer les noms et localisations des cellules.
+    - S'assurant que la structure des capteurs (`sensors`) est conforme au schéma Pydantic.
+    """
     cell_uuids = [uuid.UUID(c) if isinstance(c, str) else c for c in alert.cell_ids]
 
     cells_data: List[CellInfoSchema] = []
     for cid in cell_uuids:
         cell = db.query(Cell).filter(Cell.id == cid).first()
         if cell:
-            area_name = cell.area.name if cell.area else ""
+            full_location = get_full_location_path_for_cell(cell)
             cells_data.append(
                 CellInfoSchema(
                     id=cell.id,
                     name=cell.name,
-                    location=area_name,
+                    location=full_location,
                 )
             )
 
@@ -61,11 +63,29 @@ def _build_alert_response(alert: Alert, db: Session) -> AlertResponseSchema:
     )
 
 
-def _detect_conflicts(db: Session, cell_ids: List[uuid.UUID], sensor_types: List[str]) -> List[dict]:
-    """Retourne la liste des conflits (cellule × type de capteur déjà couverts par une alerte)."""
+def _detect_conflicts(db: Session, cell_ids: List[uuid.UUID], sensor_types: List[str], exclude_alert_id: Optional[uuid.UUID] = None) -> List[dict]:
+    """
+    Détecte les conflits entre une configuration d'alerte potentielle et les alertes existantes.
+
+    Un conflit se produit si une alerte existante surveille déjà le même type de capteur
+    sur l'une des mêmes cellules.
+
+    Args:
+        db: La session de base de données.
+        cell_ids: Liste des IDs de cellules pour la nouvelle alerte/mise à jour.
+        sensor_types: Liste des types de capteurs pour la nouvelle alerte/mise à jour.
+        exclude_alert_id: ID d'une alerte à exclure de la détection (utile lors d'une mise à jour).
+
+    Returns:
+        Une liste de dictionnaires, chaque dictionnaire représentant un conflit trouvé.
+    """
     conflicts: List[dict] = []
 
-    all_alerts = db.query(Alert).all()
+    query = db.query(Alert)
+    if exclude_alert_id:
+        query = query.filter(Alert.id != exclude_alert_id)
+
+    all_alerts = query.all()
 
     for alert in all_alerts:
         existing_cell_ids = {
@@ -99,11 +119,61 @@ def _detect_conflicts(db: Session, cell_ids: List[uuid.UUID], sensor_types: List
     return conflicts
 
 
+def _resolve_conflicts(db: Session, conflicts: List[dict]) -> List[uuid.UUID]:
+    """
+    Résout les conflits d'alerte de manière "chirurgicale" en modifiant les alertes existantes.
+
+    Pour chaque alerte existante en conflit :
+    1.  Retire uniquement les capteurs en conflit.
+    2.  Si, après le retrait, l'alerte se retrouve sans aucun capteur, elle est supprimée.
+
+    Args:
+        db: La session de base de données.
+        conflicts: La liste des conflits détectés par `_detect_conflicts`.
+
+    Returns:
+        La liste des IDs des alertes qui ont été entièrement supprimées (car devenues vides).
+    """
+    overwritten_alert_ids: List[uuid.UUID] = []
+    if not conflicts:
+        return overwritten_alert_ids
+
+    conflicts_by_alert_id = defaultdict(list)
+    for conflict in conflicts:
+        conflicts_by_alert_id[conflict['existingAlertId']].append(conflict)
+
+    for alert_id_str, alert_conflicts in conflicts_by_alert_id.items():
+        alert_id = uuid.UUID(alert_id_str)
+        existing_alert = db.query(Alert).filter(Alert.id == alert_id).first()
+        if not existing_alert:
+            continue
+
+        # Identifier les types de capteurs à retirer de cette alerte spécifique
+        sensor_types_to_remove = {c['sensorType'] for c in alert_conflicts}
+
+        # Filtrer les capteurs existants pour ne garder que les non-conflictuels
+        updated_sensors = [
+            s for s in (existing_alert.sensors or [])
+            if s.get('type') not in sensor_types_to_remove
+        ]
+
+        if not updated_sensors:
+            # Si plus aucun capteur, l'alerte est considérée comme entièrement écrasée et est supprimée.
+            overwritten_alert_ids.append(existing_alert.id)
+            db.delete(existing_alert)
+        else:
+            # Sinon, on met à jour l'alerte avec les capteurs restants.
+            existing_alert.sensors = updated_sensors
+
+    return overwritten_alert_ids
+
+
 # ---------------------------------------------------------------------------
 # Alertes — CRUD
 # ---------------------------------------------------------------------------
 
 def get_all_alerts(db: Session, cell_id: Optional[uuid.UUID] = None) -> List[AlertResponseSchema]:
+    """Récupère toutes les alertes, avec un filtre optionnel par cellule."""
     query = db.query(Alert)
     alerts = query.all()
 
@@ -118,6 +188,7 @@ def get_all_alerts(db: Session, cell_id: Optional[uuid.UUID] = None) -> List[Ale
 
 
 def get_alert_by_id(db: Session, alert_id: uuid.UUID) -> AlertResponseSchema:
+    """Récupère une alerte par son ID."""
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise AlertNotFoundError(alert_id)
@@ -125,14 +196,28 @@ def get_alert_by_id(db: Session, alert_id: uuid.UUID) -> AlertResponseSchema:
 
 
 def validate_alert(db: Session, payload: AlertValidateInputSchema) -> dict:
-    conflicts = _detect_conflicts(db, payload.cell_ids, payload.sensor_types)
+    """
+    Valide une configuration d'alerte potentielle pour détecter les conflits.
+    Utilisé par le front-end avant de soumettre une création ou une mise à jour.
+    """
+    conflicts = _detect_conflicts(
+        db, payload.cell_ids, payload.sensor_types, exclude_alert_id=payload.alert_id
+    )
     return {
         "conflicts": conflicts,
         "hasConflicts": len(conflicts) > 0,
     }
 
 
-def create_alert(db: Session, alert_data: AlertCreateSchema) -> dict:
+def create_alert(db: Session, alert_data: AlertCreateUpdateSchema) -> dict:
+    """
+    Crée une nouvelle alerte.
+
+    Gère les conflits avec les alertes existantes :
+    - Si `overwriteExisting` est `False`, lève une exception `AlertConflictError`.
+    - Si `overwriteExisting` est `True`, résout les conflits en modifiant ou supprimant
+      les parties conflictuelles des alertes existantes via `_resolve_conflicts`.
+    """
     sensor_types = [s.type for s in alert_data.sensors]
     conflicts = _detect_conflicts(db, alert_data.cell_ids, sensor_types)
 
@@ -142,13 +227,7 @@ def create_alert(db: Session, alert_data: AlertCreateSchema) -> dict:
         raise AlertConflictError(conflicts)
 
     if conflicts and alert_data.overwrite_existing:
-        # Supprimer les alertes en conflit
-        conflicting_ids = {uuid.UUID(c["existingAlertId"]) for c in conflicts}
-        for aid in conflicting_ids:
-            existing = db.query(Alert).filter(Alert.id == aid).first()
-            if existing:
-                overwritten_alert_ids.append(existing.id)
-                db.delete(existing)
+        overwritten_alert_ids = _resolve_conflicts(db, conflicts)
 
     new_alert = Alert(
         title=alert_data.title,
@@ -169,10 +248,31 @@ def create_alert(db: Session, alert_data: AlertCreateSchema) -> dict:
     }
 
 
-def update_alert(db: Session, alert_id: uuid.UUID, alert_data: AlertUpdateSchema) -> dict:
+def update_alert(db: Session, alert_id: uuid.UUID, alert_data: AlertCreateUpdateSchema) -> dict:
+    """
+    Met à jour une alerte existante.
+
+    Gère les conflits avec d'autres alertes de la même manière que `create_alert` :
+    - Si `overwriteExisting` est `False`, lève une exception `AlertConflictError`.
+    - Si `overwriteExisting` est `True`, résout les conflits en modifiant ou supprimant
+      les parties conflictuelles des autres alertes via `_resolve_conflicts`.
+    """
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise AlertNotFoundError(alert_id)
+
+    sensor_types = [s.type for s in alert_data.sensors]
+    conflicts = _detect_conflicts(
+        db, alert_data.cell_ids, sensor_types, exclude_alert_id=alert_id
+    )
+
+    overwritten_alert_ids: List[uuid.UUID] = []
+
+    if conflicts and not alert_data.overwrite_existing:
+        raise AlertConflictError(conflicts)
+
+    if conflicts and alert_data.overwrite_existing:
+        overwritten_alert_ids = _resolve_conflicts(db, conflicts)
 
     alert.title = alert_data.title
     alert.is_active = alert_data.is_active
@@ -187,10 +287,12 @@ def update_alert(db: Session, alert_id: uuid.UUID, alert_data: AlertUpdateSchema
         "id": alert.id,
         "title": alert.title,
         "message": "Alerte mise à jour avec succès.",
+        "overwrittenAlerts": overwritten_alert_ids,
     }
 
 
 def toggle_alert(db: Session, alert_id: uuid.UUID, payload: AlertToggleSchema) -> dict:
+    """Active ou désactive une alerte."""
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise AlertNotFoundError(alert_id)
@@ -207,6 +309,7 @@ def toggle_alert(db: Session, alert_id: uuid.UUID, payload: AlertToggleSchema) -
 
 
 def delete_alert(db: Session, alert_id: uuid.UUID) -> None:
+    """Supprime une alerte et ses événements associés (via cascade)."""
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise AlertNotFoundError(alert_id)
@@ -225,6 +328,7 @@ def get_alert_events(
     start_date=None,
     end_date=None,
 ) -> List[AlertEvent]:
+    """Récupère l'historique des événements d'alerte non archivés, avec filtres."""
     query = db.query(AlertEvent).filter(AlertEvent.is_archived == False)  # noqa: E712
 
     if cell_id:
@@ -240,6 +344,7 @@ def get_alert_events(
 
 
 def archive_event(db: Session, event_id: uuid.UUID) -> dict:
+    """Archive un événement d'alerte spécifique."""
     event = db.query(AlertEvent).filter(AlertEvent.id == event_id).first()
     if not event:
         raise AlertEventNotFoundError(event_id)
@@ -254,6 +359,7 @@ def archive_event(db: Session, event_id: uuid.UUID) -> dict:
 
 
 def archive_all_events(db: Session) -> dict:
+    """Archive tous les événements d'alerte non encore archivés."""
     result = (
         db.query(AlertEvent)
         .filter(AlertEvent.is_archived == False)  # noqa: E712
@@ -271,6 +377,7 @@ def archive_all_events(db: Session) -> dict:
 
 
 def archive_events_by_cell(db: Session, cell_id: uuid.UUID) -> dict:
+    """Archive tous les événements non archivés pour une cellule spécifique."""
     result = (
         db.query(AlertEvent)
         .filter(AlertEvent.cell_id == cell_id, AlertEvent.is_archived == False)  # noqa: E712

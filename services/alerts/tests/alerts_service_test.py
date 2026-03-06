@@ -1,24 +1,19 @@
 """
 
 Tests de la couche service pour le module alertes.
-On mocke la Session SQLAlchemy pour tester la logique métier
-sans dépendance à une vraie base de données.
+On utilise une base de données en mémoire (via la fixture db_session de conftest.py)
+pour tester la logique métier en conditions réelles.
 """
 
 import pytest
 import uuid
 from datetime import datetime, UTC
-from unittest.mock import MagicMock, patch, call
 
 from services.alerts import service
 from services.alerts.schemas import (
-    AlertCreateSchema,
-    AlertUpdateSchema,
+    AlertCreateUpdateSchema,
     AlertToggleSchema,
     AlertValidateInputSchema,
-    AlertSensorSchema,
-    RangeSchema,
-    RangeOptionalSchema,
 )
 from services.alerts.errors import (
     AlertNotFoundError,
@@ -29,46 +24,50 @@ from db.models import Alert, AlertEvent, Cell, Area, SeverityEnum
 
 
 # ---------------------------------------------------------------------------
-# Builders — objets Alert/Cell factices
+# Fixtures — Mise en place de l'état de la base de données
 # ---------------------------------------------------------------------------
 
-def make_cell(name: str = "Rangée A", area_name: str = "Parcelle Nord") -> MagicMock:
-    cell = MagicMock(spec=Cell)
-    cell.id = uuid.uuid4()
-    cell.name = name
-    area = MagicMock(spec=Area)
-    area.name = area_name
-    cell.area = area
+@pytest.fixture
+def setup_area(db_session):
+    area = Area(name="Test Area", color="#FF0000")
+    db_session.add(area)
+    db_session.commit()
+    return area
+
+@pytest.fixture
+def setup_cell(db_session, setup_area):
+    cell = Cell(name="Test Cell", area_id=setup_area.id)
+    db_session.add(cell)
+    db_session.commit()
     return cell
 
-
-def make_alert(cell_id: uuid.UUID | None = None, sensor_type: str = "air_temperature") -> MagicMock:
-    alert = MagicMock(spec=Alert)
-    alert.id = uuid.uuid4()
-    alert.title = "Alerte Test"
-    alert.is_active = True
-    alert.warning_enabled = False
-    alert.cell_ids = [str(cell_id)] if cell_id else [str(uuid.uuid4())]
-    alert.sensors = [
-        {
-            "type": sensor_type,
-            "index": 0,
-            "criticalRange": {"min": -5.0, "max": 40.0},
-            "warningRange": None,
-        }
-    ]
-    alert.created_at = datetime.now(UTC)
-    alert.updated_at = datetime.now(UTC)
-    return alert
-
+@pytest.fixture
+def alert_factory(db_session):
+    """Factory pour créer des alertes dans la base de données de test."""
+    def _make_alert(title="Factory Alert", cell_ids=None, sensor_types=None, is_active=True, warning_enabled=False):
+        if sensor_types is None:
+            sensor_types = ["air_temperature"]
+        
+        alert = Alert(
+            title=title, is_active=is_active, warning_enabled=warning_enabled,
+            cell_ids=cell_ids or [],
+            sensors=[
+                {"type": s_type, "index": 0, "criticalRange": {"min": -5.0, "max": 40.0}, "warningRange": None}
+                for s_type in sensor_types
+            ]
+        )
+        db_session.add(alert)
+        db_session.commit()
+        return alert
+    return _make_alert
 
 def make_alert_create(
     cell_ids: list[uuid.UUID] | None = None,
     sensor_type: str = "air_temperature",
     overwrite: bool = False,
-) -> AlertCreateSchema:
+) -> AlertCreateUpdateSchema:
     cids = cell_ids or [uuid.uuid4()]
-    return AlertCreateSchema(
+    return AlertCreateUpdateSchema(
         **{
             "title": "Nouvelle Alerte",
             "isActive": True,
@@ -93,36 +92,29 @@ def make_alert_create(
 
 class TestGetAllAlerts:
 
-    def test_returns_all_alerts_when_no_filter(self):
-        db = MagicMock()
-        cell_id = uuid.uuid4()
-        alert1 = make_alert(cell_id)
-        alert2 = make_alert(uuid.uuid4())
-        db.query().all.return_value = [alert1, alert2]
+    def test_returns_all_alerts_when_no_filter(self, db_session, alert_factory, setup_cell):
+        alert_factory(cell_ids=[str(setup_cell.id)])
+        alert_factory()
 
-        with patch.object(service, "_build_alert_response", side_effect=lambda a, d: a):
-            result = service.get_all_alerts(db, cell_id=None)
+        result = service.get_all_alerts(db_session, cell_id=None)
 
         assert len(result) == 2
 
-    def test_filters_by_cell_id(self):
-        db = MagicMock()
-        cell_id = uuid.uuid4()
-        alert_match = make_alert(cell_id)
-        alert_other = make_alert(uuid.uuid4())
-        db.query().all.return_value = [alert_match, alert_other]
+    def test_filters_by_cell_id(self, db_session, alert_factory, setup_cell):
+        alert_match = alert_factory(cell_ids=[str(setup_cell.id)])
+        alert_factory() # Une autre alerte non liée
 
-        with patch.object(service, "_build_alert_response", side_effect=lambda a, d: a):
-            result = service.get_all_alerts(db, cell_id=cell_id)
+        result = service.get_all_alerts(db_session, cell_id=setup_cell.id)
 
         assert len(result) == 1
-        assert result[0] is alert_match
+        assert result[0].id == alert_match.id
 
-    def test_returns_empty_list_when_no_alerts(self):
-        db = MagicMock()
-        db.query().all.return_value = []
+    def test_returns_empty_list_when_no_alerts(self, db_session):
+        # S'assure que la DB est vide pour ce test
+        db_session.query(Alert).delete()
+        db_session.commit()
 
-        result = service.get_all_alerts(db)
+        result = service.get_all_alerts(db_session)
 
         assert result == []
 
@@ -133,22 +125,17 @@ class TestGetAllAlerts:
 
 class TestGetAlertById:
 
-    def test_returns_alert_when_found(self):
-        db = MagicMock()
-        alert = make_alert()
-        db.query().filter().first.return_value = alert
+    def test_returns_alert_when_found(self, db_session, alert_factory):
+        alert = alert_factory()
 
-        with patch.object(service, "_build_alert_response", return_value=alert):
-            result = service.get_alert_by_id(db, alert.id)
+        result = service.get_alert_by_id(db_session, alert.id)
 
-        assert result is alert
+        assert result.id == alert.id
 
-    def test_raises_404_when_not_found(self):
-        db = MagicMock()
-        db.query().filter().first.return_value = None
+    def test_raises_404_when_not_found(self, db_session):
 
         with pytest.raises(AlertNotFoundError):
-            service.get_alert_by_id(db, uuid.uuid4())
+            service.get_alert_by_id(db_session, uuid.uuid4())
 
 
 # ---------------------------------------------------------------------------
@@ -157,67 +144,52 @@ class TestGetAlertById:
 
 class TestValidateAlert:
 
-    def test_no_conflicts_returns_empty(self):
-        db = MagicMock()
-        db.query().all.return_value = []  # aucune alerte existante
-
+    def test_no_conflicts_returns_empty(self, db_session):
         payload = AlertValidateInputSchema(
-            **{"cellIds": [str(uuid.uuid4())], "sensorTypes": ["air_temperature"]}
+            **{"cellIds": [uuid.uuid4()], "sensorTypes": ["air_temperature"]}
         )
-        result = service.validate_alert(db, payload)
+        result = service.validate_alert(db_session, payload)
 
         assert result["hasConflicts"] is False
         assert result["conflicts"] == []
 
-    def test_detects_conflict_on_same_cell_and_sensor_type(self):
-        db = MagicMock()
-        cell_id = uuid.uuid4()
-        existing = make_alert(cell_id, sensor_type="air_temperature")
-
-        # db.query(Alert).all() → liste d'alertes
-        # db.query(Cell).filter().first() → cellule
-        cell_mock = make_cell()
-        cell_mock.id = cell_id
-
-        db.query.side_effect = lambda model: _mock_query_for(model, existing, cell_mock)
+    def test_detects_conflict_on_same_cell_and_sensor_type(self, db_session, setup_cell, alert_factory):
+        alert_factory(cell_ids=[str(setup_cell.id)], sensor_types=["air_temperature"])
 
         payload = AlertValidateInputSchema(
-            **{"cellIds": [str(cell_id)], "sensorTypes": ["air_temperature"]}
+            **{"cellIds": [setup_cell.id], "sensorTypes": ["air_temperature"]}
         )
-        result = service.validate_alert(db, payload)
+        result = service.validate_alert(db_session, payload)
 
         assert result["hasConflicts"] is True
         assert len(result["conflicts"]) == 1
         assert result["conflicts"][0]["sensorType"] == "air_temperature"
 
-    def test_no_conflict_when_sensor_type_differs(self):
-        db = MagicMock()
-        cell_id = uuid.uuid4()
-        existing = make_alert(cell_id, sensor_type="air_temperature")
-        cell_mock = make_cell()
-        cell_mock.id = cell_id
-
-        db.query.side_effect = lambda model: _mock_query_for(model, existing, cell_mock)
+    def test_no_conflict_when_sensor_type_differs(self, db_session, setup_cell, alert_factory):
+        alert_factory(cell_ids=[str(setup_cell.id)], sensor_types=["air_temperature"])
 
         payload = AlertValidateInputSchema(
-            **{"cellIds": [str(cell_id)], "sensorTypes": ["soil_humidity"]}
+            **{"cellIds": [setup_cell.id], "sensorTypes": ["soil_humidity"]}
         )
-        result = service.validate_alert(db, payload)
+        result = service.validate_alert(db_session, payload)
 
         assert result["hasConflicts"] is False
 
-    def test_no_conflict_when_cell_differs(self):
-        db = MagicMock()
-        existing = make_alert(uuid.uuid4(), sensor_type="air_temperature")
-        db.query().all.return_value = [existing]
+    def test_no_conflict_when_cell_differs(self, db_session, setup_cell, alert_factory):
+        alert_factory(cell_ids=[str(uuid.uuid4())], sensor_types=["air_temperature"])
 
         payload = AlertValidateInputSchema(
-            **{"cellIds": [str(uuid.uuid4())], "sensorTypes": ["air_temperature"]}
+            **{"cellIds": [setup_cell.id], "sensorTypes": ["air_temperature"]}
         )
-        result = service.validate_alert(db, payload)
+        result = service.validate_alert(db_session, payload)
 
         assert result["hasConflicts"] is False
 
+    def test_no_conflict_when_excluding_alert_id(self, db_session, setup_cell, alert_factory):
+        existing = alert_factory(cell_ids=[str(setup_cell.id)], sensor_types=["air_temperature"])
+        payload = AlertValidateInputSchema(**{"cellIds": [setup_cell.id], "sensorTypes": ["air_temperature"], "alertId": existing.id})
+        result = service.validate_alert(db_session, payload)
+        assert result["hasConflicts"] is False
 
 # ---------------------------------------------------------------------------
 # Tests — create_alert
@@ -225,53 +197,59 @@ class TestValidateAlert:
 
 class TestCreateAlert:
 
-    def test_creates_alert_without_conflicts(self):
-        db = MagicMock()
-        db.query().all.return_value = []  # pas de conflits
+    def test_creates_alert_without_conflicts(self, db_session, setup_cell):
+        create_payload = make_alert_create(cell_ids=[setup_cell.id])
+        result = service.create_alert(db_session, create_payload)
 
-        new_alert = make_alert()
-        db.refresh.side_effect = lambda obj: None
-
-        with patch("services.alerts.service.Alert") as MockAlert:
-            MockAlert.return_value = new_alert
-            result = service.create_alert(db, make_alert_create())
-
-        db.add.assert_called_once()
-        db.commit.assert_called()
         assert result["message"] == "Alerte créée avec succès."
+        created_alert = db_session.query(Alert).filter(Alert.id == result["id"]).first()
+        assert created_alert is not None
+        assert created_alert.title == "Nouvelle Alerte"
 
-    def test_raises_409_when_conflict_and_no_overwrite(self):
-        db = MagicMock()
-        cell_id = uuid.uuid4()
-        existing = make_alert(cell_id, sensor_type="air_temperature")
-        cell_mock = make_cell()
-        cell_mock.id = cell_id
-        db.query.side_effect = lambda model: _mock_query_for(model, existing, cell_mock)
+    def test_raises_409_when_conflict_and_no_overwrite(self, db_session, setup_cell, alert_factory):
+        alert_factory(cell_ids=[str(setup_cell.id)], sensor_types=["air_temperature"])
 
         with pytest.raises(AlertConflictError):
-            service.create_alert(db, make_alert_create(cell_ids=[cell_id], overwrite=False))
+            service.create_alert(db_session, make_alert_create(cell_ids=[setup_cell.id], overwrite=False))
 
-    def test_overwrites_existing_alert_when_flag_true(self):
-        db = MagicMock()
-        cell_id = uuid.uuid4()
-        existing = make_alert(cell_id, sensor_type="air_temperature")
-        cell_mock = make_cell()
-        cell_mock.id = cell_id
+    def test_partially_overwrites_conflicting_sensor_when_flag_true(self, db_session, setup_cell, alert_factory):
+        """
+        Si une nouvelle alerte entre en conflit sur un seul capteur d'une alerte existante
+        qui en a plusieurs, seul le capteur en conflit est retiré de l'alerte existante.
+        """
+        existing_alert = alert_factory(
+            cell_ids=[str(setup_cell.id)], sensor_types=["air_temperature", "soil_humidity"]
+        )
+        create_payload = make_alert_create(
+            cell_ids=[setup_cell.id], sensor_type="air_temperature", overwrite=True
+        )
 
-        db.query.side_effect = lambda model: _mock_query_for(model, existing, cell_mock)
-        # db.refresh ne doit rien faire (l'objet Alert est instancié sans session réelle)
-        db.refresh.side_effect = lambda obj: None
+        result = service.create_alert(db_session, create_payload)
 
-        # On NE patche PAS services.alerts.service.Alert :
-        # patcher la classe remplace le modèle passé à db.query(), ce qui casse
-        # le type-check `model is Alert` dans _mock_query_for et empêche
-        # la branche delete d'être atteinte.
-        result = service.create_alert(db, make_alert_create(cell_ids=[cell_id], overwrite=True))
-
-        # L'alerte existante doit avoir été supprimée
-        db.delete.assert_called()
+        db_session.refresh(existing_alert)
+        assert len(existing_alert.sensors) == 1
+        assert existing_alert.sensors[0]["type"] == "soil_humidity"
         assert result["message"] == "Alerte créée avec succès."
-        assert len(result["overwrittenAlerts"]) >= 1
+        assert len(result["overwrittenAlerts"]) == 0
+
+    def test_fully_overwrites_alert_when_all_sensors_conflict(self, db_session, setup_cell, alert_factory):
+        """
+        Si une nouvelle alerte entre en conflit sur tous les capteurs d'une alerte
+        existante, l'alerte existante est complètement supprimée.
+        """
+        existing_alert = alert_factory(cell_ids=[str(setup_cell.id)], sensor_types=["air_temperature"])
+        existing_alert_id = existing_alert.id
+        create_payload = make_alert_create(
+            cell_ids=[setup_cell.id], sensor_type="air_temperature", overwrite=True
+        )
+
+        result = service.create_alert(db_session, create_payload)
+
+        deleted_alert = db_session.query(Alert).filter(Alert.id == existing_alert_id).first()
+        assert deleted_alert is None
+        assert result["message"] == "Alerte créée avec succès."
+        assert len(result["overwrittenAlerts"]) == 1
+        assert result["overwrittenAlerts"][0] == existing_alert_id
 
 
 # ---------------------------------------------------------------------------
@@ -280,13 +258,9 @@ class TestCreateAlert:
 
 class TestUpdateAlert:
 
-    def test_updates_alert_fields(self):
-        db = MagicMock()
-        existing = make_alert()
-        db.query().filter().first.return_value = existing
-        db.refresh.side_effect = lambda obj: None
-
-        update_data = AlertUpdateSchema(
+    def test_updates_alert_fields(self, db_session, alert_factory):
+        existing = alert_factory()
+        update_data = AlertCreateUpdateSchema(
             **{
                 "title": "Titre Modifié",
                 "isActive": False,
@@ -300,32 +274,85 @@ class TestUpdateAlert:
                     }
                 ],
                 "warningEnabled": True,
+                "overwriteExisting": False,
             }
         )
 
-        result = service.update_alert(db, existing.id, update_data)
+        result = service.update_alert(db_session, existing.id, update_data)
 
+        db_session.refresh(existing)
         assert existing.title == "Titre Modifié"
         assert existing.is_active is False
         assert existing.warning_enabled is True
-        db.commit.assert_called()
         assert result["message"] == "Alerte mise à jour avec succès."
 
-    def test_raises_404_when_not_found(self):
-        db = MagicMock()
-        db.query().filter().first.return_value = None
-
-        update_data = AlertUpdateSchema(
+    def test_raises_404_when_not_found(self, db_session):
+        """Vérifie qu'une exception est levée si l'alerte à mettre à jour n'existe pas."""
+        update_data = AlertCreateUpdateSchema(
             **{
                 "title": "X",
                 "isActive": True,
                 "cellIds": [],
                 "sensors": [],
                 "warningEnabled": False,
+                "overwriteExisting": False,
             }
         )
         with pytest.raises(AlertNotFoundError):
-            service.update_alert(db, uuid.uuid4(), update_data)
+            service.update_alert(db_session, uuid.uuid4(), update_data)
+
+    def test_update_raises_409_when_conflict_and_no_overwrite(self, db_session, setup_cell, alert_factory):
+        """
+        Vérifie qu'une mise à jour créant un conflit lève une erreur 409
+        si `overwriteExisting` est False.
+        """
+        alert_to_update = alert_factory(title="To Update")
+        alert_factory(title="Conflicting", cell_ids=[str(setup_cell.id)], sensor_types=["air_temperature"])
+        update_data = make_alert_create(
+            cell_ids=[setup_cell.id], sensor_type="air_temperature", overwrite=False
+        )
+
+        with pytest.raises(AlertConflictError):
+            service.update_alert(db_session, alert_to_update.id, update_data)
+
+    def test_update_partially_overwrites_conflicting_sensor(self, db_session, setup_cell, alert_factory):
+        """
+        Vérifie qu'une mise à jour résout un conflit partiel en modifiant l'autre alerte.
+        """
+        alert_to_update = alert_factory(title="To Update")
+        conflicting_alert = alert_factory(
+            title="Conflicting",
+            cell_ids=[str(setup_cell.id)],
+            sensor_types=["air_temperature", "soil_humidity"]
+        )
+        update_data = make_alert_create(cell_ids=[setup_cell.id], sensor_type="air_temperature", overwrite=True)
+
+        result = service.update_alert(db_session, alert_to_update.id, update_data)
+
+        db_session.refresh(conflicting_alert)
+        assert len(conflicting_alert.sensors) == 1
+        assert conflicting_alert.sensors[0]["type"] == "soil_humidity"
+        assert len(result["overwrittenAlerts"]) == 0
+
+    def test_update_fully_overwrites_conflicting_alert(self, db_session, setup_cell, alert_factory):
+        """
+        Vérifie qu'une mise à jour résout un conflit total en supprimant l'autre alerte.
+        """
+        alert_to_update = alert_factory(title="To Update")
+        conflicting_alert = alert_factory(
+            title="Conflicting",
+            cell_ids=[str(setup_cell.id)],
+            sensor_types=["air_temperature"]
+        )
+        conflicting_alert_id = conflicting_alert.id
+        update_data = make_alert_create(cell_ids=[setup_cell.id], sensor_type="air_temperature", overwrite=True)
+
+        result = service.update_alert(db_session, alert_to_update.id, update_data)
+
+        deleted_alert = db_session.query(Alert).filter(Alert.id == conflicting_alert_id).first()
+        assert deleted_alert is None
+        assert len(result["overwrittenAlerts"]) == 1
+        assert result["overwrittenAlerts"][0] == conflicting_alert.id
 
 
 # ---------------------------------------------------------------------------
@@ -334,36 +361,25 @@ class TestUpdateAlert:
 
 class TestToggleAlert:
 
-    def test_activates_alert(self):
-        db = MagicMock()
-        alert = make_alert()
-        alert.is_active = False
-        db.query().filter().first.return_value = alert
-        db.refresh.side_effect = lambda obj: None
+    def test_activates_alert(self, db_session, alert_factory):
+        alert = alert_factory(is_active=False)
+        result = service.toggle_alert(db_session, alert.id, AlertToggleSchema(**{"isActive": True}))
 
-        result = service.toggle_alert(db, alert.id, AlertToggleSchema(**{"isActive": True}))
-
+        db_session.refresh(alert)
         assert alert.is_active is True
         assert result["isActive"] is True
 
-    def test_deactivates_alert(self):
-        db = MagicMock()
-        alert = make_alert()
-        alert.is_active = True
-        db.query().filter().first.return_value = alert
-        db.refresh.side_effect = lambda obj: None
+    def test_deactivates_alert(self, db_session, alert_factory):
+        alert = alert_factory(is_active=True)
+        result = service.toggle_alert(db_session, alert.id, AlertToggleSchema(**{"isActive": False}))
 
-        result = service.toggle_alert(db, alert.id, AlertToggleSchema(**{"isActive": False}))
-
+        db_session.refresh(alert)
         assert alert.is_active is False
         assert result["isActive"] is False
 
-    def test_raises_404_when_not_found(self):
-        db = MagicMock()
-        db.query().filter().first.return_value = None
-
+    def test_raises_404_when_not_found(self, db_session):
         with pytest.raises(AlertNotFoundError):
-            service.toggle_alert(db, uuid.uuid4(), AlertToggleSchema(**{"isActive": True}))
+            service.toggle_alert(db_session, uuid.uuid4(), AlertToggleSchema(**{"isActive": True}))
 
 
 # ---------------------------------------------------------------------------
@@ -372,22 +388,17 @@ class TestToggleAlert:
 
 class TestDeleteAlert:
 
-    def test_deletes_existing_alert(self):
-        db = MagicMock()
-        alert = make_alert()
-        db.query().filter().first.return_value = alert
+    def test_deletes_existing_alert(self, db_session, alert_factory):
+        alert = alert_factory()
+        alert_id = alert.id
+        service.delete_alert(db_session, alert.id)
 
-        service.delete_alert(db, alert.id)
+        deleted_alert = db_session.query(Alert).filter(Alert.id == alert_id).first()
+        assert deleted_alert is None
 
-        db.delete.assert_called_once_with(alert)
-        db.commit.assert_called()
-
-    def test_raises_404_when_not_found(self):
-        db = MagicMock()
-        db.query().filter().first.return_value = None
-
+    def test_raises_404_when_not_found(self, db_session):
         with pytest.raises(AlertNotFoundError):
-            service.delete_alert(db, uuid.uuid4())
+            service.delete_alert(db_session, uuid.uuid4())
 
 
 # ---------------------------------------------------------------------------
@@ -396,105 +407,62 @@ class TestDeleteAlert:
 
 class TestAlertEvents:
 
-    def _make_event(self, is_archived: bool = False, severity=SeverityEnum.CRITICAL) -> MagicMock:
-        event = MagicMock(spec=AlertEvent)
-        event.id = uuid.uuid4()
-        event.alert_id = uuid.uuid4()
-        event.alert_title = "Alerte Test"
-        event.cell_id = uuid.uuid4()
-        event.cell_name = "Rangée A"
-        event.cell_location = "Parcelle Nord"
-        event.sensor_type = "air_temperature"
-        event.severity = severity
-        event.value = 45.0
-        event.threshold_min = -5.0
-        event.threshold_max = 40.0
-        event.timestamp = datetime.now(UTC)
-        event.is_archived = is_archived
+    def _make_event(self, db_session, is_archived: bool = False, severity=SeverityEnum.CRITICAL) -> AlertEvent:
+        event = AlertEvent(
+            id=uuid.uuid4(), alert_id=uuid.uuid4(), alert_title="Alerte Test",
+            cell_id=uuid.uuid4(), cell_name="Rangée A", cell_location="Parcelle Nord",
+            sensor_type="air_temperature", severity=severity, value=45.0,
+            threshold_min=-5.0, threshold_max=40.0, timestamp=datetime.now(UTC),
+            is_archived=is_archived
+        )
+        db_session.add(event)
+        db_session.commit()
         return event
 
-    def test_get_events_returns_non_archived(self):
-        db = MagicMock()
-        events = [self._make_event(False), self._make_event(False)]
+    def test_get_events_returns_non_archived(self, db_session):
         # Sans filtres optionnels le service fait exactement :
         # db.query(AlertEvent).filter(...).order_by(...).all()
         # → 1 seul .filter(), pas 4
-        db.query().filter().order_by().all.return_value = events
+        self._make_event(db_session, is_archived=False)
+        self._make_event(db_session, is_archived=False)
+        self._make_event(db_session, is_archived=True)
 
-        result = service.get_alert_events(db)
+        result = service.get_alert_events(db_session)
 
         assert isinstance(result, list)
         assert len(result) == 2
 
-    def test_archive_event_sets_flag(self):
-        db = MagicMock()
-        event = self._make_event(is_archived=False)
-        db.query().filter().first.return_value = event
+    def test_archive_event_sets_flag(self, db_session):
+        event = self._make_event(db_session, is_archived=False)
+        result = service.archive_event(db_session, event.id)
 
-        result = service.archive_event(db, event.id)
-
+        db_session.refresh(event)
         assert event.is_archived is True
-        db.commit.assert_called()
         assert "archivé" in result["message"]
 
-    def test_archive_event_raises_404_when_not_found(self):
-        db = MagicMock()
-        db.query().filter().first.return_value = None
-
+    def test_archive_event_raises_404_when_not_found(self, db_session):
         with pytest.raises(AlertEventNotFoundError):
-            service.archive_event(db, uuid.uuid4())
+            service.archive_event(db_session, uuid.uuid4())
 
-    def test_archive_all_events(self):
-        db = MagicMock()
-        events = [self._make_event(False) for _ in range(3)]
-        db.query().filter().all.return_value = events
+    def test_archive_all_events(self, db_session):
+        events = [self._make_event(db_session, is_archived=False) for _ in range(3)]
+        result = service.archive_all_events(db_session)
 
-        result = service.archive_all_events(db)
-
-        for e in events:
-            assert e.is_archived is True
         assert result["archivedCount"] == 3
-        db.commit.assert_called()
+        for event in events:
+            db_session.refresh(event)
+            assert event.is_archived is True
 
-    def test_archive_all_returns_zero_when_no_events(self):
-        db = MagicMock()
-        db.query().filter().all.return_value = []
-
-        result = service.archive_all_events(db)
-
+    def test_archive_all_returns_zero_when_no_events(self, db_session):
+        result = service.archive_all_events(db_session)
         assert result["archivedCount"] == 0
 
-    def test_archive_by_cell(self):
-        db = MagicMock()
-        cell_id = uuid.uuid4()
-        events = [self._make_event(False) for _ in range(2)]
-        db.query().filter().all.return_value = events
+    def test_archive_by_cell(self, db_session):
+        event = self._make_event(db_session, is_archived=False)
+        cell_id = event.cell_id
+        result = service.archive_events_by_cell(db_session, cell_id)
 
-        result = service.archive_events_by_cell(db, cell_id)
-
-        for e in events:
-            assert e.is_archived is True
-        assert result["archivedCount"] == 2
+        db_session.refresh(event)
+        assert event.is_archived is True
+        assert result["archivedCount"] == 1
         assert result["cellId"] == cell_id
-
-
-# ---------------------------------------------------------------------------
-# Helpers internes pour les mocks
-# ---------------------------------------------------------------------------
-
-def _mock_query_for(model, existing_alert: MagicMock, cell_mock: MagicMock):
-    """
-    Retourne un mock de query adapté selon le modèle interrogé.
-    - Alert  → renvoie la liste [existing_alert] pour .all()
-    - Cell   → renvoie cell_mock pour .filter().first()
-    """
-    q = MagicMock()
-    if model is Alert:
-        q.all.return_value = [existing_alert]
-        q.filter.return_value.first.return_value = existing_alert
-    elif model is Cell:
-        q.filter.return_value.first.return_value = cell_mock
-    else:
-        q.all.return_value = []
-        q.filter.return_value.first.return_value = None
-    return q

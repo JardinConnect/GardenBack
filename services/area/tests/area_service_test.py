@@ -3,21 +3,34 @@ from datetime import datetime, timedelta, UTC
 import uuid
 
 from fastapi import HTTPException
-from db.models import Area as AreaModel, Cell as CellModel, Sensor as SensorModel, Analytic as AnalyticModel, AnalyticType
-from services.area.service import get_area_with_analytics, create_area, delete_area, update_area, _calculate_daily_averages
+from db.models import Area as AreaModel, Cell as CellModel, Sensor as SensorModel, Analytic as AnalyticModel, AnalyticType, User as UserModel, RoleEnum
+from services.area.service import get_area_with_analytics, create_area, delete_area, update_area, _calculate_daily_averages, get_full_location_path_for_cell
 from services.area.schemas import AreaCreate, AreaUpdate
 from services.area.errors import ParentAreaNotFoundError, AreaNotFoundError
 
 
+@pytest.fixture
+def setup_user(db_session):
+    user = UserModel(
+        first_name="Test",
+        last_name="User",
+        email="test@example.com",
+        password="hashedpassword",
+        role=RoleEnum.ADMIN
+    )
+    db_session.add(user)
+    db_session.commit()
+    return user
+
 # === Tests for create_area ===
 
-def test_create_area_as_root_success(db_session):
+def test_create_area_as_root_success(db_session, setup_user):
     """Vérifie la création réussie d'une zone racine."""
     # Arrange
     area_data = AreaCreate(name="Root Garden", color="#00FF00")
 
     # Act
-    result = create_area(db_session, area_data)
+    result = create_area(db_session, area_data, setup_user)
 
     # Assert
     # Vérifier le schéma Pydantic retourné
@@ -25,6 +38,8 @@ def test_create_area_as_root_success(db_session):
     assert result.name == "Root Garden"
     assert result.color == "#00FF00"
     assert result.level == 1
+    assert result.originator.id == setup_user.id
+    assert result.updater.id == setup_user.id
     assert result.areas == []
     assert result.cells == []
 
@@ -34,8 +49,10 @@ def test_create_area_as_root_success(db_session):
     assert db_area.name == "Root Garden"
     assert db_area.color == "#00FF00"
     assert db_area.parent_id is None
+    assert db_area.originator_id == setup_user.id
+    assert db_area.updater_id == setup_user.id
 
-def test_create_area_as_child_success(db_session):
+def test_create_area_as_child_success(db_session, setup_user):
     """Vérifie la création réussie d'une zone enfant."""
     # Arrange
     parent_area = AreaModel(name="Parent Area")
@@ -45,7 +62,7 @@ def test_create_area_as_child_success(db_session):
     area_data = AreaCreate(name="Child Area", color="#FFA500", parent_id=parent_area.id)
 
     # Act
-    result = create_area(db_session, area_data)
+    result = create_area(db_session, area_data, setup_user)
 
     # Assert
     # Vérifier le schéma Pydantic retourné
@@ -57,15 +74,17 @@ def test_create_area_as_child_success(db_session):
     assert db_area is not None
     assert db_area.name == "Child Area"
     assert db_area.parent_id == parent_area.id
+    assert db_area.originator_id == setup_user.id
+    assert db_area.updater_id == setup_user.id
 
-def test_create_area_with_nonexistent_parent_fails(db_session):
+def test_create_area_with_nonexistent_parent_fails(db_session, setup_user):
     """Vérifie qu'une erreur est levée si le parent n'existe pas."""
     # Arrange
     area_data = AreaCreate(name="Orphan Area", parent_id=uuid.uuid4())
 
     # Act & Assert
     with pytest.raises(ParentAreaNotFoundError):
-        create_area(db_session, area_data)
+        create_area(db_session, area_data, setup_user)
 
     # Vérifier qu'aucune zone n'a été ajoutée
     count = db_session.query(AreaModel).count()
@@ -143,6 +162,64 @@ def test_delete_area_with_hierarchy(db_session):
     assert db_session.query(CellModel).filter(CellModel.area_id != None).count() == 0
 
 
+# === Tests for get_full_location_path_for_cell ===
+
+def test_get_full_location_path_for_cell_with_deep_hierarchy(db_session):
+    """
+    Tests that the full path is correctly constructed for a cell in a deep hierarchy.
+    e.g., Parcelle > Planche > Section
+    """
+    # 1. Create hierarchy
+    parcelle = AreaModel(name="Parcelle Nord", color="#2E8B57")
+    db_session.add(parcelle)
+    db_session.commit()
+
+    planche = AreaModel(name="Planche Tomates", color="#FF6347", parent_id=parcelle.id)
+    db_session.add(planche)
+    db_session.commit()
+
+    section = AreaModel(name="Section Tomates Cerises", color="#FF4500", parent_id=planche.id)
+    db_session.add(section)
+    db_session.commit()
+
+    # 2. Create cell
+    cell = CellModel(name="Rangée A", area_id=section.id)
+    db_session.add(cell)
+    db_session.commit()
+
+    # 3. Call function and assert
+    path = get_full_location_path_for_cell(cell)
+    assert path == "Parcelle Nord > Planche Tomates > Section Tomates Cerises"
+
+
+def test_get_full_location_path_for_cell_with_root_area(db_session):
+    """
+    Tests that the path is correct for a cell directly under a root area.
+    """
+    parcelle = AreaModel(name="Parcelle Sud", color="#228B22")
+    db_session.add(parcelle)
+    db_session.commit()
+
+    cell = CellModel(name="Carottes", area_id=parcelle.id)
+    db_session.add(cell)
+    db_session.commit()
+
+    path = get_full_location_path_for_cell(cell)
+    assert path == "Parcelle Sud"
+
+
+def test_get_full_location_path_for_cell_with_no_area(db_session):
+    """
+    Tests that an empty string is returned for a cell with no associated area.
+    """
+    cell = CellModel(name="Orphan Cell", area_id=None)
+    db_session.add(cell)
+    db_session.commit()
+
+    path = get_full_location_path_for_cell(cell)
+    assert path == ""
+
+
 # === Tests for Helper Functions (_get_analytics_for_area, _calculate_daily_averages) ===
 
 def test_calculate_daily_averages_basic():
@@ -213,7 +290,7 @@ def test_get_area_with_analytics_structure(db_session, setup_hierarchy_for_servi
 
     # Action
     result = get_area_with_analytics(db_session, parcelle_id)
-
+    assert result is not None
     # Assertions
     assert result.name == "Parcelle Test"
     assert result.color == "#111111"
@@ -229,6 +306,7 @@ def test_get_area_with_analytics_structure(db_session, setup_hierarchy_for_servi
     assert len(planche_schema.cells) == 1
     cellule_schema = planche_schema.cells[0]
     assert cellule_schema.name == "Cellule Test"
+    assert cellule_schema.location == "Parcelle Test > Planche Test"
 
 def test_get_area_not_found(db_session):
     """
@@ -377,29 +455,31 @@ def test_get_area_uses_latest_analytic_only(db_session):
 
 # === Tests for update_area ===
 
-def test_update_area_not_found(db_session):
+def test_update_area_not_found(db_session, setup_user):
     """Vérifie qu'une AreaNotFoundError est levée si la zone à mettre à jour n'existe pas."""
     update_data = AreaUpdate(name="New Name")
     with pytest.raises(AreaNotFoundError):
-        update_area(db_session, uuid.uuid4(), update_data)
+        update_area(db_session, uuid.uuid4(), update_data, setup_user)
 
-def test_update_area_name_and_color(db_session):
+def test_update_area_name_and_color(db_session, setup_user):
     """Vérifie la mise à jour simple du nom et de la couleur."""
     area = AreaModel(name="Old Name", color="#000000")
     db_session.add(area)
     db_session.commit()
 
     update_data = AreaUpdate(name="New Name", color="#FFFFFF")
-    updated_area_schema = update_area(db_session, area.id, update_data)
+    updated_area_schema = update_area(db_session, area.id, update_data, setup_user)
 
     assert updated_area_schema.name == "New Name"
     assert updated_area_schema.color == "#FFFFFF"
+    assert updated_area_schema.updater.id == setup_user.id
 
     db_session.refresh(area)
     assert area.name == "New Name"
     assert area.color == "#FFFFFF"
+    assert area.updater_id == setup_user.id
 
-def test_update_area_change_parent(db_session):
+def test_update_area_change_parent(db_session, setup_user):
     """Vérifie le changement de parent d'une zone."""
     root1 = AreaModel(name="Root 1")
     root2 = AreaModel(name="Root 2")
@@ -411,14 +491,14 @@ def test_update_area_change_parent(db_session):
 
     # Move child from root1 to root2
     update_data = AreaUpdate(parent_id=root2.id)
-    updated_area_schema = update_area(db_session, child.id, update_data)
+    updated_area_schema = update_area(db_session, child.id, update_data, setup_user)
 
     assert updated_area_schema.level == 2
     
     db_session.refresh(child)
     assert child.parent_id == root2.id
 
-def test_update_area_move_to_root(db_session):
+def test_update_area_move_to_root(db_session, setup_user):
     """Vérifie le déplacement d'une zone enfant vers la racine."""
     parent = AreaModel(name="Parent")
     db_session.add(parent)
@@ -429,14 +509,14 @@ def test_update_area_move_to_root(db_session):
 
     # Move child to root by setting parent_id to None
     update_data = AreaUpdate(parent_id=None)
-    updated_area_schema = update_area(db_session, child.id, update_data)
+    updated_area_schema = update_area(db_session, child.id, update_data, setup_user)
 
     assert updated_area_schema.level == 1
     
     db_session.refresh(child)
     assert child.parent_id is None
 
-def test_update_area_self_parent_error(db_session):
+def test_update_area_self_parent_error(db_session, setup_user):
     """Vérifie qu'une erreur est levée si une zone est définie comme son propre parent."""
     area = AreaModel(name="Area")
     db_session.add(area)
@@ -444,9 +524,9 @@ def test_update_area_self_parent_error(db_session):
 
     update_data = AreaUpdate(parent_id=area.id)
     with pytest.raises(ValueError, match="An area cannot be its own parent."):
-        update_area(db_session, area.id, update_data)
+        update_area(db_session, area.id, update_data, setup_user)
 
-def test_update_area_cyclic_dependency_error(db_session):
+def test_update_area_cyclic_dependency_error(db_session, setup_user):
     """Vérifie qu'une erreur est levée si on déplace un parent dans son propre enfant."""
     parent = AreaModel(name="Parent")
     db_session.add(parent)
@@ -458,4 +538,4 @@ def test_update_area_cyclic_dependency_error(db_session):
     # Try to move parent into child
     update_data = AreaUpdate(parent_id=child.id)
     with pytest.raises(ValueError, match="Cannot move an area into one of its own descendants"):
-        update_area(db_session, parent.id, update_data)
+        update_area(db_session, parent.id, update_data, setup_user)

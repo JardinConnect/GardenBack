@@ -9,7 +9,7 @@ from services.cell.repository import (
     delete_cell,
     update_cell
 )
-from services.cell.schemas import Cell as CellSchema, CellUpdate
+from services.cell.schemas import Cell as CellSchema, CellUpdate, CellCreate
 from services.cell.errors import CellNotFoundError
 
 
@@ -49,6 +49,7 @@ def test_get_cell_by_id_success(db_session, setup_cell):
     assert result.name == "Test Cell"
     assert result.area_id == setup_cell.area_id
     assert result.is_tracked is True
+    assert result.location == "Test Area"
 
 
 def test_get_cell_by_id_not_found(db_session):
@@ -75,6 +76,8 @@ def test_get_cells_success(db_session, setup_area):
     cell_names = {cell.name for cell in results}
     assert "Cell 1" in cell_names
     assert "Cell 2" in cell_names
+    for cell in results:
+        assert cell.location == "Test Area"
 
 
 def test_get_cells_empty_database(db_session):
@@ -89,15 +92,9 @@ def test_get_cells_empty_database(db_session):
 
 def test_create_cell_with_area(db_session, setup_area):
     """Teste la création d'une cellule avec une area."""
-    cell_data = CellSchema(
-        id=uuid.uuid4(),
+    cell_data = CellCreate(
         name="New Cell",
         area_id=setup_area.id,
-        is_tracked=True,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-        sensors=[],
-        analytics={}
     )
     
     result = create_cell(db_session, cell_data)
@@ -106,7 +103,8 @@ def test_create_cell_with_area(db_session, setup_area):
     assert isinstance(result, CellSchema)
     assert result.name == "New Cell"
     assert result.area_id == setup_area.id
-    assert result.is_tracked is True
+    assert result.is_tracked is False  # Default value in DB model
+    assert result.location == "Test Area"
     
     db_cell = db_session.query(CellModel).filter(CellModel.id == result.id).first()
     assert db_cell is not None
@@ -115,15 +113,9 @@ def test_create_cell_with_area(db_session, setup_area):
 
 def test_create_cell_without_area(db_session):
     """Teste la création d'une cellule sans area."""
-    cell_data = CellSchema(
-        id=uuid.uuid4(),
+    cell_data = CellCreate(
         name="Orphan Cell",
         area_id=None,
-        is_tracked=False,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-        sensors=[],
-        analytics={}
     )
     
     result = create_cell(db_session, cell_data)
@@ -132,6 +124,7 @@ def test_create_cell_without_area(db_session):
     assert result.name == "Orphan Cell"
     assert result.area_id is None
     assert result.is_tracked is False
+    assert result.location == ""
 
 
 # =========================================================
@@ -184,6 +177,7 @@ def test_update_cell_name(db_session, setup_cell):
     result = update_cell(db_session, setup_cell.id, update_data)
     
     assert result.name == "Updated Cell Name"
+    assert result.location == "Test Area"
     
     db_session.refresh(setup_cell)
     assert setup_cell.name == "Updated Cell Name"
@@ -200,6 +194,7 @@ def test_update_cell_area(db_session, setup_cell):
     result = update_cell(db_session, setup_cell.id, update_data)
     
     assert result.area_id == new_area.id
+    assert result.location == "New Area"
     
     db_session.refresh(setup_cell)
     assert setup_cell.area_id == new_area.id
@@ -212,6 +207,7 @@ def test_update_cell_is_tracked(db_session, setup_cell):
     result = update_cell(db_session, setup_cell.id, update_data)
     
     assert result.is_tracked is False
+    assert result.location == "Test Area"
     
     db_session.refresh(setup_cell)
     assert setup_cell.is_tracked is False
@@ -234,6 +230,7 @@ def test_update_cell_multiple_fields(db_session, setup_cell):
     assert result.name == "Multi Update Cell"
     assert result.area_id == new_area.id
     assert result.is_tracked is False
+    assert result.location == "Another Area"
 
 
 def test_update_cell_not_found(db_session):
@@ -251,6 +248,7 @@ def test_update_cell_remove_area(db_session, setup_cell):
     result = update_cell(db_session, setup_cell.id, update_data)
     
     assert result.area_id is None
+    assert result.location == ""
     
     db_session.refresh(setup_cell)
     assert setup_cell.area_id is None

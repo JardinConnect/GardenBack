@@ -76,16 +76,22 @@ class Area(Base):
 
     # Auto-référence pour la hiérarchie
     parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("areas.id"), nullable=True)
+    originator_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    updater_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     # Relations
     if TYPE_CHECKING:
         parent: Mapped[Optional["Area"]] = relationship("Area", remote_side=[id], back_populates="children")
         children: Mapped[List["Area"]] = relationship("Area", back_populates="parent")
         cells: Mapped[List["Cell"]] = relationship("Cell", back_populates="area")
+        originator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[originator_id])
+        updater: Mapped[Optional["User"]] = relationship("User", foreign_keys=[updater_id])
     else:
         parent = relationship("Area", remote_side=[id], back_populates="children")
         children = relationship("Area", back_populates="parent")
         cells = relationship("Cell", back_populates="area")
+        originator = relationship("User", foreign_keys=[originator_id])
+        updater = relationship("User", foreign_keys=[updater_id])
 
 
 # =========================================================

@@ -44,14 +44,14 @@ def create_area(
     - `404 Not Found`: Si le `parent_id` fourni ne correspond à aucune zone existante.
     """
     try:
-        area = service.create_area(db, area_data)
+        area = service.create_area(db, area_data, current_user)
         log_action(db, current_user, "create", "area", area.id, details={"name": area.name})
         return area
     except ParentAreaNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
-@router.put("/{area_id}", response_model=Area, dependencies=[Depends(JWTBearer())])
+@router.put("/{area_id}", response_model=Area, response_model_by_alias=True, dependencies=[Depends(JWTBearer())])
 def update_area(
     area_data: AreaUpdate,
     area_id: uuid.UUID = Path(..., title="The ID of the area to update"),
@@ -73,7 +73,7 @@ def update_area(
     - `400 Bad Request`: Si une tentative de créer une dépendance cyclique est détectée (ex: déplacer une zone dans un de ses propres enfants).
     """
     try:
-        updated_area = service.update_area(db, area_id, area_data)
+        updated_area = service.update_area(db, area_id, area_data, current_user)
         log_action(db, current_user, "update", "area", area_id, details=area_data.model_dump(exclude_unset=True))
         return updated_area
     except (AreaNotFoundError, ParentAreaNotFoundError) as e:

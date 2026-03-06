@@ -16,7 +16,9 @@ def create_cell(db: Session, cell_data: schemas.CellCreate) -> schemas.Cell:
         area = repositoryArea.get_by_id(db, cell_data.area_id)
         if not area:
             raise errors.ParentCellNotFoundError
-    return repositoryCell.create_cell(db, cell_data)
+    cell = repositoryCell.create_cell(db, cell_data)
+    
+    return cell
 
 def delete_cell(db: Session, cell_id: uuid.UUID) -> bool:
     """

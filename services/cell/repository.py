@@ -1,41 +1,48 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 import uuid
 from db.models import Cell as CellModel
-from .schemas import Cell as CellSchema, CellUpdate
+from .schemas import Cell as CellSchema, CellUpdate, CellCreate
 from .errors import CellNotFoundError
+from services.area.service import get_full_location_path_for_cell
 
 def get_cell_by_id(db: Session, cell_id: uuid.UUID) -> CellSchema:
     """
     Récupère une seule cellule par son ID.
     """
-    cell = db.query(CellModel).filter(CellModel.id == cell_id).first()
+    cell = db.query(CellModel).options(joinedload(CellModel.area)).filter(CellModel.id == cell_id).first()
     if not cell:
         raise CellNotFoundError
     
-    return CellSchema.model_validate(cell)
+    cell_schema = CellSchema.model_validate(cell)
+    cell_schema.location = get_full_location_path_for_cell(cell)
+    return cell_schema
 
 def get_cells(db: Session) -> List[CellSchema]:
     """
     Récupère toutes les cellules.
     """
-    cells = db.query(CellModel).all()
+    cells = db.query(CellModel).options(joinedload(CellModel.area)).all()
     if not cells:
         raise CellNotFoundError
-    
-    return [CellSchema.model_validate(cell) for cell in cells]
 
-def create_cell(db: Session, cell_data: CellSchema) -> CellSchema:
+    cell_schemas = []
+    for cell in cells:
+        cell_schema = CellSchema.model_validate(cell)
+        cell_schema.location = get_full_location_path_for_cell(cell)
+        cell_schemas.append(cell_schema)
+
+    return cell_schemas
+
+def create_cell(db: Session, cell_data: CellCreate) -> CellSchema:
     """
     Crée une nouvelle cellule.
     """
-    # Exclude fields from the schema that are not columns in the DB model.
-    cell = CellModel(**cell_data.model_dump(exclude={'sensors', 'analytics'}))
+    cell = CellModel(**cell_data.model_dump())
     db.add(cell)
     db.commit()
-    db.refresh(cell)
     
-    return CellSchema.model_validate(cell)
+    return get_cell_by_id(db, cell.id)
 
 def delete_cell(db: Session, cell_id: uuid.UUID) -> None:
     """
@@ -61,6 +68,5 @@ def update_cell(db: Session, cell_id: uuid.UUID, cell_data: CellUpdate) -> CellS
         setattr(cell, field, value)
     
     db.commit()
-    db.refresh(cell)
     
-    return CellSchema.model_validate(cell)
+    return get_cell_by_id(db, cell.id)

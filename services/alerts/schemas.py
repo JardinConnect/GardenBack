@@ -54,7 +54,7 @@ class AlertSensorSchema(BaseModel):
 # Alert — Entrées (Create / Update)
 # ---------------------------------------------------------------------------
 
-class AlertCreateSchema(BaseModel):
+class AlertCreateUpdateSchema(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     title: str
@@ -63,16 +63,6 @@ class AlertCreateSchema(BaseModel):
     sensors: List[AlertSensorSchema]
     warning_enabled: bool = Field(False, alias="warningEnabled")
     overwrite_existing: bool = Field(False, alias="overwriteExisting")
-
-
-class AlertUpdateSchema(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    title: str
-    is_active: bool = Field(..., alias="isActive")
-    cell_ids: List[uuid.UUID] = Field(..., alias="cellIds")
-    sensors: List[AlertSensorSchema]
-    warning_enabled: bool = Field(False, alias="warningEnabled")
 
 
 class AlertToggleSchema(BaseModel):
@@ -108,12 +98,6 @@ class AlertCreatedResponseSchema(BaseModel):
     overwritten_alerts: List[uuid.UUID] = Field(default_factory=list, alias="overwrittenAlerts")
 
 
-class AlertUpdatedResponseSchema(BaseModel):
-    id: uuid.UUID
-    title: str
-    message: str
-
-
 class AlertToggleResponseSchema(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -135,6 +119,7 @@ class AlertValidateInputSchema(BaseModel):
 
     cell_ids: List[uuid.UUID] = Field(..., alias="cellIds")
     sensor_types: List[str] = Field(..., alias="sensorTypes")
+    alert_id: Optional[uuid.UUID] = Field(None, alias="alertId")
 
 
 class AlertConflictItemSchema(BaseModel):
