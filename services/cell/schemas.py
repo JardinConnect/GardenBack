@@ -34,6 +34,7 @@ class Cell(BaseModel):
     is_tracked: bool
     sensors: List[Sensor] = Field(default_factory=list)
     analytics: Dict[AnalyticType, List[AnalyticSchema]] = Field(default_factory=dict)
+    location: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -49,6 +50,7 @@ class CellDTO(BaseModel):
     updated_at: datetime
     is_tracked: bool
     analytics: Dict[AnalyticType, List[AnalyticSchema]] = Field(default_factory=dict)
+    location: Optional[str] = None  # Champ calculé pour l'affichage de la localisation de la cellule
     
     model_config = ConfigDict(from_attributes=True)
     
@@ -61,7 +63,8 @@ class CellDTO(BaseModel):
             parent_id=cell.area_id,
             updated_at=cell.updated_at,
             is_tracked=cell.is_tracked,
-            analytics=cell.analytics
+            analytics=cell.analytics,
+            location=cell.location
         )
 
 

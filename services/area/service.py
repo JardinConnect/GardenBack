@@ -181,6 +181,15 @@ def _build_area_schema_recursively(
 
     analytics_averages_by_type = _calculate_daily_averages(all_analytics)
 
+    # Manually process cells to include their location path
+    processed_cells = []
+    for cell_model in area.cells:
+        # We need to import the Cell schema from the cell service
+        from services.cell.schemas import Cell as CellSchema
+        cell_schema = CellSchema.model_validate(cell_model)
+        cell_schema.location = get_full_location_path_for_cell(cell_model)
+        processed_cells.append(cell_schema)
+
     # Utilisation de model_validate pour une meilleure robustesse avec l'analyse statique.
     area_dict = {
         "id": area.id,
@@ -193,7 +202,7 @@ def _build_area_schema_recursively(
         "originator": area.originator,
         "updater": area.updater,
         "areas": processed_sub_areas,
-        "cells": area.cells,
+        "cells": processed_cells,
         "analytics": analytics_averages_by_type,
     }
     area_schema = schemas.Area.model_validate(area_dict)

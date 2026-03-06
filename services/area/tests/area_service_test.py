@@ -306,6 +306,7 @@ def test_get_area_with_analytics_structure(db_session, setup_hierarchy_for_servi
     assert len(planche_schema.cells) == 1
     cellule_schema = planche_schema.cells[0]
     assert cellule_schema.name == "Cellule Test"
+    assert cellule_schema.location == "Parcelle Test > Planche Test"
 
 def test_get_area_not_found(db_session):
     """
