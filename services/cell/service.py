@@ -2,7 +2,6 @@ from typing import List, Dict
 import uuid
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
-from services.area.service import get_full_location_path_for_cell
 import services.cell.repository as repositoryCell
 import services.area.repository as repositoryArea
 import services.cell.schemas as schemas
