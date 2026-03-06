@@ -1,6 +1,6 @@
 import pytest
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime, UTC, timedelta
 from db.models import (
     Cell as CellModel,
     Area as AreaModel,
@@ -18,7 +18,7 @@ from services.cell.service import (
     get_all_analytics_for_cell
 )
 from services.cell.schemas import CellCreate, CellUpdate
-from services.cell.errors import CellNotFoundError, ParentCellNotFoundError
+from services.cell.errors import CellNotFoundError, ParentCellNotFoundError, InvalidDateRangeError
 
 
 # =========================================================
@@ -198,6 +198,39 @@ def test_get_cell_with_analytics(db_session, setup_cell_with_sensors):
     assert result.analytics is not None
     assert AnalyticType.AIR_TEMPERATURE in result.analytics
     assert AnalyticType.AIR_HUMIDITY in result.analytics
+
+
+def test_get_cell_with_analytics_date_filter(db_session, setup_cell_with_sensors):
+    """Teste que le filtre de date sur get_cell fonctionne pour les analytics."""
+    cell = setup_cell_with_sensors["cell"]
+    sensor_temp = setup_cell_with_sensors["sensor_temp"]
+    
+    # Add an old analytic that should be filtered out
+    old_analytic = AnalyticModel(
+        sensor_id=sensor_temp.id,
+        sensor_code="TEMP-01",
+        analytic_type=AnalyticType.AIR_TEMPERATURE,
+        value=10.0,
+        occurred_at=datetime(2020, 1, 1, tzinfo=UTC)
+    )
+    db_session.add(old_analytic)
+    db_session.commit()
+
+    from_date = datetime.now(UTC) - timedelta(days=1)
+    result = get_cell(db_session, cell.id, from_date=from_date)
+
+    assert result is not None
+    assert len(result.analytics[AnalyticType.AIR_TEMPERATURE]) == 1
+    assert result.analytics[AnalyticType.AIR_TEMPERATURE][0].value == 25.5
+
+def test_get_cell_with_invalid_date_range(db_session, setup_cell_with_sensors):
+    """Teste que get_cell lève une erreur si la plage de dates est invalide."""
+    cell = setup_cell_with_sensors["cell"]
+    from_date = datetime(2025, 1, 1, tzinfo=UTC)
+    to_date = datetime(2024, 1, 1, tzinfo=UTC)
+
+    with pytest.raises(InvalidDateRangeError):
+        get_cell(db_session, cell.id, from_date=from_date, to_date=to_date)
 
 
 def test_get_cell_not_found(db_session):

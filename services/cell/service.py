@@ -1,8 +1,9 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
 import uuid
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 import services.cell.repository as repositoryCell
+from datetime import datetime
 import services.area.repository as repositoryArea
 import services.cell.schemas as schemas
 import services.cell.errors as errors
@@ -38,14 +39,17 @@ def update_cell(db: Session, cell_id: uuid.UUID, cell_data: schemas.CellUpdate) 
     
     return repositoryCell.update_cell(db, cell_id, cell_data)
 
-def get_cell(db: Session, cell_id: uuid.UUID) -> schemas.Cell:
+def get_cell(db: Session, cell_id: uuid.UUID, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None) -> schemas.Cell:
     """
     Récupère une cellule de la base de données.
     """
+    if from_date and to_date and from_date > to_date:
+        raise errors.InvalidDateRangeError("La date de début (from) ne peut pas être postérieure à la date de fin (to).")
+
     cell = repositoryCell.get_cell_by_id(db, cell_id)
     if not cell:
         raise errors.CellNotFoundError
-    analytics = get_all_analytics_for_cell(db, cell_id)
+    analytics = get_all_analytics_for_cell(db, cell_id, from_date, to_date)
     cell.analytics = analytics
     return cell
 
@@ -95,7 +99,7 @@ def get_analytics_for_cell(db: Session, cell_id: uuid.UUID) -> List[Dict[Analyti
     latest_by_type = {a.analytic_type: [schemas.AnalyticSchema.model_validate(a)] for a in latest_analytics}
     return latest_by_type
 
-def get_all_analytics_for_cell(db: Session, cell_id: uuid.UUID) -> Dict[AnalyticType, List[schemas.AnalyticSchema]]:
+def get_all_analytics_for_cell(db: Session, cell_id: uuid.UUID, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None) -> Dict[AnalyticType, List[schemas.AnalyticSchema]]:
     cell = repositoryCell.get_cell_by_id(db, cell_id)
     if not cell:
         raise errors.CellNotFoundError
@@ -104,10 +108,17 @@ def get_all_analytics_for_cell(db: Session, cell_id: uuid.UUID) -> Dict[Analytic
     if not sensor_ids:
         return {}
     
-    analytics = db.query(AnalyticModel).filter(
+    query = db.query(AnalyticModel).filter(
         AnalyticModel.sensor_id.in_(sensor_ids)
-    ).all()
+    )
     
+    if from_date:
+        query = query.filter(AnalyticModel.occurred_at >= from_date)
+    if to_date:
+        query = query.filter(AnalyticModel.occurred_at <= to_date)
+    
+    analytics = query.all()
+
     # Grouper par type et convertir en schémas
     analytics_by_type = {}
     for analytic in analytics:

@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, Path, status, HTTPException
+from fastapi import APIRouter, Depends, Path, status, HTTPException, Query
 import uuid
 from sqlalchemy.orm import Session
+from typing import Optional
+from datetime import datetime
 
 from .schemas import CellCreate, CellUpdate, CellDTO
 from . import service
@@ -27,12 +29,15 @@ def get_cells(
 def get_cell(
     cell_id: uuid.UUID = Path(..., title="The ID of the cell to get"),
     db: Session = Depends(get_db),
+    from_date: Optional[datetime] = Query(None, alias="from", description="Start date for analytics filter (ISO 8601 format)"),
+    to_date: Optional[datetime] = Query(None, alias="to", description="End date for analytics filter (ISO 8601 format)"),
 ) -> CellDTO:
     """
     Récupère une cellule spécifique par son ID.
+    Il est possible de filtrer les analytiques retournées par date avec les paramètres `from` et `to`.
     """
     try:
-        cell = service.get_cell(db, cell_id)
+        cell = service.get_cell(db, cell_id, from_date=from_date, to_date=to_date)
         return CellDTO.from_cell(cell)
     except CellNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Cell with id {cell_id} not found")
@@ -82,4 +87,3 @@ def update_cell(
         return CellDTO.from_cell(cell)
     except CellNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-
