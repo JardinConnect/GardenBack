@@ -369,9 +369,9 @@ def seed_alerts(db: Session, cells: list[Cell]):
             "title": "Alerte Multi-capteurs",
             "sensors": [
                 {
-                    "type": "air_temperature",
+                    "type": "light",
                     "index": 0,
-                    "criticalRange": {"min": -5.0, "max": 42.0},
+                    "criticalRange": {"min": 10.0, "max": 90.0},
                     "warningRange": None,
                 },
                 {
