@@ -22,7 +22,9 @@ def get_all_areas_with_relations(db: Session) -> List[AreaModel]:
     """
     return db.query(AreaModel).options(
         selectinload(AreaModel.children),
-        selectinload(AreaModel.cells)
+        selectinload(AreaModel.cells),
+        selectinload(AreaModel.originator),
+        selectinload(AreaModel.updater)
     ).all()
 
 
@@ -33,7 +35,9 @@ def get_areas_by_ids_with_relations(db: Session, area_ids: List[uuid.UUID]) -> L
     """
     return db.query(AreaModel).options(
         selectinload(AreaModel.children),
-        selectinload(AreaModel.cells)
+        selectinload(AreaModel.cells),
+        selectinload(AreaModel.originator),
+        selectinload(AreaModel.updater)
     ).filter(AreaModel.id.in_(area_ids)).all()
 
 
@@ -69,7 +73,7 @@ def get_descendant_area_ids(db: Session, area_id: uuid.UUID) -> List[uuid.UUID]:
         select(area_alias.id).where(area_alias.parent_id == cte_alias.c.id)
     )
     query = select(cte.c.id)
-    result = db.execute(query).scalars().all()
+    result: List[uuid.UUID] = db.execute(query).scalars().all() # type: ignore
     return result
 
 

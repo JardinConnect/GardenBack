@@ -110,10 +110,15 @@ def seed_garden_hierarchy(db: Session) -> list[Cell]:
     """
     print("\n🌱 Seeding Structure Hiérarchique du Jardin...")
 
+    admin_user = db.query(User).filter(User.email == "admin@garden.com").first()
+    if not admin_user:
+        raise Exception("Admin user not found. Cannot seed areas without an originator.")
+    admin_user_id = admin_user.id
+
     # Niveau 1 — Parcelles
     print("\n  📍 Création des parcelles (Niveau 1)...")
-    parcelle_nord = Area(name="Parcelle Nord", color="#2E8B57")
-    parcelle_sud = Area(name="Parcelle Sud", color="#228B22")
+    parcelle_nord = Area(name="Parcelle Nord", color="#2E8B57", originator_id=admin_user_id, updater_id=admin_user_id)
+    parcelle_sud = Area(name="Parcelle Sud", color="#228B22", originator_id=admin_user_id, updater_id=admin_user_id)
     db.add_all([parcelle_nord, parcelle_sud])
     db.commit()
     db.refresh(parcelle_nord)
@@ -122,10 +127,10 @@ def seed_garden_hierarchy(db: Session) -> list[Cell]:
 
     # Niveau 2 — Planches
     print("\n  📍 Création des planches (Niveau 2)...")
-    planche_tomates = Area(name="Planche Tomates", color="#FF6347", parent_id=parcelle_nord.id)
-    planche_salades = Area(name="Planche Salades", color="#90EE90", parent_id=parcelle_nord.id)
-    planche_carottes = Area(name="Planche Carottes", color="#FFA500", parent_id=parcelle_sud.id)
-    planche_herbes = Area(name="Planche Herbes Aromatiques", color="#9ACD32", parent_id=parcelle_sud.id)
+    planche_tomates = Area(name="Planche Tomates", color="#FF6347", parent_id=parcelle_nord.id, originator_id=admin_user_id, updater_id=admin_user_id)
+    planche_salades = Area(name="Planche Salades", color="#90EE90", parent_id=parcelle_nord.id, originator_id=admin_user_id, updater_id=admin_user_id)
+    planche_carottes = Area(name="Planche Carottes", color="#FFA500", parent_id=parcelle_sud.id, originator_id=admin_user_id, updater_id=admin_user_id)
+    planche_herbes = Area(name="Planche Herbes Aromatiques", color="#9ACD32", parent_id=parcelle_sud.id, originator_id=admin_user_id, updater_id=admin_user_id)
     db.add_all([planche_tomates, planche_salades, planche_carottes, planche_herbes])
     db.commit()
     for p in [planche_tomates, planche_salades, planche_carottes, planche_herbes]:
@@ -134,8 +139,8 @@ def seed_garden_hierarchy(db: Session) -> list[Cell]:
 
     # Niveau 3 — Sous-planches
     print("\n  📍 Création des sous-planches (Niveau 3)...")
-    sous_planche_tomates_cerises = Area(name="Section Tomates Cerises", color="#FF4500", parent_id=planche_tomates.id)
-    sous_planche_tomates_coeur = Area(name="Section Tomates Coeur de Boeuf", color="#DC143C", parent_id=planche_tomates.id)
+    sous_planche_tomates_cerises = Area(name="Section Tomates Cerises", color="#FF4500", parent_id=planche_tomates.id, originator_id=admin_user_id, updater_id=admin_user_id)
+    sous_planche_tomates_coeur = Area(name="Section Tomates Coeur de Boeuf", color="#DC143C", parent_id=planche_tomates.id, originator_id=admin_user_id, updater_id=admin_user_id)
     db.add_all([sous_planche_tomates_cerises, sous_planche_tomates_coeur])
     db.commit()
     db.refresh(sous_planche_tomates_cerises)
