@@ -14,8 +14,7 @@ from services.audit.service import log_action
 from .schemas import (
     # Alerts
     AlertResponseSchema,
-    AlertCreateSchema,
-    AlertUpdatedResponseSchema,
+    AlertCreateUpdateSchema,
     AlertCreatedResponseSchema,
     AlertToggleSchema,
     AlertToggleResponseSchema,
@@ -95,7 +94,7 @@ def get_alert(
     summary="Créer une alerte",
 )
 def create_alert(
-    alert_data: AlertCreateSchema,
+    alert_data: AlertCreateUpdateSchema,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -112,20 +111,31 @@ def create_alert(
 
 @router.put(
     "/{alert_id}",
-    response_model=AlertUpdatedResponseSchema,
+    response_model=AlertCreatedResponseSchema,
+    response_model_by_alias=True,
     summary="Mettre à jour une alerte",
 )
 def update_alert(
     alert_id: uuid.UUID,
-    alert_data: AlertUpdatedResponseSchema,
+    alert_data: AlertCreateUpdateSchema,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Met à jour une alerte existante (titre, cellules, capteurs, plages).
+
+    - Si des conflits avec d'autres alertes existent et que **overwriteExisting** est `false`, retourne `409 Conflict`.
+    - Si **overwriteExisting** est `true`, les capteurs en conflit sont retirés des autres alertes. Si une alerte se retrouve sans capteur, elle est supprimée.
     """
     result = service.update_alert(db, alert_id, alert_data)
-    log_action(db, current_user, "update", "alert", alert_id)
+    log_action(
+        db,
+        current_user,
+        "update",
+        "alert",
+        alert_id,
+        details={"overwritten_count": len(result.get("overwrittenAlerts", []))},
+    )
     return result
 
 

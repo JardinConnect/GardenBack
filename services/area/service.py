@@ -6,7 +6,7 @@ from collections import defaultdict
 
 from . import schemas, repository
 from .errors import ParentAreaNotFoundError, AreaNotFoundError
-from db.models import Area as AreaModel, Analytic as AnalyticModel, AnalyticType
+from db.models import Area as AreaModel, Cell as CellModel, Analytic as AnalyticModel, AnalyticType
 
 
 def create_area(db: Session, area_data: schemas.AreaCreate) -> schemas.Area:
@@ -95,6 +95,20 @@ def delete_area(db: Session, area_id: uuid.UUID) -> bool:
     return True
 
 
+def get_full_location_path_for_cell(cell: CellModel) -> str:
+    """Construit le chemin hiérarchique complet pour une cellule (fil d'Ariane)."""
+    if not cell.area:
+        return ""
+
+    path_parts = []
+    current_area = cell.area
+    while current_area:
+        path_parts.append(current_area.name)
+        current_area = current_area.parent
+
+    return " > ".join(reversed(path_parts))
+
+
 # --- Fonctions de logique métier (privées, pas d'accès DB) ---
 
 def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[AnalyticType, List[schemas.AnalyticSchema]]:
@@ -124,7 +138,7 @@ def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[Analyt
             daily_average_analytic = schemas.AnalyticSchema(
                 value=round(average_value, 2),
                 occurred_at=datetime.combine(current_day, datetime.min.time()),
-            )
+            ) # type: ignore
             daily_averages_for_type.append(daily_average_analytic)
         
         analytics_averages_by_type[analytic_type] = daily_averages_for_type

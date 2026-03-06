@@ -4,7 +4,7 @@ import uuid
 
 from fastapi import HTTPException
 from db.models import Area as AreaModel, Cell as CellModel, Sensor as SensorModel, Analytic as AnalyticModel, AnalyticType
-from services.area.service import get_area_with_analytics, create_area, delete_area, update_area, _calculate_daily_averages
+from services.area.service import get_area_with_analytics, create_area, delete_area, update_area, _calculate_daily_averages, get_full_location_path_for_cell
 from services.area.schemas import AreaCreate, AreaUpdate
 from services.area.errors import ParentAreaNotFoundError, AreaNotFoundError
 
@@ -141,6 +141,64 @@ def test_delete_area_with_hierarchy(db_session):
 
     # Vérifie que toutes les cellules ont bien leur area_id à None
     assert db_session.query(CellModel).filter(CellModel.area_id != None).count() == 0
+
+
+# === Tests for get_full_location_path_for_cell ===
+
+def test_get_full_location_path_for_cell_with_deep_hierarchy(db_session):
+    """
+    Tests that the full path is correctly constructed for a cell in a deep hierarchy.
+    e.g., Parcelle > Planche > Section
+    """
+    # 1. Create hierarchy
+    parcelle = AreaModel(name="Parcelle Nord", color="#2E8B57")
+    db_session.add(parcelle)
+    db_session.commit()
+
+    planche = AreaModel(name="Planche Tomates", color="#FF6347", parent_id=parcelle.id)
+    db_session.add(planche)
+    db_session.commit()
+
+    section = AreaModel(name="Section Tomates Cerises", color="#FF4500", parent_id=planche.id)
+    db_session.add(section)
+    db_session.commit()
+
+    # 2. Create cell
+    cell = CellModel(name="Rangée A", area_id=section.id)
+    db_session.add(cell)
+    db_session.commit()
+
+    # 3. Call function and assert
+    path = get_full_location_path_for_cell(cell)
+    assert path == "Parcelle Nord > Planche Tomates > Section Tomates Cerises"
+
+
+def test_get_full_location_path_for_cell_with_root_area(db_session):
+    """
+    Tests that the path is correct for a cell directly under a root area.
+    """
+    parcelle = AreaModel(name="Parcelle Sud", color="#228B22")
+    db_session.add(parcelle)
+    db_session.commit()
+
+    cell = CellModel(name="Carottes", area_id=parcelle.id)
+    db_session.add(cell)
+    db_session.commit()
+
+    path = get_full_location_path_for_cell(cell)
+    assert path == "Parcelle Sud"
+
+
+def test_get_full_location_path_for_cell_with_no_area(db_session):
+    """
+    Tests that an empty string is returned for a cell with no associated area.
+    """
+    cell = CellModel(name="Orphan Cell", area_id=None)
+    db_session.add(cell)
+    db_session.commit()
+
+    path = get_full_location_path_for_cell(cell)
+    assert path == ""
 
 
 # === Tests for Helper Functions (_get_analytics_for_area, _calculate_daily_averages) ===

@@ -7,6 +7,7 @@ from db.models import (
     AnalyticType, User, Area, Analytic, RefreshToken, Cell, Sensor, RoleEnum, Farm,
     Alert, AlertEvent, SeverityEnum,
 )
+from services.area.service import get_full_location_path_for_cell
 import bcrypt
 import random
 
@@ -348,13 +349,13 @@ def seed_alerts(db: Session, cells: list[Cell]):
             "warning_enabled": True,
         },
         {
-            "title": "Alerte Batterie",
+            "title": "Alerte Sécheresse Profonde",
             "sensors": [
                 {
-                    "type": "battery",
+                    "type": "deep_soil_humidity",
                     "index": 0,
-                    "criticalRange": {"min": 0.0, "max": 15.0},
-                    "warningRange": {"min": 0.0, "max": 30.0},
+                    "criticalRange": {"min": 0.0, "max": 20.0},
+                    "warningRange": {"min": 20.0, "max": 35.0},
                 }
             ],
             "warning_enabled": True,
@@ -482,13 +483,13 @@ def seed_alert_events(db: Session, alerts: list[Alert], cells: list[Cell]):
     for ev in events_config:
         alert: Alert = ev["alert"]
         cell: Cell = ev["cell"]
-        area_name = cell.area.name if cell.area else ""
+        full_location = get_full_location_path_for_cell(cell)
         event = AlertEvent(
             alert_id=alert.id,
             alert_title=alert.title,
             cell_id=cell.id,
             cell_name=cell.name,
-            cell_location=area_name,
+            cell_location=full_location,
             sensor_type=ev["sensor_type"],
             severity=ev["severity"],
             value=ev["value"],
