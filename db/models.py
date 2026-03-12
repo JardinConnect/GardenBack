@@ -4,7 +4,6 @@ import uuid
 from sqlalchemy import (
     String, DateTime, Float, ForeignKey, UUID, JSON, Boolean
 ) 
-from sqlalchemy import and_
 from sqlalchemy.types import TypeDecorator
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
