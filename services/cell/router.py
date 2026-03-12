@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Path, status, HTTPException, Query, Response
 import uuid
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
 from .schemas import CellCreate, CellUpdate, CellDTO, CellSettingsUpdate
