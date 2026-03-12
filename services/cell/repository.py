@@ -70,3 +70,9 @@ def update_cell(db: Session, cell_id: uuid.UUID, cell_data: CellUpdate) -> CellS
     db.commit()
     
     return get_cell_by_id(db, cell.id)
+
+def get_cells_by_ids(db: Session, cell_ids: List[uuid.UUID]) -> List[CellModel]:
+    """Récupère une liste de cellules par leurs IDs."""
+    if not cell_ids:
+        return []
+    return db.query(CellModel).filter(CellModel.id.in_(cell_ids)).all()

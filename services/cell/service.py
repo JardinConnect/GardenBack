@@ -2,6 +2,7 @@ from typing import List, Dict, Optional
 import uuid
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 import services.cell.repository as repositoryCell
 from datetime import datetime
 import services.area.repository as repositoryArea
@@ -127,3 +128,34 @@ def get_all_analytics_for_cell(db: Session, cell_id: uuid.UUID, from_date: Optio
         analytics_by_type[analytic.analytic_type].append(schemas.AnalyticSchema.model_validate(analytic))
     
     return analytics_by_type
+
+def update_multiple_cells_settings(db: Session, settings_data: schemas.CellSettingsUpdate):
+    """
+    Logique métier pour mettre à jour les paramètres de plusieurs cellules.
+    """
+    # 1. Récupérer les cellules cibles
+    cells_to_update = repositoryCell.get_cells_by_ids(db, settings_data.cell_ids)
+    
+    # 2. Vérifier que toutes les cellules demandées ont été trouvées
+    found_ids = {cell.id for cell in cells_to_update}
+    requested_ids = set(settings_data.cell_ids)
+    
+    if not_found_ids := requested_ids - found_ids:
+        raise errors.CellsNotFoundError(list(not_found_ids))
+
+    # 3. Préparer le dictionnaire de settings à appliquer
+    settings_payload = {
+        "daily_update_count": settings_data.daily_update_count,
+        "update_times": settings_data.update_times,
+        "measurement_frequency": settings_data.measurement_frequency,
+    }
+
+    # 4. Mettre à jour le champ 'settings' de chaque cellule
+    for cell in cells_to_update:
+        if cell.settings is None:
+            cell.settings = {}
+        cell.settings.update(settings_payload)
+        flag_modified(cell, "settings")
+
+    # 5. Appliquer la transaction
+    db.commit()
