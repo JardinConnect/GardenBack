@@ -3,7 +3,8 @@ from typing import Optional, List, TYPE_CHECKING
 import uuid
 from sqlalchemy import (
     String, DateTime, Float, ForeignKey, UUID, JSON, Boolean
-)
+) 
+from sqlalchemy import and_
 from sqlalchemy.types import TypeDecorator
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
@@ -83,13 +84,21 @@ class Area(Base):
     if TYPE_CHECKING:
         parent: Mapped[Optional["Area"]] = relationship("Area", remote_side=[id], back_populates="children")
         children: Mapped[List["Area"]] = relationship("Area", back_populates="parent")
-        cells: Mapped[List["Cell"]] = relationship("Cell", back_populates="area")
+        cells: Mapped[List["Cell"]] = relationship(
+            "Cell",
+            primaryjoin="and_(Area.id==Cell.area_id, Cell.deleted_at==None)",
+            back_populates="area"
+        )
         originator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[originator_id])
         updater: Mapped[Optional["User"]] = relationship("User", foreign_keys=[updater_id])
     else:
         parent = relationship("Area", remote_side=[id], back_populates="children")
         children = relationship("Area", back_populates="parent")
-        cells = relationship("Cell", back_populates="area")
+        cells = relationship(
+            "Cell",
+            primaryjoin="and_(Area.id==Cell.area_id, Cell.deleted_at==None)",
+            back_populates="area"
+        )
         originator = relationship("User", foreign_keys=[originator_id])
         updater = relationship("User", foreign_keys=[updater_id])
 
@@ -106,6 +115,7 @@ class Cell(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
     is_tracked: Mapped[bool] = mapped_column(Boolean, default=False)
     settings: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Relation vers l'area parent
     area_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("areas.id"), nullable=True)

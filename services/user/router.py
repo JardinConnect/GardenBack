@@ -16,7 +16,7 @@ from db.models import User, RoleEnum
 router = APIRouter()
 
 
-@router.get("/users/", response_model=List[UserResponse])
+@router.get("/", response_model=List[UserResponse])
 def get_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     Récupère une liste paginée d'utilisateurs.
@@ -30,7 +30,7 @@ def get_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db), cur
     return users
 
 @router.get(
-    "/users/{user_id}",
+    "/{user_id}",
     response_model=UserResponse,
     responses={
         status.HTTP_403_FORBIDDEN: {"description": "Forbidden", "model": MessageResponse},
@@ -62,7 +62,7 @@ def get_user(user_id: uuid.UUID, db: Session = Depends(get_db), current_user: Us
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.post(
-    "/users/",
+    "/",
     response_model=UserResponse,
     status_code=201,
     responses={
@@ -95,7 +95,7 @@ def create_user(user: UserSchema, db: Session = Depends(get_db), current_user: U
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.put(
-    "/users/{user_id}",
+    "/{user_id}",
     response_model=UserResponse,
     responses={
         status.HTTP_403_FORBIDDEN: {"description": "Forbidden", "model": MessageResponse},
@@ -130,7 +130,7 @@ def update_user(user_id: uuid.UUID, user_data: UserUpdate, db: Session = Depends
         raise HTTPException(status_code=404, detail=str(e))
 
 @router.put(
-    "/users/{user_id}/password",
+    "/{user_id}/password",
     response_model=MessageResponse,
     responses={
         status.HTTP_403_FORBIDDEN: {"description": "Forbidden", "model": MessageResponse},
@@ -170,7 +170,7 @@ def update_user_password( # Ajout de Path pour user_id pour une meilleure docume
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/users/{user_id}", response_model=MessageResponse)
+@router.delete("/{user_id}", response_model=MessageResponse)
 def delete_user(user_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     Supprime un utilisateur par son ID.
