@@ -12,7 +12,7 @@ def get_cell_by_id(db: Session, cell_id: uuid.UUID) -> CellSchema:
     Récupère une seule cellule par son ID, si elle n'est pas "soft-deleted".
     """
     cell = db.query(CellModel).options(joinedload(CellModel.area)).filter(
-        CellModel.id == cell_id, CellModel.deleted_at == None).first()
+        CellModel.id == cell_id, CellModel.deleted_at.is_(None)).first()
     if not cell:
         raise CellNotFoundError
     
@@ -24,7 +24,7 @@ def get_cells(db: Session) -> List[CellSchema]:
     """
     Récupère toutes les cellules non "soft-deleted".
     """
-    cells = db.query(CellModel).options(joinedload(CellModel.area)).filter(CellModel.deleted_at == None).all()
+    cells = db.query(CellModel).options(joinedload(CellModel.area)).filter(CellModel.deleted_at.is_(None)).all()
     
     cell_schemas = []
     for cell in cells:
@@ -48,7 +48,7 @@ def delete_cell(db: Session, cell_id: uuid.UUID) -> None:
     """
     Effectue un "soft delete" sur une cellule en marquant son champ `deleted_at`.
     """
-    cell = db.query(CellModel).filter(CellModel.id == cell_id, CellModel.deleted_at == None).first()
+    cell = db.query(CellModel).filter(CellModel.id == cell_id, CellModel.deleted_at.is_(None)).first()
     if not cell:
         raise CellNotFoundError
     
@@ -58,7 +58,7 @@ def delete_cell(db: Session, cell_id: uuid.UUID) -> None:
     return None
 
 def update_cell(db: Session, cell_id: uuid.UUID, cell_data: CellUpdate) -> CellSchema:
-    cell = db.query(CellModel).filter(CellModel.id == cell_id, CellModel.deleted_at == None).first()
+    cell = db.query(CellModel).filter(CellModel.id == cell_id, CellModel.deleted_at.is_(None)).first()
     if not cell:
         raise CellNotFoundError
     
@@ -75,4 +75,4 @@ def get_cells_by_ids(db: Session, cell_ids: List[uuid.UUID]) -> List[CellModel]:
     """Récupère une liste de cellules par leurs IDs, si elles ne sont pas "soft-deleted"."""
     if not cell_ids:
         return []
-    return db.query(CellModel).filter(CellModel.id.in_(cell_ids), CellModel.deleted_at == None).all()
+    return db.query(CellModel).filter(CellModel.id.in_(cell_ids), CellModel.deleted_at.is_(None)).all()
