@@ -1,3 +1,4 @@
+from datetime import datetime
 import uuid
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional
@@ -33,8 +34,10 @@ class UserResponse(UserBase):
     last_name: str
     phone_number: Optional[str]
     role: RoleEnum
+    created_at: datetime = Field(..., alias="createdAt")
+    updated_at: datetime = Field(..., alias="updatedAt")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class MessageResponse(BaseModel):
     message: str
