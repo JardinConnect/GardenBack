@@ -15,10 +15,11 @@ from services.cell.service import (
     get_cell,
     get_cells,
     get_analytics_for_cell,
-    get_all_analytics_for_cell
+    get_all_analytics_for_cell,
+    update_multiple_cells_settings
 )
-from services.cell.schemas import CellCreate, CellUpdate
-from services.cell.errors import CellNotFoundError, ParentCellNotFoundError, InvalidDateRangeError
+from services.cell.schemas import CellCreate, CellUpdate, CellSettingsUpdate
+from services.cell.errors import CellNotFoundError, ParentCellNotFoundError, InvalidDateRangeError, CellsNotFoundError
 
 
 # =========================================================
@@ -65,6 +66,19 @@ def setup_cell_with_sensors(db_session, setup_area):
     
     return {"cell": cell, "sensor_temp": sensor_temp, "sensor_hum": sensor_hum}
 
+
+@pytest.fixture(scope="function")
+def setup_multiple_cells(db_session):
+    """Crée plusieurs cellules de test."""
+    cell1 = CellModel(name="Cell 1")
+    cell2 = CellModel(name="Cell 2")
+    cell3 = CellModel(name="Cell 3", settings={"existing_key": "old_value"})
+    db_session.add_all([cell1, cell2, cell3])
+    db_session.commit()
+    db_session.refresh(cell1)
+    db_session.refresh(cell2)
+    db_session.refresh(cell3)
+    return [cell1, cell2, cell3]
 
 # =========================================================
 # TESTS FOR create_cell
@@ -340,6 +354,73 @@ def test_get_all_analytics_for_cell(db_session, setup_cell_with_sensors):
     values = {a.value for a in result[AnalyticType.AIR_TEMPERATURE]}
     assert 10.0 in values
     assert 25.5 in values
+
+
+# =========================================================
+# TESTS FOR update_multiple_cells_settings
+# =========================================================
+
+def test_update_multiple_cells_settings_success(db_session, setup_multiple_cells):
+    """Teste la mise à jour réussie des paramètres de plusieurs cellules."""
+    cells = setup_multiple_cells
+    cell_ids_to_update = [cells[0].id, cells[2].id]
+    
+    settings_data = CellSettingsUpdate(
+        cell_ids=cell_ids_to_update,
+        daily_update_count=2,
+        update_times=["10:00", "22:00"],
+        measurement_frequency=900
+    )
+    
+    update_multiple_cells_settings(db_session, settings_data)
+    
+    db_session.refresh(cells[0])
+    db_session.refresh(cells[1])
+    db_session.refresh(cells[2])
+    
+    # Cell 1 (initialement sans settings) doit être mise à jour
+    assert cells[0].settings is not None
+    assert cells[0].settings["daily_update_count"] == 2
+    assert cells[0].settings["update_times"] == ["10:00", "22:00"]
+    assert cells[0].settings["measurement_frequency"] == 900
+    
+    # Cell 2 ne doit PAS être mise à jour
+    assert cells[1].settings is None
+    
+    # Cell 3 (avec settings existants) doit être mise à jour et préserver les anciennes clés
+    assert cells[2].settings is not None
+    assert cells[2].settings["daily_update_count"] == 2
+    assert cells[2].settings["measurement_frequency"] == 900
+    assert cells[2].settings["existing_key"] == "old_value"
+
+
+def test_update_multiple_cells_settings_cell_not_found(db_session, setup_multiple_cells):
+    """Teste que la fonction lève une erreur si une cellule n'est pas trouvée."""
+    cells = setup_multiple_cells
+    non_existent_id = uuid.uuid4()
+    cell_ids_to_update = [cells[0].id, non_existent_id]
+    
+    settings_data = CellSettingsUpdate(
+        cell_ids=cell_ids_to_update,
+        daily_update_count=1,
+        update_times=["12:00"],
+        measurement_frequency=300
+    )
+    
+    with pytest.raises(CellsNotFoundError) as exc_info:
+        update_multiple_cells_settings(db_session, settings_data)
+        
+    assert non_existent_id in exc_info.value.not_found_ids
+
+
+def test_update_multiple_cells_settings_empty_list(db_session):
+    """Teste que la fonction ne lève pas d'erreur avec une liste vide d'IDs."""
+    settings_data = CellSettingsUpdate(cell_ids=[], daily_update_count=1, update_times=[], measurement_frequency=300)
+    
+    try:
+        update_multiple_cells_settings(db_session, settings_data)
+    except Exception as e:
+        pytest.fail(f"update_multiple_cells_settings a levé une exception inattendue avec une liste vide: {e}")
 
 
 def test_get_all_analytics_for_cell_grouping(db_session, setup_cell_with_sensors):
