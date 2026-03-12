@@ -1,10 +1,25 @@
 from typing import Optional, Any
 import uuid
+from datetime import datetime
 from sqlalchemy.orm import Session
 
 from db.models import User
 from . import repository
 from .schemas import ActionLogResponse, ActionLogFilter, PaginatedActionLogResult
+
+
+def _make_details_json_serializable(obj: Any) -> Any:
+    if obj is None:
+        return None
+    if isinstance(obj, uuid.UUID):
+        return str(obj)
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, dict):
+        return {k: _make_details_json_serializable(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_make_details_json_serializable(v) for v in obj]
+    return obj
 
 
 def log_action(
@@ -16,13 +31,14 @@ def log_action(
     details: Optional[dict[str, Any]] = None,
 ) -> None:
     user_id = user.id if user else None
+    details_safe = _make_details_json_serializable(details) if details else None
     repository.create_action_log(
         db,
         user_id=user_id,
         action=action,
         resource_type=resource_type,
         entity_id=entity_id,
-        details=details,
+        details=details_safe,
     )
 
 

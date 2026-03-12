@@ -25,6 +25,37 @@ def test_log_action_calls_repository_with_user_id():
         assert call_kw["details"] == {"name": "Zone A"}
 
 
+def test_log_action_with_details_containing_uuid_stores_json_serializable(db_session):
+    """Garantit que details avec UUID (ex. model_dump area/cell update) ne lèvent pas TypeError au commit."""
+    user = Mock(spec=User)
+    user.id = uuid.uuid4()
+    parent_id = uuid.uuid4()
+    entity_id = uuid.uuid4()
+    details_with_uuid = {
+        "name": "Parcelle nono",
+        "color": "ff2e8b57",
+        "parent_id": parent_id,
+        "is_tracked": False,
+    }
+    log_action(
+        db_session,
+        user,
+        "update",
+        "area",
+        entity_id=entity_id,
+        details=details_with_uuid,
+    )
+    from services.audit.repository import get_action_logs
+
+    rows, total = get_action_logs(db_session, limit=1)
+    assert total >= 1
+    log = rows[0]
+    assert log.details is not None
+    assert log.details.get("parent_id") == str(parent_id)
+    assert log.details.get("name") == "Parcelle nono"
+    assert isinstance(log.details["parent_id"], str)
+
+
 def test_log_action_with_user_none():
     db = Mock()
     with patch("services.audit.service.repository.create_action_log") as create:
