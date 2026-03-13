@@ -2,7 +2,6 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List
 import uuid
 from datetime import datetime, UTC
-from db.models import Cell as CellModel
 from db.models import Cell as CellModel, Sensor
 from .schemas import Cell as CellSchema, CellUpdate, CellCreate
 from .errors import CellNotFoundError
