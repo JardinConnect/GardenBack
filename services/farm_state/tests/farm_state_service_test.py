@@ -1,6 +1,13 @@
 import pytest
-from services.farm_state.service import get_farm_details
-from db.models import User, Area, Cell, Sensor, RoleEnum, Farm, Analytic, AnalyticType
+from services.farm_state.service import get_farm_details, setup_farm
+from db.models import (
+    User, Area, Cell, Sensor, RoleEnum, Farm, Analytic, AnalyticType
+)
+from services.farm_state.schemas import OnboardingPayload, FarmCreate
+from services.user.schemas import UserSchema
+from services.area.schemas import AreaCreate
+from services.farm_state.errors import FarmAlreadyExistsError
+from services.user.errors import UserAlreadyExistsError as UserExistsError
 
 
 def test_get_farm_details_empty_db(db_session):
@@ -111,3 +118,88 @@ def test_get_farm_details_with_analytics_rounding(db_session):
     # Assert
     assert details.average_analytics is not None
     assert details.average_analytics["light"] == 12.33
+
+
+class TestSetupFarm:
+    def test_setup_farm_success(self, db_session):
+        """
+        Vérifie que la configuration initiale crée la ferme, l'utilisateur SUPERADMIN et les zones.
+        """
+        # Arrange
+        payload = OnboardingPayload(
+            farm=FarmCreate(name="Ma Nouvelle Ferme"),
+            user=UserSchema(
+                first_name="Super",
+                last_name="Admin",
+                email="super@newfarm.com",
+                password="securepassword123",
+                role=RoleEnum.EMPLOYEES,  # Le service doit forcer SUPERADMIN
+            ),
+            areas=[
+                AreaCreate(name="Serre Principale"),
+                AreaCreate(name="Champ Ouest"),
+            ],
+        )
+
+        # Act
+        result = setup_farm(db_session, payload)
+
+        # Assert
+        assert result == {"message": "Ferme configurée avec succès."}
+
+        # Vérifier la ferme
+        farm = db_session.query(Farm).one()
+        assert farm.name == "Ma Nouvelle Ferme"
+
+        # Vérifier l'utilisateur
+        user = db_session.query(User).one()
+        assert user.email == "super@newfarm.com"
+        assert user.role == RoleEnum.SUPERADMIN  # Vérifier que le rôle a été forcé
+
+        # Vérifier les zones
+        areas = db_session.query(Area).all()
+        assert len(areas) == 2
+        area_names = {area.name for area in areas}
+        assert "Serre Principale" in area_names
+        assert "Champ Ouest" in area_names
+        for area in areas:
+            assert area.parent_id is None  # Doivent être des zones racines
+
+    def test_setup_farm_fails_if_farm_already_exists(self, db_session):
+        """
+        Vérifie que setup_farm lève une FarmAlreadyExistsError si une ferme existe déjà.
+        """
+        # Arrange
+        db_session.add(Farm(name="Ferme Existante"))
+        db_session.commit()
+
+        payload = OnboardingPayload(
+            farm=FarmCreate(name="Une autre ferme"),
+            user=UserSchema(first_name="a", last_name="b", email="c@d.com", password="password123", role=RoleEnum.ADMIN),
+            areas=[],
+        )
+
+        # Act & Assert
+        with pytest.raises(FarmAlreadyExistsError):
+            setup_farm(db_session, payload)
+
+    def test_setup_farm_fails_if_user_already_exists(self, db_session):
+        """
+        Vérifie que setup_farm propage UserExistsError si l'email de l'utilisateur existe déjà.
+        """
+        # Arrange
+        db_session.add(User(email="super@newfarm.com", password="pwd", first_name="f", last_name="l"))
+        db_session.commit()
+
+        payload = OnboardingPayload(
+            farm=FarmCreate(name="Ma Nouvelle Ferme"),
+            user=UserSchema(first_name="Super", last_name="Admin", email="super@newfarm.com", password="password123", role=RoleEnum.EMPLOYEES),
+            areas=[],
+        )
+
+        # Act & Assert
+        with pytest.raises(UserExistsError):
+            setup_farm(db_session, payload)
+
+        # Vérifier qu'aucune ferme n'a été créée dans ce cas
+        assert db_session.query(Farm).count() == 0

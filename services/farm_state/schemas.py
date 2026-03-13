@@ -1,5 +1,20 @@
 from pydantic import BaseModel
-from typing import Dict, Optional
+from typing import Dict, Optional, List
+
+from services.user.schemas import UserSchema
+from services.area.schemas import AreaCreate
+
+
+class FarmCreate(BaseModel):
+    """Schéma pour la création de la ferme."""
+    name: str
+
+
+class OnboardingPayload(BaseModel):
+    """Schéma pour le payload de configuration initiale de la ferme."""
+    farm: FarmCreate
+    user: UserSchema
+    areas: List[AreaCreate] = []
 
 
 class FarmStateSummary(BaseModel):

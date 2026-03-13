@@ -1,8 +1,13 @@
 from sqlalchemy.orm import Session
 from collections import Counter
+from typing import Dict
 
 from . import repository
-from .schemas import FarmStateSummary, FarmDetails
+from .schemas import FarmStateSummary, FarmDetails, OnboardingPayload
+from .errors import FarmAlreadyExistsError
+from db.models import Farm, RoleEnum
+from services.user.repository import create_user as create_user_repo
+from services.area.service import create_area as create_area_service
 
 def get_farm_details(db: Session, with_analytics: bool = False) -> FarmDetails:
     """
@@ -44,3 +49,33 @@ def get_farm_details(db: Session, with_analytics: bool = False) -> FarmDetails:
         summary=summary,
         average_analytics=average_analytics,
     )
+
+def setup_farm(db: Session, payload: OnboardingPayload) -> Dict[str, str]:
+    """
+    Effectue la configuration initiale de la ferme.
+    Crée la ferme, le premier utilisateur SUPERADMIN, et les zones racines.
+    """
+    # 1. Vérifier si la ferme existe déjà
+    if repository.get_farm(db):
+        raise FarmAlreadyExistsError()
+
+    try:
+        # 2. Créer la ferme
+        farm = Farm(name=payload.farm.name)
+        db.add(farm)
+
+        # 3. Créer l'utilisateur SUPERADMIN
+        user_data = payload.user
+        user_data.role = RoleEnum.SUPERADMIN  # Forcer le rôle pour la sécurité
+        admin_user = create_user_repo(db, user=user_data)
+
+        # 4. Créer les zones initiales comme zones racines
+        for area_data in payload.areas:
+            area_data.parent_id = None  # S'assurer qu'elles sont à la racine
+            create_area_service(db, area_data=area_data, current_user=admin_user)
+
+        return {"message": "Ferme configurée avec succès."}
+    except Exception as e:
+        # Note : les services appelés (create_user, create_area) committent individuellement.
+        # Une gestion transactionnelle plus poussée nécessiterait une refonte de ces services.
+        raise e

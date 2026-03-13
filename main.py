@@ -58,5 +58,5 @@ app.include_router(audit_router, prefix="/api/action-logs", tags=["Audit"], depe
 app.include_router(data_router, prefix="/api/data", tags=["Data"], dependencies=[auth_dependency])
 app.include_router(area_router, prefix="/api/area", tags=["Area"], dependencies=[auth_dependency])
 app.include_router(user_router, prefix="/api/user", tags=["User"], dependencies=[auth_dependency])
-app.include_router(farm_state_router, prefix="/api/farm-stats", tags=["Farm Stats"], dependencies=[auth_dependency])
+app.include_router(farm_state_router, prefix="/api/farm", tags=["Farm Stats"], dependencies=[auth_dependency])
 app.include_router(cell_router, prefix="/api/cell", tags=["Cell"], dependencies=[auth_dependency])

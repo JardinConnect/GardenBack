@@ -73,6 +73,24 @@ def test_get_farm_not_exists(db_session):
     assert result is None
 
 
+def test_get_farm_returns_first_if_multiple_exist(db_session):
+    """
+    Vérifie que get_farm retourne bien la première ferme si plusieurs existent par erreur.
+    Le système est conçu pour n'avoir qu'une seule ferme, mais ce test valide la robustesse de la requête.
+    """
+    # Arrange
+    farm1 = Farm(name="Ferme 1")
+    farm2 = Farm(name="Ferme 2")
+    db_session.add_all([farm1, farm2])
+    db_session.commit()
+
+    # Act
+    result = get_farm(db_session)
+
+    # Assert
+    assert result is not None
+    assert result.id == farm1.id
+
 # === Tests for get_all_sensor_types ===
 
 def test_get_all_sensor_types_populated(db_session):

@@ -8,7 +8,7 @@ from db.database import get_db
 # user
 from services.user import repository
 from services.user.schemas import UserResponse, UserSchema, UserUpdate, MessageResponse, UserPasswordUpdate
-from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID, InvalidPasswordError
+from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID, InvalidPasswordError, CannotDeleteSuperAdminError
 from services.auth.dependencies import get_current_user
 from services.audit.service import log_action
 from db.models import User, RoleEnum
@@ -197,3 +197,8 @@ def delete_user(user_id: uuid.UUID, db: Session = Depends(get_db), current_user:
         return {"message": f"Utilisateur {user_id} supprimé avec succès"}
     except UserNotFoundErrorID as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except CannotDeleteSuperAdminError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )

@@ -5,10 +5,10 @@ import uuid
 from sqlalchemy.orm import Session
 
 from services.user.repository import (
-    check_user, get_user, get_users, create_user, delete_user, update_user, update_user_password
+    check_user, get_user, get_users, create_user, delete_user, update_user, update_user_password, get_user_by_email
 )
 
-from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID, InvalidPasswordError
+from services.user.errors import UserAlreadyExistsError, UserNotFoundErrorID, InvalidPasswordError, CannotDeleteSuperAdminError
 from services.user.schemas import UserLoginSchema, UserSchema, UserUpdate, UserPasswordUpdate
 from db.models import User, RoleEnum
 
@@ -100,6 +100,31 @@ class TestUserService:
             get_user(self.mock_db, non_existent_id)
         
         assert str(non_existent_id) in str(exc_info.value)
+
+    # Tests pour get_user_by_email
+    def test_get_user_by_email_success(self):
+        """Test de récupération d'utilisateur par email réussie"""
+        # Arrange
+        self.mock_query.filter.return_value.first.return_value = self.test_user
+        
+        # Act
+        result = get_user_by_email(self.mock_db, "test@example.com")
+        
+        # Assert
+        assert result == self.test_user
+        self.mock_db.query.assert_called_once_with(User)
+
+    def test_get_user_by_email_not_found(self):
+        """Test utilisateur non trouvé par email"""
+        # Arrange
+        self.mock_query.filter.return_value.first.return_value = None
+        
+        # Act
+        result = get_user_by_email(self.mock_db, "nonexistent@example.com")
+        
+        # Assert
+        assert result is None
+        self.mock_db.query.assert_called_once_with(User)
 
     # Tests pour get_users
     def test_get_users_default_params(self):
@@ -212,6 +237,20 @@ class TestUserService:
         assert str(non_existent_id) in str(exc_info.value)
         self.mock_db.delete.assert_not_called()
 
+    def test_delete_user_superadmin_fails(self):
+        """Test que la suppression d'un superadmin lève une erreur."""
+        # Arrange
+        superadmin_user = self.test_user
+        superadmin_user.role = RoleEnum.SUPERADMIN
+        self.mock_query.filter.return_value.first.return_value = superadmin_user
+        
+        # Act & Assert
+        with pytest.raises(CannotDeleteSuperAdminError):
+            delete_user(self.mock_db, self.test_user_id)
+        
+        self.mock_db.delete.assert_not_called()
+        self.mock_db.commit.assert_not_called()
+
     # Tests pour update_user
     @patch('services.user.repository.datetime')
     def test_update_user_success(self, mock_datetime):
@@ -247,6 +286,31 @@ class TestUserService:
             with pytest.raises(UserNotFoundErrorID):
                 update_user(self.mock_db, non_existent_id, update_data)
             mock_get_user.assert_called_once_with(self.mock_db, user_id=non_existent_id)
+
+    def test_update_user_cannot_change_superadmin_role(self):
+        """Test qu'il est impossible de changer le rôle d'un superadmin, mais que les autres champs sont mis à jour."""
+        # Arrange
+        superadmin_user = self.test_user
+        superadmin_user.role = RoleEnum.SUPERADMIN
+        
+        with patch('services.user.repository.get_user', return_value=superadmin_user) as mock_get_user:
+            update_data = UserUpdate(
+                first_name="new_firstname", 
+                role=RoleEnum.ADMIN # Tentative de rétrogradation
+            )
+
+            # Act
+            result = update_user(self.mock_db, self.test_user_id, update_data)
+
+            # Assert
+            mock_get_user.assert_called_once_with(self.mock_db, user_id=self.test_user_id)
+            # Le prénom doit être mis à jour
+            assert result.first_name == "new_firstname"
+            # Le rôle ne doit PAS être mis à jour et rester SUPERADMIN
+            assert result.role == RoleEnum.SUPERADMIN
+            self.mock_db.add.assert_called_once_with(superadmin_user)
+            self.mock_db.commit.assert_called_once()
+            self.mock_db.refresh.assert_called_once_with(superadmin_user)
 
     # Tests pour update_user_password
     @patch('services.user.repository.get_password_hash')
@@ -356,4 +420,5 @@ class TestUserService:
         
         # Assert
         assert result == []
+
         self.mock_query.offset.assert_called_once_with(1000)
