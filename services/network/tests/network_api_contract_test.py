@@ -19,7 +19,7 @@ class TestGetCurrentNetworkContract:
             gateway="192.168.1.1",
             mac_address="AA:BB:CC:DD:EE:FF",
         )
-        response = client.get("/network/current")
+        response = client.get("/api/network/current")
         assert response.status_code == 200
         data = response.json()
         assert data["connected"] is True
@@ -36,7 +36,7 @@ class TestGetCurrentNetworkContract:
             connected=False,
             interface="wlan0",
         )
-        response = client.get("/network/current")
+        response = client.get("/api/network/current")
         assert response.status_code == 200
         data = response.json()
         assert data["connected"] is False
@@ -54,7 +54,7 @@ class TestGetListContract:
             NetworkInfo(ssid="Net1", signal=80, security="WPA2"),
             NetworkInfo(ssid="Net2", signal=50, security="open", frequency=2437),
         ]
-        response = client.get("/network/list")
+        response = client.get("/api/network/list")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -65,7 +65,7 @@ class TestGetListContract:
     @patch("services.network.service.list_networks")
     def test_returns_200_empty_list(self, mock_list, client):
         mock_list.return_value = []
-        response = client.get("/network/list")
+        response = client.get("/api/network/list")
         assert response.status_code == 200
         assert response.json() == []
 
@@ -81,7 +81,7 @@ class TestPostConnectContract:
             ssid="MyWiFi",
         )
         response = client.post(
-            "/network/connect",
+            "/api/network/connect",
             json={"ssid": "MyWiFi", "password": "secret"},
         )
         assert response.status_code == 200
@@ -99,7 +99,7 @@ class TestPostConnectContract:
             ssid="HiddenNet",
         )
         response = client.post(
-            "/network/connect",
+            "/api/network/connect",
             json={"ssid": "HiddenNet", "hidden": True},
         )
         assert response.status_code == 200

@@ -122,18 +122,17 @@ def test_create_cell_with_invalid_area(db_session):
 # =========================================================
 
 def test_delete_cell_success(db_session, setup_area):
-    """Teste la suppression réussie d'une cellule."""
+    """Teste la suppression (soft delete) réussie d'une cellule."""
     cell = CellModel(name="Cell to Delete", area_id=setup_area.id)
     db_session.add(cell)
     db_session.commit()
     cell_id = cell.id
     
-    result = delete_cell(db_session, cell_id)
+    delete_cell(db_session, cell_id)
     
-    assert result is None
-    
-    deleted_cell = db_session.query(CellModel).filter(CellModel.id == cell_id).first()
-    assert deleted_cell is None
+    # Après un soft delete, la cellule ne doit plus être récupérable par get_cell
+    with pytest.raises(CellNotFoundError):
+        get_cell(db_session, cell_id)
 
 
 def test_delete_cell_not_found(db_session):
@@ -280,9 +279,9 @@ def test_get_cells_with_analytics(db_session, setup_cell_with_sensors):
 
 
 def test_get_cells_empty_database(db_session):
-    """Teste que get_cells lève une erreur si aucune cellule n'existe."""
-    with pytest.raises(CellNotFoundError):
-        get_cells(db_session)
+    """Teste que get_cells retourne une liste vide si aucune cellule n'existe."""
+    results = get_cells(db_session)
+    assert results == []
 
 
 # =========================================================

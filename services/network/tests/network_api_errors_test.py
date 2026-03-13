@@ -10,7 +10,7 @@ class TestGetCurrentNetworkErrors:
         self, mock_get_current, client
     ):
         mock_get_current.side_effect = NetworkUnavailableError("nmcli not found")
-        response = client.get("/network/current")
+        response = client.get("/api/network/current")
         assert response.status_code == 503
         body = response.json()
         assert "detail" in body or "error" in body
@@ -24,7 +24,7 @@ class TestGetListErrors:
         self, mock_list, client
     ):
         mock_list.side_effect = NetworkUnavailableError("timeout")
-        response = client.get("/network/list")
+        response = client.get("/api/network/list")
         assert response.status_code == 503
 
 
@@ -35,7 +35,7 @@ class TestPostConnectErrors:
     ):
         mock_connect.side_effect = ConnectFailedError("Wrong password")
         response = client.post(
-            "/network/connect",
+            "/api/network/connect",
             json={"ssid": "MyWiFi", "password": "wrong"},
         )
         assert response.status_code == 502
@@ -48,14 +48,14 @@ class TestPostConnectErrors:
     ):
         mock_connect.side_effect = NetworkUnavailableError("nmcli not found")
         response = client.post(
-            "/network/connect",
+            "/api/network/connect",
             json={"ssid": "MyWiFi"},
         )
         assert response.status_code == 503
 
     def test_returns_422_when_ssid_missing(self, client):
         response = client.post(
-            "/network/connect",
+            "/api/network/connect",
             json={"password": "secret"},
         )
         assert response.status_code == 422

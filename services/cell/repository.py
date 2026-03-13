@@ -3,6 +3,7 @@ from typing import List
 import uuid
 from datetime import datetime, UTC
 from db.models import Cell as CellModel
+from db.models import Cell as CellModel, Sensor
 from .schemas import Cell as CellSchema, CellUpdate, CellCreate
 from .errors import CellNotFoundError
 from services.area.service import get_full_location_path_for_cell
@@ -46,13 +47,18 @@ def create_cell(db: Session, cell_data: CellCreate) -> CellSchema:
 
 def delete_cell(db: Session, cell_id: uuid.UUID) -> None:
     """
-    Effectue un "soft delete" sur une cellule en marquant son champ `deleted_at`.
+    Effectue un "soft delete" sur une cellule et ses capteurs associés.
     """
     cell = db.query(CellModel).filter(CellModel.id == cell_id, CellModel.deleted_at.is_(None)).first()
     if not cell:
         raise CellNotFoundError
     
-    cell.deleted_at = datetime.now(UTC)
+    now = datetime.now(UTC)
+    
+    # Soft delete les capteurs associés
+    db.query(Sensor).filter(Sensor.cell_id == cell.id, Sensor.deleted_at.is_(None)).update({"deleted_at": now}, synchronize_session=False)
+    
+    cell.deleted_at = now
     db.commit()
     
     return None

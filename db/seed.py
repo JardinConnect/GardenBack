@@ -250,7 +250,7 @@ def seed_garden_hierarchy(db: Session) -> list[Cell]:
 
 def seed_analytics(db: Session):
     print("\n📊 Seeding Données Analytiques...")
-    sensors = db.query(Sensor).all()
+    sensors = db.query(Sensor).filter(Sensor.deleted_at.is_(None)).all()
 
     if not sensors:
         print("  ⚠️  Aucun capteur trouvé.")

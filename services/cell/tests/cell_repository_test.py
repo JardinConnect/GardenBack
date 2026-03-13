@@ -81,9 +81,9 @@ def test_get_cells_success(db_session, setup_area):
 
 
 def test_get_cells_empty_database(db_session):
-    """Teste que get_cells lève une erreur si aucune cellule n'existe."""
-    with pytest.raises(CellNotFoundError):
-        get_cells(db_session)
+    """Teste que get_cells retourne une liste vide si aucune cellule n'existe."""
+    results = get_cells(db_session)
+    assert results == []
 
 
 # =========================================================
@@ -132,15 +132,16 @@ def test_create_cell_without_area(db_session):
 # =========================================================
 
 def test_delete_cell_success(db_session, setup_cell):
-    """Teste la suppression réussie d'une cellule."""
+    """Teste la suppression (soft delete) réussie d'une cellule."""
     cell_id = setup_cell.id
     
     result = delete_cell(db_session, cell_id)
     
     assert result is None
     
-    deleted_cell = db_session.query(CellModel).filter(CellModel.id == cell_id).first()
-    assert deleted_cell is None
+    # Après un soft delete, la cellule ne doit plus être récupérable par get_cell_by_id
+    with pytest.raises(CellNotFoundError):
+        get_cell_by_id(db_session, cell_id)
 
 
 def test_delete_cell_not_found(db_session):
@@ -150,7 +151,7 @@ def test_delete_cell_not_found(db_session):
 
 
 def test_delete_cell_with_sensors(db_session, setup_cell):
-    """Teste que la suppression d'une cellule supprime aussi ses capteurs (cascade)."""
+    """Teste que le soft-delete d'une cellule soft-delete aussi ses capteurs."""
     sensor = SensorModel(
         sensor_id="SENSOR-01",
         sensor_type="temperature",
@@ -159,12 +160,13 @@ def test_delete_cell_with_sensors(db_session, setup_cell):
     db_session.add(sensor)
     db_session.commit()
     sensor_id = sensor.id
-    
-    delete_cell(db_session, setup_cell.id)
-    
-    deleted_sensor = db_session.query(SensorModel).filter(SensorModel.id == sensor_id).first()
-    assert deleted_sensor is None
 
+    delete_cell(db_session, setup_cell.id)
+
+    # Vérifier que le capteur est bien soft-deleted en le requêtant directement
+    soft_deleted_sensor = db_session.query(SensorModel).filter(SensorModel.id == sensor_id).first()
+    assert soft_deleted_sensor is not None
+    assert soft_deleted_sensor.deleted_at is not None
 
 # =========================================================
 # TESTS FOR update_cell

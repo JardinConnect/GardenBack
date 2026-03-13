@@ -13,7 +13,7 @@ from .schemas import TokenResponse, RefreshTokenSchema
 
 router = APIRouter()
 
-@router.post("/api/signup", status_code=201, response_model=TokenResponse)
+@router.post("/signup", status_code=201, response_model=TokenResponse)
 async def signup(
     user: UserSchema = Body(...),
     db: Session = Depends(get_db)
@@ -36,7 +36,7 @@ async def signup(
 
     return sign_jwt(db, db_user)
 
-@router.post("/api/login", status_code=200, response_model=TokenResponse)
+@router.post("/login", status_code=200, response_model=TokenResponse)
 async def login(
     user: UserLoginSchema = Body(..., examples=[{"email": "admin@garden.com", "password": "admin123"}]),
     db: Session = Depends(get_db)
@@ -61,7 +61,7 @@ async def login(
         detail="Incorrect email or password",
     )
 
-@router.post("/api/refresh-token", response_model=TokenResponse)
+@router.post("/refresh-token", response_model=TokenResponse)
 async def refresh_access_token(
     body: RefreshTokenSchema,
     db: Session = Depends(get_db)
@@ -99,7 +99,7 @@ async def refresh_access_token(
     # Générer et retourner une nouvelle paire de tokens
     return sign_jwt(db, user)
 
-@router.post("/api/logout", status_code=200)
+@router.post("/logout", status_code=200)
 async def logout(
     body: RefreshTokenSchema,
     db: Session = Depends(get_db)

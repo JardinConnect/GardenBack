@@ -48,12 +48,12 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         },
     )
 
-app.include_router(auth_router, tags=["Authentication"])
-app.include_router(mqtt_router, tags=["MQTT"])
-app.include_router(network_router, prefix="/network", tags=["Network"])
+app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(mqtt_router, prefix="/api/mqtt", tags=["MQTT"])
+app.include_router(network_router, prefix="/api/network", tags=["Network"])
 
 auth_dependency = Depends(JWTBearer())
-app.include_router(alert_router, prefix="/api//alert", tags=["Alert"], dependencies=[auth_dependency])
+app.include_router(alert_router, prefix="/api/alert", tags=["Alert"], dependencies=[auth_dependency])
 app.include_router(audit_router, prefix="/api/action-logs", tags=["Audit"], dependencies=[auth_dependency])
 app.include_router(data_router, prefix="/api/data", tags=["Data"], dependencies=[auth_dependency])
 app.include_router(area_router, prefix="/api/area", tags=["Area"], dependencies=[auth_dependency])
