@@ -10,7 +10,7 @@ class TestGetCurrentNetworkAccessibleWithoutAuth:
             connected=False,
             interface="wlan0",
         )
-        response = client.get("/network/current")
+        response = client.get("/api/network/current")
         assert response.status_code == 200
 
 
@@ -18,7 +18,7 @@ class TestGetListAccessibleWithoutAuth:
     @patch("services.network.service.list_networks")
     def test_returns_200_without_authorization_header(self, mock_list, client):
         mock_list.return_value = []
-        response = client.get("/network/list")
+        response = client.get("/api/network/list")
         assert response.status_code == 200
 
 
@@ -31,7 +31,7 @@ class TestPostConnectAccessibleWithoutAuth:
             ssid="TestNet",
         )
         response = client.post(
-            "/network/connect",
+            "/api/network/connect",
             json={"ssid": "TestNetwork"},
         )
         assert response.status_code == 200

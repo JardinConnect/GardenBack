@@ -122,10 +122,15 @@ class Cell(Base):
     # Relations
     if TYPE_CHECKING:
         area: Mapped["Area"] = relationship("Area", back_populates="cells")
-        sensors: Mapped[List["Sensor"]] = relationship("Sensor", back_populates="cell", cascade="all, delete-orphan")
+        sensors: Mapped[List["Sensor"]] = relationship(
+            "Sensor",
+            primaryjoin="and_(Cell.id==Sensor.cell_id, Sensor.deleted_at==None)",
+            back_populates="cell",
+            cascade="all, delete-orphan"
+        )
     else:
         area = relationship("Area", back_populates="cells")
-        sensors = relationship("Sensor", back_populates="cell", cascade="all, delete-orphan")
+        sensors = relationship("Sensor", primaryjoin="and_(Cell.id==Sensor.cell_id, Sensor.deleted_at==None)", back_populates="cell", cascade="all, delete-orphan")
 
 
 # =========================================================
@@ -141,6 +146,7 @@ class Sensor(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
     settings: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Relation vers la cellule
     cell_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cells.id"), nullable=False)

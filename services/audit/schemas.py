@@ -8,7 +8,8 @@ from db.models import ResourceTypeEnum
 
 class ActionLogResponse(BaseModel):
     id: uuid.UUID
-    user_id: Optional[uuid.UUID] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     action: str
     resource_type: str
     entity_id: Optional[uuid.UUID] = None

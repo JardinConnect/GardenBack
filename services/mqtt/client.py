@@ -30,7 +30,7 @@ def process_data_message(payload: str):
         try:
             # On cherche le capteur correspondant à l'UID
             # sensor_uid peut être par exemple "TC-A-TEMP-01"
-            sensor = db.query(Sensor).filter(Sensor.sensor_id == sensor_uid).first()
+            sensor = db.query(Sensor).filter(Sensor.sensor_id == sensor_uid, Sensor.deleted_at.is_(None)).first()
             if not sensor or sensor.id is None:
                 print(f"[MQTT] Erreur: Capteur avec UID '{sensor_uid}' non trouvé. Message ignoré.")
                 return

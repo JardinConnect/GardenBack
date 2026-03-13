@@ -6,7 +6,7 @@ from services.audit.repository import create_action_log
 
 
 def test_list_action_logs_returns_200_with_admin(client, headers_admin, db_session):
-    response = client.get("/action-logs/", headers=headers_admin)
+    response = client.get("/api/action-logs/", headers=headers_admin)
     assert response.status_code == 200
     body = response.json()
     assert "total" in body
@@ -17,30 +17,30 @@ def test_list_action_logs_returns_200_with_admin(client, headers_admin, db_sessi
 
 
 def test_list_action_logs_returns_200_with_superadmin(client, headers_superadmin):
-    response = client.get("/action-logs/", headers=headers_superadmin)
+    response = client.get("/api/action-logs/", headers=headers_superadmin)
     assert response.status_code == 200
 
 
 def test_list_action_logs_returns_200_with_employees(client, headers_employees):
-    response = client.get("/action-logs/", headers=headers_employees)
+    response = client.get("/api/action-logs/", headers=headers_employees)
     assert response.status_code == 200
     body = response.json()
     assert "total" in body and "data" in body
 
 
 def test_list_action_logs_returns_200_with_trainee(client, headers_trainee):
-    response = client.get("/action-logs/", headers=headers_trainee)
+    response = client.get("/api/action-logs/", headers=headers_trainee)
     assert response.status_code == 200
 
 
 def test_list_action_logs_returns_401_without_token(client):
-    response = client.get("/action-logs/")
+    response = client.get("/api/action-logs/")
     assert response.status_code == 401
 
 
 def test_list_action_logs_returns_401_invalid_token(client):
     response = client.get(
-        "/action-logs/",
+        "/api/action-logs/",
         headers={"Authorization": "Bearer invalid_token"},
     )
     assert response.status_code == 401
@@ -55,14 +55,15 @@ def test_list_action_logs_response_structure(client, headers_admin, db_session):
         entity_id=uuid.uuid4(),
         details={"name": "Zone"},
     )
-    response = client.get("/action-logs/", headers=headers_admin)
+    response = client.get("/api/action-logs/", headers=headers_admin)
     assert response.status_code == 200
     body = response.json()
     assert "total" in body and "data" in body and "skip" in body and "limit" in body
     if body["data"]:
         log = body["data"][0]
         assert "id" in log
-        assert "user_id" in log
+        assert "first_name" in log
+        assert "last_name" in log
         assert "action" in log
         assert "resource_type" in log
         assert "entity_id" in log
@@ -90,12 +91,12 @@ def test_list_action_logs_filter_by_user_id(client, headers_admin, db_session, u
         details={},
     )
     response = client.get(
-        f"/action-logs/?user_id={user_admin.id}",
+        f"/api/action-logs/?user_id={user_admin.id}",
         headers=headers_admin,
     )
     assert response.status_code == 200
     body = response.json()
-    assert all(d["user_id"] == str(user_admin.id) for d in body["data"])
+    assert all(d["first_name"] == "Test" and d["last_name"] == "Admin" for d in body["data"])
 
 
 def test_list_action_logs_filter_by_resource_type(client, headers_admin, db_session):
@@ -107,14 +108,14 @@ def test_list_action_logs_filter_by_resource_type(client, headers_admin, db_sess
         entity_id=uuid.uuid4(),
         details={},
     )
-    response = client.get("/action-logs/?resource_type=alert", headers=headers_admin)
+    response = client.get("/api/action-logs/?resource_type=alert", headers=headers_admin)
     assert response.status_code == 200
     body = response.json()
     assert all(d["resource_type"] == "alert" for d in body["data"])
 
 
 def test_list_action_logs_pagination_skip_limit(client, headers_admin):
-    response = client.get("/action-logs/?skip=0&limit=1", headers=headers_admin)
+    response = client.get("/api/action-logs/?skip=0&limit=1", headers=headers_admin)
     assert response.status_code == 200
     body = response.json()
     assert body["skip"] == 0
@@ -123,13 +124,13 @@ def test_list_action_logs_pagination_skip_limit(client, headers_admin):
 
 
 def test_list_action_logs_invalid_params_422(client, headers_admin):
-    response = client.get("/action-logs/?skip=-1", headers=headers_admin)
+    response = client.get("/api/action-logs/?skip=-1", headers=headers_admin)
     assert response.status_code == 422
 
-    response = client.get("/action-logs/?limit=0", headers=headers_admin)
+    response = client.get("/api/action-logs/?limit=0", headers=headers_admin)
     assert response.status_code == 422
 
-    response = client.get("/action-logs/?limit=201", headers=headers_admin)
+    response = client.get("/api/action-logs/?limit=201", headers=headers_admin)
     assert response.status_code == 422
 
 
@@ -137,7 +138,7 @@ def test_create_area_creates_one_audit_log(client, headers_admin, db_session):
     from db.models import ActionLog
 
     payload = {"name": "Zone Test Audit", "color": "#fff"}
-    r = client.post("/area/", json=payload, headers=headers_admin)
+    r = client.post("/api/area/", json=payload, headers=headers_admin)
     assert r.status_code == 201
     area_id = r.json()["id"]
     logs = (
@@ -150,7 +151,7 @@ def test_create_area_creates_one_audit_log(client, headers_admin, db_session):
 
 
 def test_401_does_not_reveal_system_info(client):
-    response = client.get("/action-logs/")
+    response = client.get("/api/action-logs/")
     assert response.status_code == 401
     data = response.json()
     message = data.get("error", {}).get("message", data.get("detail", ""))
