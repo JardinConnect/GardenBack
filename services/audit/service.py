@@ -42,6 +42,21 @@ def log_action(
     )
 
 
+def _row_to_action_log_response(row) -> "ActionLogResponse":
+    first_name = row.user.first_name if row.user else None
+    last_name = row.user.last_name if row.user else None
+    return ActionLogResponse(
+        id=row.id,
+        first_name=first_name,
+        last_name=last_name,
+        action=row.action,
+        resource_type=row.resource_type,
+        entity_id=row.entity_id,
+        details=row.details,
+        created_at=row.created_at,
+    )
+
+
 def get_action_logs_paginated(
     db: Session,
     filters: ActionLogFilter,
@@ -60,5 +75,5 @@ def get_action_logs_paginated(
         total=total,
         skip=filters.skip,
         limit=filters.limit,
-        data=[ActionLogResponse.model_validate(row) for row in rows],
+        data=[_row_to_action_log_response(row) for row in rows],
     )

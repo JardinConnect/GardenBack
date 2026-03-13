@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 import uuid
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 
 from db.models import ActionLog
@@ -39,7 +39,7 @@ def get_action_logs(
     skip: int = 0,
     limit: int = 50,
 ) -> tuple[List[ActionLog], int]:
-    query = db.query(ActionLog)
+    query = db.query(ActionLog).options(joinedload(ActionLog.user))
     filters = []
     if user_id is not None:
         filters.append(ActionLog.user_id == user_id)

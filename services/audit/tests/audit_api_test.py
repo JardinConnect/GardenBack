@@ -62,7 +62,8 @@ def test_list_action_logs_response_structure(client, headers_admin, db_session):
     if body["data"]:
         log = body["data"][0]
         assert "id" in log
-        assert "user_id" in log
+        assert "first_name" in log
+        assert "last_name" in log
         assert "action" in log
         assert "resource_type" in log
         assert "entity_id" in log
@@ -95,7 +96,7 @@ def test_list_action_logs_filter_by_user_id(client, headers_admin, db_session, u
     )
     assert response.status_code == 200
     body = response.json()
-    assert all(d["user_id"] == str(user_admin.id) for d in body["data"])
+    assert all(d["first_name"] == "Test" and d["last_name"] == "Admin" for d in body["data"])
 
 
 def test_list_action_logs_filter_by_resource_type(client, headers_admin, db_session):
