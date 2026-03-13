@@ -2,12 +2,12 @@ import uuid
 from datetime import datetime, UTC
 from typing import List
 from sqlalchemy.orm import Session
-
-from db.models import User
+ 
+from db.models import User, RoleEnum
 from services.auth.utils.security import get_password_hash, verify_password 
-
+ 
 from .schemas import UserSchema, UserUpdate, UserLoginSchema, UserPasswordUpdate
-from .errors import UserAlreadyExistsError, UserNotFoundErrorID, InvalidPasswordError
+from .errors import UserAlreadyExistsError, UserNotFoundErrorID, InvalidPasswordError, CannotDeleteSuperAdminError
 
 def get_user(db: Session, user_id: uuid.UUID) -> User:
     user = db.query(User).filter(User.id == user_id).first()
@@ -45,6 +45,11 @@ def update_user(db: Session, user_id: uuid.UUID, user_data: UserUpdate) -> User:
     db_user = get_user(db, user_id=user_id)
     
     update_data = user_data.model_dump(exclude_unset=True)
+
+    # Règle de sécurité : on ne peut pas changer le rôle d'un super administrateur.
+    if db_user.role == RoleEnum.SUPERADMIN and 'role' in update_data:
+        del update_data['role']
+
     for key, value in update_data.items():
         setattr(db_user, key, value)
     
@@ -56,6 +61,8 @@ def update_user(db: Session, user_id: uuid.UUID, user_data: UserUpdate) -> User:
 
 def delete_user(db: Session, user_id: uuid.UUID) -> bool:
     db_user = get_user(db, user_id=user_id)
+    if db_user.role == RoleEnum.SUPERADMIN:
+        raise CannotDeleteSuperAdminError()
     db.delete(db_user)
     db.commit()
     return True

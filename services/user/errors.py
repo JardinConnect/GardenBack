@@ -15,3 +15,9 @@ class InvalidPasswordError(Exception):
     def __init__(self, message: str = "Le mot de passe actuel est incorrect."):
         self.message = message
         super().__init__(self.message)
+
+class CannotDeleteSuperAdminError(Exception):
+    """Levée lorsqu'on tente de supprimer un super administrateur."""
+    def __init__(self, message: str = "Un super administrateur ne peut pas être supprimé."):
+        self.message = message
+        super().__init__(self.message)
