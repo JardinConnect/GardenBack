@@ -451,10 +451,12 @@ def seed_alert_events(db: Session, alerts: list[Alert]):
             return None
         cell_id_str = alert.cell_ids[0]
         cell = db.query(Cell).filter(Cell.id == uuid.UUID(cell_id_str)).first()
-        if not cell: return None
+        if not cell:
+            return None
         
         sensor = db.query(Sensor).filter(Sensor.cell_id == cell.id, Sensor.sensor_type == sensor_type).first()
-        if not sensor: return None
+        if not sensor:
+            return None
 
         # 2. Trouver un analytic à une date approximative et le modifier
         target_date = (datetime.now(UTC) - timedelta(days=days_ago)).date()
