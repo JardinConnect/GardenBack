@@ -10,6 +10,7 @@ from db.models import (
 from services.area.service import get_full_location_path_for_cell
 import bcrypt
 import random
+import math
 
 DATABASE_FILE_NAME = "database.db"
 
@@ -277,19 +278,28 @@ def seed_analytics(db: Session):
         else:
             continue
 
+        # Générer une seule donnée par jour pour les 365 derniers jours
         for day in range(total_days):
-            for hour in range(24):
-                occurred_at = datetime.now(UTC) - timedelta(days=day, hours=hour)
-                hour_factor = 1 - ((hour - 14) / 12) ** 2
-                cycle_value = hour_factor + random.uniform(-0.1, 0.1)
-                value = max(0, base_value + (amplitude * cycle_value) + random.uniform(-noise, noise))
-                analytics_to_add.append(Analytic(
-                    sensor_id=sensor.id,
-                    sensor_code=sensor.sensor_id,
-                    analytic_type=analytic_type,
-                    value=round(value, 2),
-                    occurred_at=occurred_at,
-                ))
+            # Une seule donnée par jour, à midi.
+            occurred_at = (datetime.now(UTC) - timedelta(days=day)).replace(hour=12, minute=0, second=0, microsecond=0)
+
+            # Génération de valeur simplifiée pour un point de donnée quotidien.
+            # Simule une variation saisonnière approximative.
+            # Le facteur saisonnier varie de -1 (hiver) à +1 (été) sur l'année.
+            seasonal_factor = -math.cos(2 * math.pi * day / 365)
+            value = base_value + (amplitude * seasonal_factor) + random.uniform(-noise, noise)
+
+            # Cas spécial pour la batterie pour simuler une décharge lente
+            if analytic_type == AnalyticType.BATTERY:
+                value = 100 - (day / total_days * 90) + random.uniform(-noise, noise)
+
+            analytics_to_add.append(Analytic(
+                sensor_id=sensor.id,
+                sensor_code=sensor.sensor_id,
+                analytic_type=analytic_type,
+                value=round(max(0, value), 2),
+                occurred_at=occurred_at,
+            ))
 
     db.bulk_save_objects(analytics_to_add)
     db.commit()
