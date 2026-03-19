@@ -8,6 +8,10 @@ from services.area.schemas import AreaCreate
 class FarmCreate(BaseModel):
     """Schéma pour la création de la ferme."""
     name: str
+    address: str
+    zip_code: str
+    city: str
+    phone_number: str
 
 
 class OnboardingPayload(BaseModel):
@@ -29,5 +33,9 @@ class FarmStateSummary(BaseModel):
 class FarmDetails(BaseModel):
     """Represents detailed information about a specific farm."""
     name: str
+    address: Optional[str] = None
+    zip_code: Optional[str] = None
+    city: Optional[str] = None
+    phone_number: Optional[str] = None
     summary: FarmStateSummary
     average_analytics: Optional[Dict[str, float]] = None

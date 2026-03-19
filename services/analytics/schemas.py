@@ -10,6 +10,7 @@ class AnalyticsFilter(BaseModel):
     sensor_id: Optional[uuid.UUID] = Field(None, description="Identifiant du capteur")
     sensor_code: Optional[str] = Field(None, description="Code du capteur")
     area_id: Optional[uuid.UUID] = Field(None, description="Identifiant de l'area (filtre sur la cellule parente)")
+    cell_id: Optional[uuid.UUID] = Field(None, description="Identifiant de la cellule")
     start_date: datetime = Field(description="Date de début")
     end_date: datetime = Field(description="Date de fin")
     skip: int = Field(0, description="Nombre d'éléments à sauter (pour la pagination)")
@@ -22,6 +23,7 @@ class AnalyticsFilter(BaseModel):
                 "sensor_code": "AT-1",
                 "sensor_id": "13fe605f-a3bd-4e66-8615-cb7ff99ba017",
                 "area_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "cell_id": "b1c2d3e4-f5g6-7890-abcd-ef1234567891",
                 "start_date": "2025-11-03T00:00:00",
                 "end_date": "2025-11-06T23:59:59",
                 "skip": 0,

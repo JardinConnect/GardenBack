@@ -53,7 +53,12 @@ def test_get_summary_counts_empty_db(db_session):
 def test_get_farm_exists(db_session):
     """Vérifie que get_farm retourne la ferme si elle existe."""
     # Arrange
-    farm = Farm(name="Ma Belle Ferme")
+    farm = Farm(
+        name="Ma Belle Ferme",
+        address="123 Rue de Test",
+        zip_code="12345",
+        city="Testville",
+        phone_number="0123456789")
     db_session.add(farm)
     db_session.commit()
 
@@ -79,8 +84,20 @@ def test_get_farm_returns_first_if_multiple_exist(db_session):
     Le système est conçu pour n'avoir qu'une seule ferme, mais ce test valide la robustesse de la requête.
     """
     # Arrange
-    farm1 = Farm(name="Ferme 1")
-    farm2 = Farm(name="Ferme 2")
+    farm1 = Farm(
+        name="Ferme 1",
+        address="123 Rue de la Ferme",
+        zip_code="44000",
+        city="Nanoed",
+        phone_number="0123456789"
+        )
+    farm2 = Farm(
+        name="Ferme 2",
+        address="456 Rue de la Ferme",
+        zip_code="44000",
+        city="Nanoed",
+        phone_number="0123456789"
+        )
     db_session.add_all([farm1, farm2])
     db_session.commit()
 

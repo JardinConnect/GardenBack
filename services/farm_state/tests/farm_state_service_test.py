@@ -34,7 +34,12 @@ def test_get_farm_details_with_data_no_analytics(db_session):
     quand la base est remplie, mais sans demander les analytiques.
     """
     # Arrange
-    db_session.add(Farm(name="Ma Super Ferme"))
+    db_session.add(Farm(
+        name="Ma Super Ferme",
+        address="123 Rue de Test",
+        zip_code="12345",
+        city="Testville",
+        phone_number="0123456789"))
     db_session.add(User(email="user@test.com", password="pwd", role=RoleEnum.EMPLOYEES, first_name="f", last_name="l"))
     area = Area(name="A1")
     db_session.add(area)
@@ -66,7 +71,12 @@ def test_get_farm_details_with_analytics(db_session):
     y compris les moyennes des analytiques quand demandé.
     """
     # Arrange
-    db_session.add(Farm(name="Ferme Analytique"))
+    db_session.add(Farm(
+        name="Ferme Analytique",
+        address="123 Rue de Test",
+        zip_code="12345",
+        city="Testville",
+        phone_number="0123456789"))
     cell = Cell(name="C1")
     db_session.add(cell)
     db_session.commit()
@@ -127,7 +137,13 @@ class TestSetupFarm:
         """
         # Arrange
         payload = OnboardingPayload(
-            farm=FarmCreate(name="Ma Nouvelle Ferme"),
+            farm=FarmCreate(
+                name="Ma Nouvelle Ferme",
+                address="123 Rue de la Ferme",
+                zip_code="44000",
+                city="Nanoed",
+                phone_number="0123456789"
+                ),
             user=UserSchema(
                 first_name="Super",
                 last_name="Admin",
@@ -170,11 +186,22 @@ class TestSetupFarm:
         Vérifie que setup_farm lève une FarmAlreadyExistsError si une ferme existe déjà.
         """
         # Arrange
-        db_session.add(Farm(name="Ferme Existante"))
+        db_session.add(Farm(
+            name="Ferme Existante",
+            address="123 Rue de Test",
+            zip_code="12345",
+            city="Testville",
+            phone_number="0123456789"))
         db_session.commit()
 
         payload = OnboardingPayload(
-            farm=FarmCreate(name="Une autre ferme"),
+            farm=FarmCreate(
+                name="Une autre ferme",
+                address="123 Rue de la Ferme",
+                zip_code="44000",
+                city="Nanoed",
+                phone_number="0123456789"
+                ),
             user=UserSchema(first_name="a", last_name="b", email="c@d.com", password="password123", role=RoleEnum.ADMIN),
             areas=[],
         )
@@ -192,7 +219,13 @@ class TestSetupFarm:
         db_session.commit()
 
         payload = OnboardingPayload(
-            farm=FarmCreate(name="Ma Nouvelle Ferme"),
+            farm=FarmCreate(
+                name="Ma Nouvelle Ferme",
+                address="123 Rue de la Ferme",
+                zip_code="44000",
+                city="Nanoed",
+                phone_number="0123456789"
+                ),
             user=UserSchema(first_name="Super", last_name="Admin", email="super@newfarm.com", password="password123", role=RoleEnum.EMPLOYEES),
             areas=[],
         )

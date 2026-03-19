@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime, timedelta, UTC
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, func
 from sqlalchemy.orm import sessionmaker, Session
 from db.models import (
     AnalyticType, User, Area, Analytic, RefreshToken, Cell, Sensor, RoleEnum, Farm,
@@ -54,7 +54,13 @@ def seed():
 
         # Ferme
         print("\n🏡 Seeding Ferme...")
-        db.add(Farm(name="Ferme de test"))
+        db.add(Farm(
+            name="Ferme de Léo le BG",
+            address="123 Rue de la Ferme",
+            zip_code="44000",
+            city="Nanoed",
+            phone_number="0240123456"
+        ))
         db.commit()
         print("  ✓ Ferme 'Ferme de test' créée.")
 
@@ -417,108 +423,125 @@ def seed_alerts(db: Session, cells: list[Cell]):
 
     # Seed de quelques événements d'alerte
     print("\n  📋 Seeding Événements d'Alerte...")
-    seed_alert_events(db, created_alerts, target_cells)
+    seed_alert_events(db, created_alerts)
 
     print(f"\n  ✅ {len(created_alerts)} alertes créées")
 
 
-def seed_alert_events(db: Session, alerts: list[Alert], cells: list[Cell]):
-    """Génère des événements d'alerte variés pour l'historique."""
-    events_config = [
-        # Événements critiques récents (non archivés)
-        {
-            "alert": alerts[0],
-            "cell": cells[0],
-            "sensor_type": "air_temperature",
-            "severity": SeverityEnum.CRITICAL,
-            "value": 44.2,
-            "threshold_min": -5.0,
-            "threshold_max": 40.0,
-            "hours_ago": 2,
-            "is_archived": False,
-        },
-        {
-            "alert": alerts[0],
-            "cell": cells[1],
-            "sensor_type": "air_temperature",
-            "severity": SeverityEnum.WARNING,
-            "value": 36.8,
-            "threshold_min": 0.0,
-            "threshold_max": 35.0,
-            "hours_ago": 5,
-            "is_archived": False,
-        },
-        {
-            "alert": alerts[1],
-            "cell": cells[0],
-            "sensor_type": "soil_humidity",
-            "severity": SeverityEnum.CRITICAL,
-            "value": 7.3,
-            "threshold_min": 10.0,
-            "threshold_max": 90.0,
-            "hours_ago": 10,
-            "is_archived": False,
-        },
-        {
-            "alert": alerts[2],
-            "cell": cells[2] if len(cells) > 2 else cells[0],
-            "sensor_type": "battery",
-            "severity": SeverityEnum.CRITICAL,
-            "value": 8.0,
-            "threshold_min": 0.0,
-            "threshold_max": 15.0,
-            "hours_ago": 24,
-            "is_archived": False,
-        },
-        # Événements archivés (historique ancien)
-        {
-            "alert": alerts[0],
-            "cell": cells[0],
-            "sensor_type": "air_temperature",
-            "severity": SeverityEnum.CRITICAL,
-            "value": 41.5,
-            "threshold_min": -5.0,
-            "threshold_max": 40.0,
-            "hours_ago": 72,
-            "is_archived": True,
-        },
-        {
-            "alert": alerts[1],
-            "cell": cells[0],
-            "sensor_type": "soil_humidity",
-            "severity": SeverityEnum.WARNING,
-            "value": 18.1,
-            "threshold_min": 20.0,
-            "threshold_max": 80.0,
-            "hours_ago": 96,
-            "is_archived": True,
-        },
-    ]
+def seed_alert_events(db: Session, alerts: list[Alert]):
+    """
+    Génère des événements d'alerte variés pour l'historique.
+    Cette fonction modifie quelques données analytiques existantes pour qu'elles
+    déclenchent des alertes, puis crée les événements correspondants pour
+    assurer la cohérence des données de démo.
+    """
+    events_to_create = []
 
-    for ev in events_config:
-        alert: Alert = ev["alert"]
-        cell: Cell = ev["cell"]
-        full_location = get_full_location_path_for_cell(cell)
+    # --- Helper pour créer un événement ---
+    def create_event_from_analytic(
+        alert: Alert,
+        sensor_type: str,
+        new_value: float,
+        severity: SeverityEnum,
+        days_ago: int,
+        is_archived: bool
+    ):
+        # 1. Trouver une cellule et un capteur cibles
+        if not alert.cell_ids:
+            return None
+        cell_id_str = alert.cell_ids[0]
+        cell = db.query(Cell).filter(Cell.id == uuid.UUID(cell_id_str)).first()
+        if not cell:
+            return None
+        
+        sensor = db.query(Sensor).filter(Sensor.cell_id == cell.id, Sensor.sensor_type == sensor_type).first()
+        if not sensor:
+            return None
+
+        # 2. Trouver un analytic à une date approximative et le modifier
+        target_date = (datetime.now(UTC) - timedelta(days=days_ago)).date()
+        analytic_to_modify = db.query(Analytic).filter(
+            Analytic.sensor_id == sensor.id,
+            func.date(Analytic.occurred_at) == target_date
+        ).first()
+
+        if not analytic_to_modify:
+            # Si aucun analytic n'est trouvé pour ce jour, on ne peut pas créer l'événement
+            print(f"    - AVERTISSEMENT: Aucun analytic trouvé pour {sensor_type} il y a {days_ago} jours. Impossible de créer l'événement.")
+            return None
+
+        # 3. Modifier la valeur et persister
+        analytic_to_modify.value = new_value
+        db.commit()
+        db.refresh(analytic_to_modify)
+
+        # 4. Créer l'événement d'alerte
+        sensor_config = next((s for s in alert.sensors if s['type'] == sensor_type), None)
+        if not sensor_config: 
+            return None
+
+        threshold_range = sensor_config['criticalRange']
+        if severity == SeverityEnum.WARNING and sensor_config.get('warningRange'):
+            threshold_range = sensor_config['warningRange']
+
         event = AlertEvent(
             alert_id=alert.id,
             alert_title=alert.title,
             cell_id=cell.id,
             cell_name=cell.name,
-            cell_location=full_location,
-            sensor_type=ev["sensor_type"],
-            severity=ev["severity"],
-            value=ev["value"],
-            threshold_min=ev["threshold_min"],
-            threshold_max=ev["threshold_max"],
-            timestamp=datetime.now(UTC) - timedelta(hours=ev["hours_ago"]),
-            is_archived=ev["is_archived"],
+            cell_location=get_full_location_path_for_cell(cell),
+            sensor_type=sensor_type,
+            severity=severity,
+            value=new_value,
+            threshold_min=threshold_range['min'],
+            threshold_max=threshold_range['max'],
+            timestamp=analytic_to_modify.occurred_at,
+            is_archived=is_archived,
         )
-        db.add(event)
-        status_label = "archivé" if ev["is_archived"] else "actif"
-        print(f"    • Événement [{ev['severity'].value}] {ev['sensor_type']} → {ev['value']} ({status_label})")
+        return event
 
-    db.commit()
-    print(f"    ✅ {len(events_config)} événements créés")
+    # --- Configuration des événements à générer ---
+    
+    # Trouver les alertes spécifiques dont on a besoin
+    temp_alert = next((a for a in alerts if any(s['type'] == 'air_temperature' for s in a.sensors)), None)
+    humidity_alert = next((a for a in alerts if any(s['type'] == 'soil_humidity' for s in a.sensors)), None)
+
+    if not temp_alert:
+        print("  ⚠️  Impossible de trouver les alertes de température pour le seeding.")
+        return
+    if not humidity_alert:
+        print("  ⚠️  Impossible de trouver les alertes d'humidité pour le seeding.")
+        return
+
+    # Définir les événements à créer
+    event_definitions = [
+        { "alert": temp_alert, "type": "air_temperature", "value": 44.2, "severity": SeverityEnum.CRITICAL, "days": 1, "archived": False },
+        { "alert": temp_alert, "type": "air_temperature", "value": 36.8, "severity": SeverityEnum.WARNING, "days": 2, "archived": False },
+        { "alert": humidity_alert, "type": "soil_humidity", "value": 7.3, "severity": SeverityEnum.CRITICAL, "days": 3, "archived": False },
+        { "alert": temp_alert, "type": "air_temperature", "value": -6.1, "severity": SeverityEnum.CRITICAL, "days": 15, "archived": True },
+        { "alert": humidity_alert, "type": "soil_humidity", "value": 92.5, "severity": SeverityEnum.CRITICAL, "days": 20, "archived": True },
+    ]
+
+    for definition in event_definitions:
+        event = create_event_from_analytic(
+            alert=definition["alert"],
+            sensor_type=definition["type"],
+            new_value=definition["value"],
+            severity=definition["severity"],
+            days_ago=definition["days"],
+            is_archived=definition["archived"]
+        )
+        if event:
+            events_to_create.append(event)
+            status_label = "archivé" if event.is_archived else "actif"
+            print(f"    • Événement [{event.severity.value}] {event.sensor_type} -> {event.value} ({status_label}) préparé.")
+
+    if events_to_create:
+        db.add_all(events_to_create)
+        db.commit()
+        print(f"    ✅ {len(events_to_create)} événements créés et liés à des analytics modifiés.")
+    else:
+        print("    ⚠️ Aucun événement n'a pu être créé.")
 
 
 if __name__ == "__main__":

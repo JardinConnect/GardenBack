@@ -18,7 +18,6 @@ def get_farm_details(db: Session, with_analytics: bool = False) -> FarmDetails:
     """
     # Get farm name from repository
     farm = repository.get_farm(db)
-    farm_name = farm.name if farm else "JardinConnect"  # Fallback name
 
     # Get summary counts from repository
     counts = repository.get_summary_counts(db)
@@ -45,7 +44,11 @@ def get_farm_details(db: Session, with_analytics: bool = False) -> FarmDetails:
         }
 
     return FarmDetails(
-        name=farm_name,
+        name=farm.name if farm else "JardinConnect",
+        address=farm.address if farm else None,
+        zip_code=farm.zip_code if farm else None,
+        city=farm.city if farm else None,
+        phone_number=farm.phone_number if farm else None,
         summary=summary,
         average_analytics=average_analytics,
     )
@@ -61,7 +64,7 @@ def setup_farm(db: Session, payload: OnboardingPayload) -> Dict[str, str]:
 
     try:
         # 2. Créer la ferme
-        farm = Farm(name=payload.farm.name)
+        farm = Farm(**payload.farm.model_dump())
         db.add(farm)
 
         # 3. Créer l'utilisateur SUPERADMIN
