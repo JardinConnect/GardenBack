@@ -505,8 +505,11 @@ def seed_alert_events(db: Session, alerts: list[Alert]):
     temp_alert = next((a for a in alerts if any(s['type'] == 'air_temperature' for s in a.sensors)), None)
     humidity_alert = next((a for a in alerts if any(s['type'] == 'soil_humidity' for s in a.sensors)), None)
 
-    if not temp_alert or not humidity_alert:
-        print("  ⚠️  Impossible de trouver les alertes de température ou d'humidité pour le seeding.")
+    if not temp_alert:
+        print("  ⚠️  Impossible de trouver les alertes de température pour le seeding.")
+        return
+    if not humidity_alert:
+        print("  ⚠️  Impossible de trouver les alertes d'humidité pour le seeding.")
         return
 
     # Définir les événements à créer
