@@ -477,7 +477,8 @@ def seed_alert_events(db: Session, alerts: list[Alert]):
 
         # 4. Créer l'événement d'alerte
         sensor_config = next((s for s in alert.sensors if s['type'] == sensor_type), None)
-        if not sensor_config: return None
+        if not sensor_config: 
+            return None
 
         threshold_range = sensor_config['criticalRange']
         if severity == SeverityEnum.WARNING and sensor_config.get('warningRange'):
