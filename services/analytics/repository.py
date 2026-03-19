@@ -51,10 +51,8 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> PaginatedAnalyticRes
         Analytic.analytic_type
     )
 
-    # 3. Collect area_ids if area_id filter is present
-    area_ids: Set[uuid.UUID] = set()
-    if request.area_id:
-        area_ids = _collect_area_ids(db, request.area_id)
+    # 3. Joins for location-based filtering (area or cell)
+    if request.area_id or request.cell_id:
         query = (
             query
             .join(Sensor, Analytic.sensor_id == Sensor.id)
@@ -74,8 +72,10 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> PaginatedAnalyticRes
     if request.end_date:
         filters.append(Analytic.occurred_at <= request.end_date)
     if request.area_id:
-        # Filtre sur toutes les areas descendantes (pas seulement la racine)
+        area_ids = _collect_area_ids(db, request.area_id)
         filters.append(Cell.area_id.in_(area_ids))
+    if request.cell_id:
+        filters.append(Cell.id == request.cell_id)
 
     if filters:
         query = query.filter(and_(*filters))

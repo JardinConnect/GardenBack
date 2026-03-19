@@ -7,19 +7,6 @@ from services.analytics.repository import get_analytics, validate_request, creat
 from services.analytics.errors import InvalidDateRangeError, DataNotFoundError
 from services.analytics.schemas import AnalyticsFilter, PaginatedAnalyticResult, AnalyticCreate, AnalyticSchema
 
-
-@pytest.fixture(scope="function")
-def db_session():
-    """Crée une base SQLite temporaire en mémoire pour les tests."""
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    yield session
-    session.close()
-    engine.dispose()
-
-
 @pytest.fixture(scope="function")
 def setup_sensor(db_session):
     """Crée une hiérarchie Area -> Cell -> Sensor pour les tests."""
@@ -107,6 +94,7 @@ def test_get_analytics_no_data(db_session):
         sensor_id=None,
         sensor_code=None,
         area_id=None,
+        cell_id=None,
         start_date=datetime(2025, 1, 1),
         end_date=datetime(2025, 1, 2),
         skip=0,
@@ -135,6 +123,7 @@ def test_get_analytics_success(db_session, setup_sensor):
         start_date=now - timedelta(hours=1),
         end_date=now + timedelta(hours=1),
         sensor_id=None,
+        cell_id=None,
         area_id=None,
         skip=0,
         limit=10
@@ -172,6 +161,7 @@ def test_get_analytics_filters_work(db_session, setup_sensor):
         start_date=now - timedelta(days=1),
         end_date=now + timedelta(days=1),
         sensor_id=other_sensor.id,
+        cell_id=None,
         area_id=None,
         skip=0,
         limit=10
@@ -260,7 +250,7 @@ def test_get_analytics_filter_by_direct_area(db_session, setup_area_hierarchy):
         area_id=h["section_cerises"].id,
         start_date=now - timedelta(hours=1),
         end_date=now + timedelta(hours=1),
-        sensor_id=None, sensor_code=None, analytic_type=None,
+        sensor_id=None, sensor_code=None, analytic_type=None, cell_id=None,
         skip=0, limit=100
     )
     result = get_analytics(db_session, request)
@@ -296,7 +286,7 @@ def test_get_analytics_filter_by_parent_area_is_recursive(db_session, setup_area
         area_id=h["parcelle_nord"].id,
         start_date=now - timedelta(hours=1),
         end_date=now + timedelta(hours=1),
-        sensor_id=None, sensor_code=None, analytic_type=None,
+        sensor_id=None, sensor_code=None, analytic_type=None, cell_id=None,
         skip=0, limit=100
     )
     result = get_analytics(db_session, request)
@@ -307,6 +297,46 @@ def test_get_analytics_filter_by_parent_area_is_recursive(db_session, setup_area
     assert result.total == 2
 
 
+def test_get_analytics_filter_by_cell_id(db_session, setup_area_hierarchy):
+    """Filtre sur un cell_id retourne uniquement les données de cette cellule."""
+    h = setup_area_hierarchy
+    now = datetime.now()
+
+    db_session.add(Analytic(
+        sensor_code="TA-CERISES",
+        analytic_type=AnalyticType.AIR_TEMPERATURE,
+        value=24.0,
+        occurred_at=now,
+        sensor_id=h["sensor_cerises"].id,
+    ))
+    db_session.add(Analytic(
+        sensor_code="TA-SALADES",
+        analytic_type=AnalyticType.AIR_TEMPERATURE,
+        value=19.0,
+        occurred_at=now,
+        sensor_id=h["sensor_salades"].id,
+    ))
+    db_session.commit()
+
+    # Filtre sur cell_cerises uniquement
+    request = AnalyticsFilter(
+        cell_id=h["cell_cerises"].id,
+        start_date=now - timedelta(hours=1),
+        end_date=now + timedelta(hours=1),
+        skip=0,
+        limit=100,
+        analytic_type=None,
+        sensor_id=None,
+        sensor_code=None,
+        area_id=None,
+    )
+    result = get_analytics(db_session, request)
+
+    values = [a.value for a in result.data[AnalyticType.AIR_TEMPERATURE]]
+    assert 24.0 in values
+    assert 19.0 not in values
+    assert result.total == 1
+
 def test_get_analytics_area_id_no_data(db_session, setup_area_hierarchy):
     """Un area_id valide mais sans analytics lève DataNotFoundError."""
     h = setup_area_hierarchy
@@ -316,7 +346,7 @@ def test_get_analytics_area_id_no_data(db_session, setup_area_hierarchy):
         area_id=h["parcelle_nord"].id,
         start_date=now - timedelta(hours=1),
         end_date=now + timedelta(hours=1),
-        sensor_id=None, sensor_code=None, analytic_type=None,
+        sensor_id=None, sensor_code=None, analytic_type=None, cell_id=None,
         skip=0, limit=100
     )
     with pytest.raises(DataNotFoundError):
@@ -341,8 +371,8 @@ def test_get_analytics_pagination(db_session, setup_sensor):
     request_p1 = AnalyticsFilter(
         sensor_code="TA-1",
         start_date=now - timedelta(hours=1),
-        end_date=now + timedelta(hours=1),
-        sensor_id=None, analytic_type=None, area_id=None,
+        end_date=now + timedelta(hours=1), sensor_id=None,
+        analytic_type=None, area_id=None, cell_id=None,
         skip=0, limit=3
     )
     result_p1 = get_analytics(db_session, request_p1)
@@ -353,8 +383,8 @@ def test_get_analytics_pagination(db_session, setup_sensor):
     request_p2 = AnalyticsFilter(
         sensor_code="TA-1",
         start_date=now - timedelta(hours=1),
-        end_date=now + timedelta(hours=1),
-        sensor_id=None, analytic_type=None, area_id=None,
+        end_date=now + timedelta(hours=1), sensor_id=None,
+        analytic_type=None, area_id=None, cell_id=None,
         skip=3, limit=3
     )
     result_p2 = get_analytics(db_session, request_p2)
@@ -383,7 +413,8 @@ def test_get_analytics_no_limit(db_session, setup_sensor):
         end_date=now + timedelta(hours=1),
         sensor_id=None, analytic_type=None, area_id=None,
         skip=0,
-        limit=None  # Test avec aucune limite
+        limit=None,  # Test avec aucune limite
+        cell_id=None
     )
     result = get_analytics(db_session, request)
     assert result.total == 25
