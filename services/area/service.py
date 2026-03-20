@@ -136,12 +136,18 @@ def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[Analyt
         analytics_by_day_and_type[key].append(analytic.value)
 
     analytics_averages_by_type = {}
-    today = datetime.now(timezone.utc).date()
+    
+    # Utiliser la date de l'analytique la plus récente comme fin de notre fenêtre de 7 jours.
+    # S'il n'y a pas d'analytiques, utiliser la date d'aujourd'hui par défaut.
+    if all_analytics:
+        end_date = max(analytic.occurred_at.date() for analytic in all_analytics)
+    else:
+        end_date = datetime.now(timezone.utc).date()
     
     for analytic_type in AnalyticType:
         daily_averages_for_type = []
         for i in range(7):
-            current_day = today - timedelta(days=i)
+            current_day = end_date - timedelta(days=i)
             daily_values = analytics_by_day_and_type.get((current_day, analytic_type))
 
             average_value = 0.0
