@@ -16,6 +16,12 @@ from db.models import User, RoleEnum
 router = APIRouter()
 
 
+def _user_entity_label(user: User) -> str:
+    """Libellé affichable pour un utilisateur cible (audit)."""
+    name = f"{user.first_name} {user.last_name}".strip()
+    return name if name else str(user.email)
+
+
 @router.get("/", response_model=List[UserResponse])
 def get_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
@@ -89,7 +95,7 @@ def create_user(user: UserSchema, db: Session = Depends(get_db), current_user: U
         )
     try:
         new_user = repository.create_user(db, user=user)
-        log_action(db, current_user, "create", "user", new_user.id, details={"email": new_user.email})
+        log_action(db, current_user, "create", "user", entity_name=_user_entity_label(new_user))
         return new_user
     except UserAlreadyExistsError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -124,7 +130,7 @@ def update_user(user_id: uuid.UUID, user_data: UserUpdate, db: Session = Depends
 
     try:
         updated_user = repository.update_user(db, user_id=user_id, user_data=user_data)
-        log_action(db, current_user, "update", "user", user_id, details=user_data.model_dump(exclude_unset=True))
+        log_action(db, current_user, "update", "user", entity_name=_user_entity_label(updated_user))
         return updated_user
     except UserNotFoundErrorID as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -164,7 +170,14 @@ def update_user_password( # Ajout de Path pour user_id pour une meilleure docume
 
     try:
         repository.update_user_password(db, user_id=user_id, password_data=password_data)
-        log_action(db, current_user, "update", "user", user_id, details={"field": "password"})
+        log_action(
+            db,
+            current_user,
+            "update",
+            "user",
+            entity_name=_user_entity_label(current_user),
+            context="Mot de passe modifié",
+        )
         return {"message": "Mot de passe mis à jour avec succès"}
     except InvalidPasswordError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -192,8 +205,10 @@ def delete_user(user_id: uuid.UUID, db: Session = Depends(get_db), current_user:
             detail="Vous ne pouvez pas supprimer votre propre compte."
         )
     try:
+        target_user = repository.get_user(db, user_id)
+        label = _user_entity_label(target_user)
         repository.delete_user(db, user_id=user_id)
-        log_action(db, current_user, "delete", "user", user_id)
+        log_action(db, current_user, "delete", "user", entity_name=label)
         return {"message": f"Utilisateur {user_id} supprimé avec succès"}
     except UserNotFoundErrorID as e:
         raise HTTPException(status_code=404, detail=str(e))

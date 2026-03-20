@@ -6,6 +6,7 @@ from datetime import datetime
 
 from .schemas import CellCreate, CellUpdate, CellDTO, CellSettingsUpdate
 from . import service
+import services.cell.repository as cell_repository
 from .errors import CellNotFoundError, ParentCellNotFoundError, CellsNotFoundError
 from db.database import get_db
 from db.models import User, RoleEnum
@@ -55,7 +56,7 @@ def create_cell(
     """
     try:
         cell = service.create_cell(db, cell_data)
-        log_action(db, current_user, "create", "cell", cell.id, details={"name": cell.name})
+        log_action(db, current_user, "create", "cell", entity_name=cell.name)
         return CellDTO.from_cell(cell)
     except ParentCellNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -70,8 +71,10 @@ def delete_cell(
     Supprime une cellule.
     """
     try:
+        cell_before = cell_repository.get_cell_by_id(db, cell_id)
+        cell_name = cell_before.name
         service.delete_cell(db, cell_id)
-        log_action(db, current_user, "delete", "cell", cell_id)
+        log_action(db, current_user, "delete", "cell", entity_name=cell_name)
     except CellNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     return None
@@ -109,13 +112,14 @@ def update_cells_settings(
     except CellsNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
+    n = len(settings_data.cell_ids)
     log_action(
         db=db,
         user=current_user,
         action="update",
         resource_type="cell",
-        entity_id=None,  # Opération en masse
-        details={"action": "bulk_settings_update", "cell_ids": [str(cid) for cid in settings_data.cell_ids]}
+        entity_name=None,
+        context=f"Mise à jour groupée des paramètres ({n} cellule(s))",
     )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -129,7 +133,7 @@ def update_cell(
 ) -> CellDTO:
     try:
         cell = service.update_cell(db, cell_id, cell_data)
-        log_action(db, current_user, "update", "cell", cell_id, details=cell_data.model_dump(exclude_unset=True))
+        log_action(db, current_user, "update", "cell", entity_name=cell.name)
         return CellDTO.from_cell(cell)
     except CellNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

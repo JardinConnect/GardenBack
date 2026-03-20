@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from .schemas import Area, AreaCreate, AreaUpdate
 from . import service
+from . import repository as area_repository
 from .errors import AreaNotFoundError, ParentAreaNotFoundError
 from db.database import get_db
 from db.models import User
@@ -45,7 +46,7 @@ def create_area(
     """
     try:
         area = service.create_area(db, area_data, current_user)
-        log_action(db, current_user, "create", "area", area.id, details={"name": area.name})
+        log_action(db, current_user, "create", "area", entity_name=area.name)
         return area
     except ParentAreaNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -74,7 +75,7 @@ def update_area(
     """
     try:
         updated_area = service.update_area(db, area_id, area_data, current_user)
-        log_action(db, current_user, "update", "area", area_id, details=area_data.model_dump(exclude_unset=True))
+        log_action(db, current_user, "update", "area", entity_name=updated_area.name)
         return updated_area
     except (AreaNotFoundError, ParentAreaNotFoundError) as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -101,8 +102,12 @@ def delete_area(
     - `404 Not Found`: Si l'ID de la zone n'existe pas.
     """
     try:
+        area_row = area_repository.get_by_id(db, area_id)
+        if not area_row:
+            raise AreaNotFoundError()
+        area_name = area_row.name
         service.delete_area(db, area_id)
-        log_action(db, current_user, "delete", "area", area_id)
+        log_action(db, current_user, "delete", "area", entity_name=area_name)
     except AreaNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     return None

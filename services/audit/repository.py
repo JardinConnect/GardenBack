@@ -13,14 +13,12 @@ def create_action_log(
     user_id: Optional[uuid.UUID] = None,
     action: str,
     resource_type: str,
-    entity_id: Optional[uuid.UUID] = None,
     details: Optional[dict] = None,
 ) -> ActionLog:
     log = ActionLog(
         user_id=user_id,
         action=action,
         resource_type=resource_type,
-        entity_id=entity_id,
         details=details,
     )
     db.add(log)
