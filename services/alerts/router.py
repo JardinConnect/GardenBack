@@ -105,7 +105,7 @@ def create_alert(
     - Si **overwriteExisting** est `true`, les alertes en conflit sont supprimées avant création.
     """
     result = service.create_alert(db, alert_data)
-    log_action(db, current_user, "create", "alert", result["id"], details={"title": result["title"]})
+    log_action(db, current_user, "create", "alert", entity_name=result["title"])
     return result
 
 
@@ -128,13 +128,14 @@ def update_alert(
     - Si **overwriteExisting** est `true`, les capteurs en conflit sont retirés des autres alertes. Si une alerte se retrouve sans capteur, elle est supprimée.
     """
     result = service.update_alert(db, alert_id, alert_data)
+    n_over = len(result.get("overwrittenAlerts", []))
     log_action(
         db,
         current_user,
         "update",
         "alert",
-        alert_id,
-        details={"overwritten_count": len(result.get("overwrittenAlerts", []))},
+        entity_name=result["title"],
+        context=f"{n_over} alerte(s) écrasée(s)" if n_over else None,
     )
     return result
 
@@ -154,8 +155,16 @@ def toggle_alert(
     """
     Active ou désactive une alerte depuis la vue cards.
     """
+    alert_before = service.get_alert_by_id(db, alert_id)
     result = service.toggle_alert(db, alert_id, payload)
-    log_action(db, current_user, "toggle", "alert", alert_id, details={"is_active": payload.is_active})
+    log_action(
+        db,
+        current_user,
+        "toggle",
+        "alert",
+        entity_name=alert_before.title,
+        context="active" if payload.is_active else "inactive",
+    )
     return result
 
 
@@ -172,8 +181,9 @@ def delete_alert(
     """
     Supprime définitivement une alerte (zone de danger en mode édition).
     """
+    alert_before = service.get_alert_by_id(db, alert_id)
     service.delete_alert(db, alert_id)
-    log_action(db, current_user, "delete", "alert", alert_id)
+    log_action(db, current_user, "delete", "alert", entity_name=alert_before.title)
     return {"message": "Alerte supprimée avec succès."}
 
 
@@ -213,7 +223,14 @@ def archive_all_events(
     Archive tous les événements d'alerte non encore archivés.
     """
     result = service.archive_all_events(db)
-    log_action(db, current_user, "archive_all", "alert", details={"archived_count": result.get("archivedCount", 0)})
+    n = result.get("archivedCount", 0)
+    log_action(
+        db,
+        current_user,
+        "archive_all",
+        "alert",
+        entity_label=f"Archivage — {n} événement(s)",
+    )
     return result
 
 
@@ -232,7 +249,14 @@ def archive_events_by_cell(
     Archive tous les événements non archivés d'une cellule spécifique.
     """
     result = service.archive_events_by_cell(db, payload.cell_id)
-    log_action(db, current_user, "archive_by_cell", "alert", entity_id=payload.cell_id, details={"archived_count": result.get("archivedCount", 0)})
+    n = result.get("archivedCount", 0)
+    log_action(
+        db,
+        current_user,
+        "archive_by_cell",
+        "alert",
+        entity_label=f"Archivage cellule — {n} événement(s)",
+    )
     return result
 
 
@@ -250,5 +274,5 @@ def archive_event(
     Archive un événement d'alerte spécifique.
     """
     result = service.archive_event(db, event_id)
-    log_action(db, current_user, "archive", "alert", entity_id=event_id)
+    log_action(db, current_user, "archive", "alert", entity_label="Événement archivé")
     return result

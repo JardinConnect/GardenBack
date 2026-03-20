@@ -11,20 +11,17 @@ from services.audit.repository import (
 
 def test_create_action_log_nominal(db_session):
     user_id = uuid.uuid4()
-    entity_id = uuid.uuid4()
     log = create_action_log(
         db_session,
         user_id=user_id,
         action="create",
         resource_type="area",
-        entity_id=entity_id,
         details={"name": "Zone A"},
     )
     assert log.id is not None
     assert log.user_id == user_id
     assert log.action == "create"
     assert log.resource_type == "area"
-    assert log.entity_id == entity_id
     assert log.details == {"name": "Zone A"}
     assert log.created_at is not None
     assert log.created_at.tzinfo is not None
@@ -36,27 +33,23 @@ def test_create_action_log_user_id_null(db_session):
         user_id=None,
         action="create",
         resource_type="user",
-        entity_id=None,
         details=None,
     )
     assert log.user_id is None
-    assert log.entity_id is None
     assert log.details is None
     assert log.id is not None
     assert log.resource_type == "user"
 
 
-def test_create_action_log_entity_id_and_details_null(db_session):
+def test_create_action_log_details_null(db_session):
     user_id = uuid.uuid4()
     log = create_action_log(
         db_session,
         user_id=user_id,
         action="archive_all",
         resource_type="alert",
-        entity_id=None,
         details=None,
     )
-    assert log.entity_id is None
     assert log.details is None
     assert log.user_id == user_id
 
@@ -69,7 +62,6 @@ def test_get_action_logs_ordering(db_session):
             user_id=user_id,
             action="create",
             resource_type="area",
-            entity_id=uuid.uuid4(),
             details=None,
             created_at=base - timedelta(minutes=i),
         )
@@ -85,9 +77,9 @@ def test_get_action_logs_ordering(db_session):
 def test_get_action_logs_with_filters(db_session):
     user_a = uuid.uuid4()
     user_b = uuid.uuid4()
-    create_action_log(db_session, user_id=user_a, action="create", resource_type="area", entity_id=user_a)
-    create_action_log(db_session, user_id=user_b, action="create", resource_type="cell", entity_id=user_b)
-    create_action_log(db_session, user_id=user_a, action="delete", resource_type="area", entity_id=user_a)
+    create_action_log(db_session, user_id=user_a, action="create", resource_type="area")
+    create_action_log(db_session, user_id=user_b, action="create", resource_type="cell")
+    create_action_log(db_session, user_id=user_a, action="delete", resource_type="area")
 
     rows, total = get_action_logs(db_session, user_id=user_a)
     assert total == 2
@@ -99,7 +91,7 @@ def test_get_action_logs_with_filters(db_session):
 
 
 def test_get_action_logs_skip_exceeds_total(db_session):
-    create_action_log(db_session, user_id=None, action="create", resource_type="area", entity_id=uuid.uuid4())
+    create_action_log(db_session, user_id=None, action="create", resource_type="area")
     rows, total = get_action_logs(db_session, skip=1000, limit=50)
     assert total == 1
     assert len(rows) == 0
@@ -107,7 +99,7 @@ def test_get_action_logs_skip_exceeds_total(db_session):
 
 def test_get_action_logs_limit_one(db_session):
     for _ in range(3):
-        create_action_log(db_session, user_id=None, action="create", resource_type="area", entity_id=uuid.uuid4())
+        create_action_log(db_session, user_id=None, action="create", resource_type="area")
     rows, total = get_action_logs(db_session, skip=0, limit=1)
     assert total == 3
     assert len(rows) == 1
@@ -120,7 +112,13 @@ def test_get_action_logs_from_date_to_date(db_session):
     mid = base - timedelta(days=5)
     recent = base - timedelta(days=1)
     for t in (old, mid, recent):
-        log = ActionLog(user_id=user_id, action="create", resource_type="area", entity_id=uuid.uuid4(), created_at=t)
+        log = ActionLog(
+            user_id=user_id,
+            action="create",
+            resource_type="area",
+            details=None,
+            created_at=t,
+        )
         db_session.add(log)
     db_session.commit()
 
@@ -139,14 +137,12 @@ def test_delete_logs_older_than_removes_only_old(db_session):
         user_id=user_id,
         action="create",
         resource_type="area",
-        entity_id=uuid.uuid4(),
         created_at=cutoff - timedelta(days=1),
     )
     recent_log = ActionLog(
         user_id=user_id,
         action="create",
         resource_type="area",
-        entity_id=uuid.uuid4(),
         created_at=now - timedelta(days=1),
     )
     db_session.add_all([old_log, recent_log])
@@ -174,7 +170,6 @@ def test_delete_logs_older_than_all_removed(db_session):
         user_id=user_id,
         action="create",
         resource_type="area",
-        entity_id=uuid.uuid4(),
         created_at=old_date,
     )
     db_session.add(log)

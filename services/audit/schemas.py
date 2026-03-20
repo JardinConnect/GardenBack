@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List, Any
+from typing import Optional, List
 import uuid
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -7,13 +7,17 @@ from db.models import ResourceTypeEnum
 
 
 class ActionLogResponse(BaseModel):
+    """Journal d'audit : l'acteur via first_name / last_name ; la ressource touchée via entity_label."""
+
     id: uuid.UUID
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
+    first_name: Optional[str] = Field(None, description="Prénom de la personne qui a effectué l'action")
+    last_name: Optional[str] = Field(None, description="Nom de la personne qui a effectué l'action")
     action: str
     resource_type: str
-    entity_id: Optional[uuid.UUID] = None
-    details: Optional[dict[str, Any]] = None
+    entity_label: str = Field(
+        "",
+        description="Libellé lisible de la ressource touchée (nom de zone, titre d'alerte, etc.)",
+    )
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

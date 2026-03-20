@@ -52,7 +52,6 @@ def test_list_action_logs_response_structure(client, headers_admin, db_session):
         user_id=None,
         action="create",
         resource_type="area",
-        entity_id=uuid.uuid4(),
         details={"name": "Zone"},
     )
     response = client.get("/api/action-logs/", headers=headers_admin)
@@ -66,8 +65,8 @@ def test_list_action_logs_response_structure(client, headers_admin, db_session):
         assert "last_name" in log
         assert "action" in log
         assert "resource_type" in log
-        assert "entity_id" in log
-        assert "details" in log
+        assert "entity_label" in log
+        assert log["entity_label"] == "Zone"
         assert "created_at" in log
         assert log.get("password") is None
         assert log.get("token") is None
@@ -79,7 +78,6 @@ def test_list_action_logs_filter_by_user_id(client, headers_admin, db_session, u
         user_id=user_admin.id,
         action="create",
         resource_type="area",
-        entity_id=uuid.uuid4(),
         details={},
     )
     create_action_log(
@@ -87,7 +85,6 @@ def test_list_action_logs_filter_by_user_id(client, headers_admin, db_session, u
         user_id=user_employees.id,
         action="create",
         resource_type="cell",
-        entity_id=uuid.uuid4(),
         details={},
     )
     response = client.get(
@@ -105,7 +102,6 @@ def test_list_action_logs_filter_by_resource_type(client, headers_admin, db_sess
         user_id=None,
         action="create",
         resource_type="alert",
-        entity_id=uuid.uuid4(),
         details={},
     )
     response = client.get("/api/action-logs/?resource_type=alert", headers=headers_admin)
@@ -140,14 +136,13 @@ def test_create_area_creates_one_audit_log(client, headers_admin, db_session):
     payload = {"name": "Zone Test Audit", "color": "#fff"}
     r = client.post("/api/area/", json=payload, headers=headers_admin)
     assert r.status_code == 201
-    area_id = r.json()["id"]
     logs = (
         db_session.query(ActionLog)
-        .filter(ActionLog.resource_type == "area", ActionLog.entity_id == uuid.UUID(area_id))
+        .filter(ActionLog.resource_type == "area", ActionLog.action == "create")
         .all()
     )
     assert len(logs) == 1
-    assert logs[0].action == "create"
+    assert logs[0].details and logs[0].details.get("entity_label") == "Zone Test Audit"
 
 
 def test_401_does_not_reveal_system_info(client):
