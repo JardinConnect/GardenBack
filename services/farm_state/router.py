@@ -7,7 +7,10 @@ from services.farm_state.schemas import FarmDetails, OnboardingPayload
 from services.farm_state.errors import FarmAlreadyExistsError
 from services.user.errors import UserAlreadyExistsError as UserExistsError
 
+# This router will contain protected endpoints for farm statistics.
 router = APIRouter()
+# This router will contain public endpoints, like the initial farm setup.
+public_router = APIRouter()
 
 @router.get(
     "/",
@@ -27,7 +30,7 @@ def read_farm_details(
     return get_farm_details(db, with_analytics=with_analytics)
 
 
-@router.post(
+@public_router.post(
     "/setup",
     status_code=status.HTTP_201_CREATED,
     summary="Configuration initiale de la ferme",
