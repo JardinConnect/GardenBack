@@ -74,7 +74,6 @@ def setup_farm(db: Session, payload: OnboardingPayload) -> Dict[str, str]:
 
         # 4. Créer les zones initiales comme zones racines
         for area_data in payload.areas:
-            area_data.parent_id = None  # S'assurer qu'elles sont à la racine
             create_area_service(db, area_data=area_data, current_user=admin_user)
 
         return {"message": "Ferme configurée avec succès."}

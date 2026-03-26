@@ -1,7 +1,7 @@
 from typing import List, Tuple, Optional, Dict
 import uuid
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from collections import defaultdict
 
 from . import schemas, repository
@@ -127,8 +127,11 @@ def get_full_location_path_for_cell(cell: CellModel) -> str:
 def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[AnalyticType, List[schemas.AnalyticSchema]]:
     """
     Calcule les moyennes journalières pour chaque type d'analytique sur les 7 derniers jours.
-    Retourne toujours une liste de 7 jours pour chaque type, avec une valeur de 0.0 si aucune donnée n'est disponible.
+    Si aucune donnée n'est disponible pour un type, la liste pour ce type sera vide.
     """
+    if not all_analytics:
+        return {analytic_type: [] for analytic_type in AnalyticType}
+
     analytics_by_day_and_type = defaultdict(list)
     for analytic in all_analytics:
         day = analytic.occurred_at.date()
@@ -137,28 +140,27 @@ def _calculate_daily_averages(all_analytics: List[AnalyticModel]) -> Dict[Analyt
 
     analytics_averages_by_type = {}
     
-    # Utiliser la date de l'analytique la plus récente comme fin de notre fenêtre de 7 jours.
-    # S'il n'y a pas d'analytiques, utiliser la date d'aujourd'hui par défaut.
-    if all_analytics:
-        end_date = max(analytic.occurred_at.date() for analytic in all_analytics)
-    else:
-        end_date = datetime.now(timezone.utc).date()
+    end_date = max(analytic.occurred_at.date() for analytic in all_analytics)
+    
+    # Créer un set des types d'analytiques présents pour optimiser la recherche
+    present_analytic_types = {analytic.analytic_type for analytic in all_analytics}
     
     for analytic_type in AnalyticType:
         daily_averages_for_type = []
-        for i in range(7):
-            current_day = end_date - timedelta(days=i)
-            daily_values = analytics_by_day_and_type.get((current_day, analytic_type))
+        if analytic_type in present_analytic_types:
+            for i in range(7):
+                current_day = end_date - timedelta(days=i)
+                daily_values = analytics_by_day_and_type.get((current_day, analytic_type))
 
-            average_value = 0.0
-            if daily_values:
-                average_value = sum(daily_values) / len(daily_values)
+                average_value = 0.0
+                if daily_values:
+                    average_value = sum(daily_values) / len(daily_values)
 
-            daily_average_analytic = schemas.AnalyticSchema(
-                value=round(average_value, 2),
-                occurred_at=datetime.combine(current_day, datetime.min.time()),
-            ) # type: ignore
-            daily_averages_for_type.append(daily_average_analytic)
+                daily_average_analytic = schemas.AnalyticSchema(
+                    value=round(average_value, 2),
+                    occurred_at=datetime.combine(current_day, datetime.min.time()),
+                ) # type: ignore
+                daily_averages_for_type.append(daily_average_analytic)
         
         analytics_averages_by_type[analytic_type] = daily_averages_for_type
     
