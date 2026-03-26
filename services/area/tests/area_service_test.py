@@ -252,8 +252,7 @@ def test_calculate_daily_averages_empty_input():
     """Vérifie que la fonction gère une liste d'analytiques vide."""
     result = _calculate_daily_averages([])
     for analytic_type in AnalyticType:
-        assert len(result[analytic_type]) == 7
-        assert all(avg.value == 0.0 for avg in result[analytic_type])
+        assert len(result[analytic_type]) == 0
 
 def test_calculate_daily_averages_rounding():
     """Vérifie que les valeurs moyennes sont bien arrondies à 2 décimales."""

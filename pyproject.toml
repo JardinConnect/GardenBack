@@ -5,3 +5,4 @@ extend-exclude = ["**/tests/**"]
 [tool.pytest.ini_options]
 python_files = ["test_*.py", "*_test.py"]
 testpaths = ["services"]
+asyncio_mode = "auto"

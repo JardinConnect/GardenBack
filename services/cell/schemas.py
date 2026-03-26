@@ -5,6 +5,7 @@ import re
 from datetime import datetime
 from db.models import AnalyticType
 from services.analytics.schemas import AnalyticSchema
+from enum import Enum
 
 
 # =========================================================
@@ -116,3 +117,28 @@ class CellSettingsUpdate(BaseModel):
             }
         }
     )
+
+class PairingStep(str, Enum):
+    SCANNING = "scanning"
+    DEVICE_FOUND = "device_found"
+    CREATING = "creating"
+    COMPLETED = "completed"
+    FAILED = "failed"
+ 
+ 
+class DeviceInfo(BaseModel):
+    """Informations du device IoT détecté (données issues du MQTT stub)."""
+    device_id: str
+    name: str
+    firmware_version: str
+ 
+ 
+class PairingEventData(BaseModel):
+    """
+    Structure des données envoyées dans chaque événement SSE.
+    Les champs `device` et `cell` sont présents selon l'étape.
+    """
+    step: PairingStep
+    message: str
+    device: Optional[DeviceInfo] = None
+    cell: Optional["CellDTO"] = None
