@@ -396,6 +396,12 @@ def seed_alerts(db: Session, cells: list[Cell]):
                     "criticalRange": {"min": 5.0, "max": 95.0},
                     "warningRange": None,
                 },
+                {
+                    "type": "soil_temperature",
+                    "index": 0,
+                    "criticalRange": {"min": 2.0, "max": 35.0},
+                    "warningRange": None,
+                }
             ],
             "warning_enabled": False,
         },
