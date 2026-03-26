@@ -1,7 +1,7 @@
 from typing import List, Tuple, Optional, Dict
 import uuid
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from collections import defaultdict
 
 from . import schemas, repository
