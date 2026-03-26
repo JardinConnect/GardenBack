@@ -34,13 +34,18 @@ def get_cells(db: Session) -> List[CellSchema]:
 
     return cell_schemas
 
-def create_cell(db: Session, cell_data: CellCreate) -> CellSchema:
+def create_cell(db: Session, cell_data: CellCreate, commit: bool = True) -> CellSchema:
     """
     Crée une nouvelle cellule.
+    Si commit=False, effectue un flush au lieu d'un commit pour permettre une transaction globale.
     """
     cell = CellModel(**cell_data.model_dump())
     db.add(cell)
-    db.commit()
+    
+    if commit:
+        db.commit()
+    else:
+        db.flush() # Envoie la requête SQL pour générer l'ID, mais garde la transaction ouverte
     
     return get_cell_by_id(db, cell.id)
 

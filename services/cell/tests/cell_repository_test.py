@@ -126,6 +126,22 @@ def test_create_cell_without_area(db_session):
     assert result.is_tracked is False
     assert result.location == ""
 
+def test_create_cell_no_commit(db_session, setup_area):
+    """Teste que create_cell avec commit=False garde la transaction ouverte."""
+    cell_data = CellCreate(name="Uncommitted Cell", area_id=setup_area.id)
+    
+    # On crée sans commit
+    result = create_cell(db_session, cell_data, commit=False)
+    
+    assert result is not None
+    assert result.id is not None  # L'ID a bien été généré par le flush
+    
+    # On simule une erreur et on annule la transaction
+    db_session.rollback()
+    
+    # La cellule ne doit pas exister en base
+    with pytest.raises(CellNotFoundError):
+        get_cell_by_id(db_session, result.id)
 
 # =========================================================
 # TESTS FOR delete_cell
