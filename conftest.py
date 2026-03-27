@@ -35,5 +35,7 @@ def db_session(setup_database) -> Session:
         yield session
     finally:
         session.close()
-        transaction.rollback()
+        # On vérifie si la transaction est toujours active avant de l'annuler
+        if transaction.is_active:
+            transaction.rollback()
         connection.close()
