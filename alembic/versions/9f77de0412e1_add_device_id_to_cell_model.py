@@ -89,7 +89,7 @@ def upgrade() -> None:
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
                existing_nullable=True)
-        batch_op.create_unique_constraint(None, ['deviceID'])
+        batch_op.create_unique_constraint('uq_cells_deviceID', ['deviceID'])
 
     with op.batch_alter_table('farms', schema=None) as batch_op:
         batch_op.alter_column('id',
@@ -162,7 +162,7 @@ def downgrade() -> None:
                existing_nullable=False)
 
     with op.batch_alter_table('cells', schema=None) as batch_op:
-        batch_op.drop_constraint(None, type_='unique')
+        batch_op.drop_constraint('uq_cells_deviceID', type_='unique')
         batch_op.alter_column('area_id',
                existing_type=sa.UUID(),
                type_=sa.NUMERIC(),
