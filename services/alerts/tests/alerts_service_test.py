@@ -42,6 +42,19 @@ def setup_cell(db_session, setup_area):
     return cell
 
 @pytest.fixture
+def setup_multiple_cells_for_alerts(db_session, setup_area):
+    """Crée plusieurs cellules de test pour les scénarios d'éclatement d'alertes."""
+    cell1 = Cell(name="Cell 1", area_id=setup_area.id)
+    cell2 = Cell(name="Cell 2", area_id=setup_area.id)
+    cell3 = Cell(name="Cell 3", area_id=setup_area.id)
+    db_session.add_all([cell1, cell2, cell3])
+    db_session.commit()
+    db_session.refresh(cell1)
+    db_session.refresh(cell2)
+    db_session.refresh(cell3)
+    return [cell1, cell2, cell3]
+
+@pytest.fixture
 def alert_factory(db_session):
     """Factory pour créer des alertes dans la base de données de test."""
     def _make_alert(title="Factory Alert", cell_ids=None, sensor_types=None, is_active=True, warning_enabled=False):
@@ -251,6 +264,128 @@ class TestCreateAlert:
         assert len(result["overwrittenAlerts"]) == 1
         assert result["overwrittenAlerts"][0] == existing_alert_id
 
+    def test_creates_split_off_alert_for_remaining_cells_on_conflict(self, db_session, setup_multiple_cells_for_alerts, alert_factory):
+        """
+        Vérifie que si une alerte existante couvre plusieurs cellules et qu'une nouvelle alerte
+        entre en conflit avec une sous-partie de ces cellules/capteurs, une nouvelle alerte
+        '(conflit)' est créée pour les cellules restantes de l'alerte d'origine.
+        """
+        cell1, cell2, cell3 = setup_multiple_cells_for_alerts
+        
+        # Alerte existante: 'Alerte Multi-Cellules' pour 'soil_humidity' sur cell1, cell2, cell3
+        existing_alert_title = "Alerte Multi-Cellules"
+        existing_alert = alert_factory(
+            title=existing_alert_title,
+            cell_ids=[str(cell1.id), str(cell2.id), str(cell3.id)],
+            sensor_types=["soil_humidity", "air_temperature"] # Deux capteurs
+        )
+        existing_alert_id = existing_alert.id
+        
+        # Nouvelle alerte: pour 'soil_humidity' sur cell1, avec overwrite=True
+        create_payload = AlertCreateUpdateSchema(
+            **{
+                "title": "Nouvelle Alerte Humidité Cell1",
+                "isActive": True,
+                "cellIds": [cell1.id],
+                "sensors": [
+                    {
+                        "type": "soil_humidity",
+                        "index": 0,
+                        "criticalRange": {"min": 5.0, "max": 95.0},
+                        "warningRange": {"min": 10.0, "max": 90.0},
+                    }
+                ],
+                "warningEnabled": True,
+                "overwriteExisting": True,
+            }
+        )
+
+        result = service.create_alert(db_session, create_payload)
+
+        # 1. Vérifier que la nouvelle alerte a été créée
+        new_alert = db_session.query(Alert).filter(Alert.id == result["id"]).first()
+        assert new_alert is not None
+        assert new_alert.title == "Nouvelle Alerte Humidité Cell1"
+        assert new_alert.cell_ids == [str(cell1.id)]
+        assert new_alert.sensors[0]["type"] == "soil_humidity"
+
+        # 2. Vérifier l'alerte existante: elle devrait avoir perdu le capteur 'soil_humidity'
+        db_session.refresh(existing_alert)
+        assert existing_alert.id == existing_alert_id
+        assert existing_alert.title == existing_alert_title
+        assert existing_alert.cell_ids == [str(cell1.id), str(cell2.id), str(cell3.id)] # Cell IDs remain the same on the original alert
+        assert len(existing_alert.sensors) == 1
+        assert existing_alert.sensors[0]["type"] == "air_temperature" # Only air_temperature remains
+
+        # 3. Vérifier la nouvelle alerte '(conflit)' créée pour les cellules restantes
+        split_off_alerts = db_session.query(Alert).filter(
+            Alert.title == f"{existing_alert_title} (conflit)"
+        ).all()
+        
+        assert len(split_off_alerts) == 1
+        split_off_alert = split_off_alerts[0]
+        
+        assert split_off_alert.title == f"{existing_alert_title} (conflit)"
+        assert set(split_off_alert.cell_ids) == {str(cell2.id), str(cell3.id)}
+        assert len(split_off_alert.sensors) == 1
+        assert split_off_alert.sensors[0]["type"] == "soil_humidity"
+        assert split_off_alert.sensors[0]["criticalRange"]["min"] == -5.0 # Original critical range from alert_factory
+        assert split_off_alert.sensors[0]["warningRange"] is None # Original warning range from alert_factory
+
+        # 4. Vérifier que overwrittenAlerts est vide car l'alerte d'origine n'a pas été supprimée
+        assert len(result["overwrittenAlerts"]) == 0
+
+    def test_creates_single_grouped_split_off_alert_on_multi_sensor_conflict(self, db_session, setup_multiple_cells_for_alerts, alert_factory):
+        """
+        Vérifie qu'en cas de conflit sur plusieurs capteurs, une seule alerte '(conflit)'
+        est créée, regroupant tous les capteurs éclatés pour les cellules restantes.
+        """
+        cell1, cell2, cell3 = setup_multiple_cells_for_alerts
+        
+        # Alerte existante: sur 3 cellules et 3 capteurs
+        existing_alert_title = "Alerte Complète"
+        existing_alert = alert_factory(
+            title=existing_alert_title,
+            cell_ids=[str(cell1.id), str(cell2.id), str(cell3.id)],
+            sensor_types=["soil_humidity", "air_temperature", "light"]
+        )
+        
+        # Nouvelle alerte: sur 1 cellule, en conflit avec 2 des 3 capteurs
+        create_payload = AlertCreateUpdateSchema(
+            **{
+                "title": "Nouvelle Alerte Partielle",
+                "isActive": True,
+                "cellIds": [cell1.id],
+                "sensors": [
+                    {
+                        "type": "soil_humidity", "index": 0,
+                        "criticalRange": {"min": 1, "max": 1},
+                    },
+                    {
+                        "type": "air_temperature", "index": 0,
+                        "criticalRange": {"min": 2, "max": 2},
+                    }
+                ],
+                "warningEnabled": False,
+                "overwriteExisting": True,
+            }
+        )
+
+        service.create_alert(db_session, create_payload)
+
+        # 1. Vérifier l'alerte existante: elle ne doit plus contenir que le capteur 'light'
+        db_session.refresh(existing_alert)
+        assert len(existing_alert.sensors) == 1
+        assert existing_alert.sensors[0]["type"] == "light"
+
+        # 2. Vérifier la nouvelle alerte '(conflit)'
+        split_off_alerts = db_session.query(Alert).filter(Alert.title == f"{existing_alert_title} (conflit)").all()
+        assert len(split_off_alerts) == 1, "Une seule alerte de conflit groupée doit être créée"
+        split_off_alert = split_off_alerts[0]
+        assert set(split_off_alert.cell_ids) == {str(cell2.id), str(cell3.id)}, "Doit s'appliquer aux cellules restantes"
+        assert len(split_off_alert.sensors) == 2, "Doit contenir les deux capteurs éclatés"
+        assert {s['type'] for s in split_off_alert.sensors} == {"soil_humidity", "air_temperature"}
+
 
 # ---------------------------------------------------------------------------
 # Tests — update_alert
@@ -353,6 +488,78 @@ class TestUpdateAlert:
         assert deleted_alert is None
         assert len(result["overwrittenAlerts"]) == 1
         assert result["overwrittenAlerts"][0] == conflicting_alert.id
+
+    def test_update_creates_split_off_alert_for_remaining_cells_on_conflict(self, db_session, setup_multiple_cells_for_alerts, alert_factory):
+        """
+        Vérifie que lors d'une mise à jour, si une alerte existante couvre plusieurs cellules
+        et que la mise à jour entre en conflit avec une sous-partie de ces cellules/capteurs,
+        une nouvelle alerte '(conflit)' est créée pour les cellules restantes de l'alerte d'origine.
+        """
+        cell1, cell2, cell3 = setup_multiple_cells_for_alerts
+        
+        # Alerte existante: 'Alerte Multi-Cellules' pour 'soil_humidity' sur cell1, cell2, cell3
+        existing_alert_title = "Alerte Multi-Cellules"
+        existing_alert = alert_factory(
+            title=existing_alert_title,
+            cell_ids=[str(cell1.id), str(cell2.id), str(cell3.id)],
+            sensor_types=["soil_humidity", "air_temperature"] # Deux capteurs
+        )
+        existing_alert_id = existing_alert.id
+        
+        # Alerte à mettre à jour (non conflictuelle initialement)
+        alert_to_update = alert_factory(
+            title="Alerte à Mettre à Jour",
+            cell_ids=[str(uuid.uuid4())], # Une cellule différente
+            sensor_types=["light"]
+        )
+        
+        # Données de mise à jour: pour 'soil_humidity' sur cell1, avec overwrite=True
+        update_payload = AlertCreateUpdateSchema(
+            **{
+                "title": "Alerte Humidité Cell1 Mise à Jour",
+                "isActive": True,
+                "cellIds": [cell1.id],
+                "sensors": [
+                    {
+                        "type": "soil_humidity",
+                        "index": 0,
+                        "criticalRange": {"min": 5.0, "max": 95.0},
+                        "warningRange": {"min": 10.0, "max": 90.0},
+                    }
+                ],
+                "warningEnabled": True,
+                "overwriteExisting": True,
+            }
+        )
+
+        result = service.update_alert(db_session, alert_to_update.id, update_payload)
+
+        # 1. Vérifier que l'alerte mise à jour a les nouvelles valeurs
+        db_session.refresh(alert_to_update)
+        assert alert_to_update.title == "Alerte Humidité Cell1 Mise à Jour"
+        assert alert_to_update.cell_ids == [str(cell1.id)]
+        assert alert_to_update.sensors[0]["type"] == "soil_humidity"
+
+        # 2. Vérifier l'alerte existante (celle qui a été partiellement écrasée)
+        db_session.refresh(existing_alert)
+        assert existing_alert.id == existing_alert_id
+        assert existing_alert.title == existing_alert_title
+        assert existing_alert.cell_ids == [str(cell1.id), str(cell2.id), str(cell3.id)] # Cell IDs remain the same on the original alert
+        assert len(existing_alert.sensors) == 1
+        assert existing_alert.sensors[0]["type"] == "air_temperature" # Only air_temperature remains
+
+        # 3. Vérifier la nouvelle alerte '(conflit)' créée pour les cellules restantes
+        split_off_alerts = db_session.query(Alert).filter(Alert.title == f"{existing_alert_title} (conflit)").all()
+        assert len(split_off_alerts) == 1
+        split_off_alert = split_off_alerts[0]
+        assert set(split_off_alert.cell_ids) == {str(cell2.id), str(cell3.id)}
+        assert len(split_off_alert.sensors) == 1
+        assert split_off_alert.sensors[0]["type"] == "soil_humidity"
+        assert split_off_alert.sensors[0]["criticalRange"]["min"] == -5.0 # Original critical range
+        assert split_off_alert.sensors[0]["warningRange"] is None # Original warning range
+
+        # 4. Vérifier que overwrittenAlerts est vide
+        assert len(result["overwrittenAlerts"]) == 0
 
 
 # ---------------------------------------------------------------------------

@@ -119,28 +119,34 @@ def _detect_conflicts(db: Session, cell_ids: List[uuid.UUID], sensor_types: List
     return conflicts
 
 
-def _resolve_conflicts(db: Session, conflicts: List[dict]) -> List[uuid.UUID]:
+def _resolve_conflicts(db: Session, conflicts: List[dict], new_alert_cell_ids: List[uuid.UUID]) -> List[uuid.UUID]:
     """
-    Résout les conflits d'alerte de manière "chirurgicale" en modifiant les alertes existantes.
+    Résout les conflits en "éclatant" l'alerte existante.
 
-    Pour chaque alerte existante en conflit :
-    1.  Retire uniquement les capteurs en conflit.
-    2.  Si, après le retrait, l'alerte se retrouve sans aucun capteur, elle est supprimée.
+    Pour une alerte existante A sur (c1, c2, c3) pour le capteur S, si une nouvelle alerte B
+    est créée sur (c1) pour le capteur S avec overwrite=true :
+    1. La configuration du capteur S est retirée de l'alerte A.
+    2. Une nouvelle alerte A' est créée, avec la configuration de S, pour les cellules (c2, c3) restantes.
+       Son nom est "Nom de A (conflit)".
+    3. Si l'alerte A devient vide (plus de capteurs), elle est supprimée.
 
     Args:
         db: La session de base de données.
         conflicts: La liste des conflits détectés par `_detect_conflicts`.
+        new_alert_cell_ids: Liste des IDs de cellules de la nouvelle alerte en cours de création.
 
     Returns:
         La liste des IDs des alertes qui ont été entièrement supprimées (car devenues vides).
     """
-    overwritten_alert_ids: List[uuid.UUID] = []
+    deleted_alert_ids: List[uuid.UUID] = []
     if not conflicts:
-        return overwritten_alert_ids
+        return deleted_alert_ids
 
     conflicts_by_alert_id = defaultdict(list)
     for conflict in conflicts:
         conflicts_by_alert_id[conflict['existingAlertId']].append(conflict)
+
+    new_alert_cell_ids_set = set(new_alert_cell_ids)
 
     for alert_id_str, alert_conflicts in conflicts_by_alert_id.items():
         alert_id = uuid.UUID(alert_id_str)
@@ -148,24 +154,36 @@ def _resolve_conflicts(db: Session, conflicts: List[dict]) -> List[uuid.UUID]:
         if not existing_alert:
             continue
 
-        # Identifier les types de capteurs à retirer de cette alerte spécifique
-        sensor_types_to_remove = {c['sensorType'] for c in alert_conflicts}
+        conflicting_sensor_types = {c['sensorType'] for c in alert_conflicts}
+        original_cell_ids = {uuid.UUID(cid) for cid in existing_alert.cell_ids}
+        original_sensors = existing_alert.sensors or []
 
-        # Filtrer les capteurs existants pour ne garder que les non-conflictuels
-        updated_sensors = [
-            s for s in (existing_alert.sensors or [])
-            if s.get('type') not in sensor_types_to_remove
-        ]
+        remaining_cell_ids = original_cell_ids - new_alert_cell_ids_set
+
+        if remaining_cell_ids:
+            # Regrouper tous les capteurs en conflit qui doivent être éclatés
+            split_off_sensors = [
+                s for s in original_sensors if s.get('type') in conflicting_sensor_types
+            ]
+            if split_off_sensors:
+                split_off_alert = Alert(
+                    title=f"{existing_alert.title} (conflit)",
+                    is_active=existing_alert.is_active,
+                    warning_enabled=existing_alert.warning_enabled,
+                    cell_ids=[str(cid) for cid in remaining_cell_ids],
+                    sensors=split_off_sensors,
+                )
+                db.add(split_off_alert)
+
+        updated_sensors = [s for s in original_sensors if s.get('type') not in conflicting_sensor_types]
 
         if not updated_sensors:
-            # Si plus aucun capteur, l'alerte est considérée comme entièrement écrasée et est supprimée.
-            overwritten_alert_ids.append(existing_alert.id)
+            deleted_alert_ids.append(existing_alert.id)
             db.delete(existing_alert)
         else:
-            # Sinon, on met à jour l'alerte avec les capteurs restants.
             existing_alert.sensors = updated_sensors
 
-    return overwritten_alert_ids
+    return deleted_alert_ids
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +245,7 @@ def create_alert(db: Session, alert_data: AlertCreateUpdateSchema) -> dict:
         raise AlertConflictError(conflicts)
 
     if conflicts and alert_data.overwrite_existing:
-        overwritten_alert_ids = _resolve_conflicts(db, conflicts)
+        overwritten_alert_ids = _resolve_conflicts(db, conflicts, alert_data.cell_ids)
 
     new_alert = Alert(
         title=alert_data.title,
@@ -272,7 +290,7 @@ def update_alert(db: Session, alert_id: uuid.UUID, alert_data: AlertCreateUpdate
         raise AlertConflictError(conflicts)
 
     if conflicts and alert_data.overwrite_existing:
-        overwritten_alert_ids = _resolve_conflicts(db, conflicts)
+        overwritten_alert_ids = _resolve_conflicts(db, conflicts, alert_data.cell_ids)
 
     alert.title = alert_data.title
     alert.is_active = alert_data.is_active
