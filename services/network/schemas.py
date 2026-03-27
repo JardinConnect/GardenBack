@@ -19,7 +19,6 @@ class NetworkInfo(BaseModel):
     security: str
     frequency: Optional[int] = None
     channel: Optional[int] = None
-    bssid: Optional[str] = None
 
 
 class ConnectRequest(BaseModel):

@@ -72,7 +72,6 @@ class TestNetworkInfo:
             "security": "WPA2",
             "frequency": 2437,
             "channel": 6,
-            "bssid": "AA:BB:CC:DD:EE:FF",
         }
         obj = NetworkInfo(**data)
         assert obj.ssid == "MyWiFi"
@@ -84,7 +83,6 @@ class TestNetworkInfo:
         obj = NetworkInfo(**data)
         assert obj.frequency is None
         assert obj.channel is None
-        assert obj.bssid is None
 
     def test_rejects_missing_ssid(self):
         with pytest.raises(ValidationError):
