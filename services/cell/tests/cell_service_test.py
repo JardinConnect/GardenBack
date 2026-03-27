@@ -42,7 +42,7 @@ def setup_area(db_session):
 @pytest.fixture(scope="function")
 def setup_cell_with_sensors(db_session, setup_area):
     """Crée une cellule avec des capteurs et des analytics."""
-    cell = CellModel(name="Test Cell", area_id=setup_area.id, is_tracked=True)
+    cell = CellModel(name="Test Cell", area_id=setup_area.id, is_tracked=True, deviceID="SVC-TEST-DEVICE-1")
     db_session.add(cell)
     db_session.commit()
     
@@ -74,9 +74,9 @@ def setup_cell_with_sensors(db_session, setup_area):
 @pytest.fixture(scope="function")
 def setup_multiple_cells(db_session):
     """Crée plusieurs cellules de test."""
-    cell1 = CellModel(name="Cell 1")
-    cell2 = CellModel(name="Cell 2")
-    cell3 = CellModel(name="Cell 3", settings={"existing_key": "old_value"})
+    cell1 = CellModel(name="Cell 1", deviceID="SVC-MULTI-1")
+    cell2 = CellModel(name="Cell 2", deviceID="SVC-MULTI-2")
+    cell3 = CellModel(name="Cell 3", deviceID="SVC-MULTI-3", settings={"existing_key": "old_value"})
     db_session.add_all([cell1, cell2, cell3])
     db_session.commit()
     db_session.refresh(cell1)
@@ -90,7 +90,7 @@ def setup_multiple_cells(db_session):
 
 def test_create_cell_with_valid_area(db_session, setup_area):
     """Teste la création d'une cellule avec une area valide."""
-    cell_data = CellCreate(name="New Cell", area_id=setup_area.id)
+    cell_data = CellCreate(name="New Cell", area_id=setup_area.id, deviceID="DEVICE-123")
     
     result = create_cell(db_session, cell_data)
     
@@ -104,7 +104,7 @@ def test_create_cell_with_valid_area(db_session, setup_area):
 
 def test_create_cell_without_area(db_session):
     """Teste la création d'une cellule sans area."""
-    cell_data = CellCreate(name="Orphan Cell", area_id=None)
+    cell_data = CellCreate(name="Orphan Cell", area_id=None, deviceID="DEVICE-456")
     
     result = create_cell(db_session, cell_data)
     
@@ -115,7 +115,7 @@ def test_create_cell_without_area(db_session):
 
 def test_create_cell_with_invalid_area(db_session):
     """Teste que la création échoue si l'area n'existe pas."""
-    cell_data = CellCreate(name="Invalid Cell", area_id=uuid.uuid4())
+    cell_data = CellCreate(name="Invalid Cell", area_id=uuid.uuid4(), deviceID="789")
     
     with pytest.raises(ParentCellNotFoundError):
         create_cell(db_session, cell_data)
@@ -127,7 +127,7 @@ def test_create_cell_with_invalid_area(db_session):
 
 def test_delete_cell_success(db_session, setup_area):
     """Teste la suppression (soft delete) réussie d'une cellule."""
-    cell = CellModel(name="Cell to Delete", area_id=setup_area.id)
+    cell = CellModel(name="Cell to Delete", area_id=setup_area.id, deviceID="SVC-TEST-DEVICE-2")
     db_session.add(cell)
     db_session.commit()
     cell_id = cell.id
@@ -151,7 +151,7 @@ def test_delete_cell_not_found(db_session):
 
 def test_update_cell_name(db_session, setup_area):
     """Teste la mise à jour du nom d'une cellule."""
-    cell = CellModel(name="Old Name", area_id=setup_area.id)
+    cell = CellModel(name="Old Name", area_id=setup_area.id, deviceID="SVC-TEST-DEVICE-3")
     db_session.add(cell)
     db_session.commit()
     
@@ -164,7 +164,7 @@ def test_update_cell_name(db_session, setup_area):
 
 def test_update_cell_change_area(db_session, setup_area):
     """Teste le changement d'area d'une cellule."""
-    cell = CellModel(name="Cell", area_id=setup_area.id)
+    cell = CellModel(name="Cell", area_id=setup_area.id, deviceID="SVC-TEST-DEVICE-4")
     db_session.add(cell)
     db_session.commit()
     
@@ -181,7 +181,7 @@ def test_update_cell_change_area(db_session, setup_area):
 
 def test_update_cell_with_invalid_area(db_session, setup_area):
     """Teste que la mise à jour échoue si l'area n'existe pas."""
-    cell = CellModel(name="Cell", area_id=setup_area.id)
+    cell = CellModel(name="Cell", area_id=setup_area.id, deviceID="SVC-TEST-DEVICE-5")
     db_session.add(cell)
     db_session.commit()
     
@@ -258,7 +258,7 @@ def test_get_cell_not_found(db_session):
 
 def test_get_cell_without_sensors(db_session, setup_area):
     """Teste la récupération d'une cellule sans capteurs."""
-    cell = CellModel(name="Empty Cell", area_id=setup_area.id)
+    cell = CellModel(name="Empty Cell", area_id=setup_area.id, deviceID="SVC-TEST-DEVICE-6")
     db_session.add(cell)
     db_session.commit()
     
@@ -316,7 +316,7 @@ def test_get_analytics_for_cell_latest_only(db_session, setup_cell_with_sensors)
 
 def test_get_analytics_for_cell_no_sensors(db_session, setup_area):
     """Teste que la fonction retourne un dict vide pour une cellule sans capteurs."""
-    cell = CellModel(name="Empty Cell", area_id=setup_area.id)
+    cell = CellModel(name="Empty Cell", area_id=setup_area.id, deviceID="SVC-TEST-DEVICE-7")
     db_session.add(cell)
     db_session.commit()
     

@@ -223,7 +223,11 @@ async def pair_cell_stream(
         # ── Étape 3 : création en base ────────────────────────────────────
         yield _event("status", "creating", "Création de la cellule en base de données...")
  
-        cell_data = schemas.CellCreate(name=device_data["name"], area_id=area_id)
+        cell_data = schemas.CellCreate(
+            name=device_data["name"],
+            deviceID=device_data["device_id"],
+            area_id=area_id
+        )
         
         # On passe commit=False pour garder la transaction ouverte
         cell = create_cell(db, cell_data, commit=False)  # peut lever ParentCellNotFoundError
