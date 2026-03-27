@@ -30,6 +30,7 @@ class Cell(BaseModel):
     """Schéma interne avec toutes les relations de la base de données."""
     id: uuid.UUID
     name: str
+    deviceID: str
     area_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime
@@ -82,6 +83,7 @@ class CellDTO(BaseModel):
 class CellCreate(BaseModel):
     """Schéma pour créer une nouvelle cellule."""
     name: str = Field(..., min_length=1, description="Nom de la cellule")
+    deviceID: str = Field(..., description="ID du dispositif physique (ex: 'DEVICE1')")
     area_id: Optional[uuid.UUID] = Field(default=None, description="ID de la zone parente")
 
 

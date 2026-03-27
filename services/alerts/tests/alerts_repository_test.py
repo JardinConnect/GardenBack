@@ -27,7 +27,7 @@ def setup_area(db_session):
 @pytest.fixture(scope="function")
 def setup_cell(db_session, setup_area):
     """Crée une cellule de test."""
-    cell = Cell(name="Rangée A", area_id=setup_area.id)
+    cell = Cell(name="Rangée A", area_id=setup_area.id, deviceID="REPO-TEST-DEVICE-8")
     db_session.add(cell)
     db_session.commit()
     return cell
