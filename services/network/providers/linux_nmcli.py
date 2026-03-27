@@ -121,13 +121,13 @@ class LinuxNmcliProvider(NetworkProvider):
             )
 
     def list_networks(self) -> List[NetworkInfo]:
-        stdout = _run_nmcli("-t", "-f", "SSID,SIGNAL,SECURITY,CHAN,FREQ,BSSID", "device", "wifi", "list")
+        stdout = _run_nmcli("-t", "-f", "SSID,SIGNAL,SECURITY,CHAN,FREQ", "device", "wifi", "list")
         seen: set[str] = set()
         result: List[NetworkInfo] = []
         for line in stdout.strip().split("\n"):
             if not line:
                 continue
-            parts = _split_nmcli_line(line, 6)
+            parts = _split_nmcli_line(line, 5)
             ssid = (parts[0] or "").strip()
             if ssid in seen:
                 continue
@@ -136,7 +136,6 @@ class LinuxNmcliProvider(NetworkProvider):
             security = (parts[2] or "unknown").strip()
             channel = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else None
             frequency = int(parts[4]) if len(parts) > 4 and parts[4].isdigit() else None
-            bssid = (parts[5] or "").strip() or None
             result.append(
                 NetworkInfo(
                     ssid=ssid,
@@ -144,7 +143,6 @@ class LinuxNmcliProvider(NetworkProvider):
                     security=security,
                     channel=channel,
                     frequency=frequency,
-                    bssid=bssid,
                 )
             )
         return result
