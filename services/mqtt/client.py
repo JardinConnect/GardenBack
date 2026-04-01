@@ -9,54 +9,30 @@ from services.analytics.schemas import AnalyticCreate
 # Client MQTT global
 mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
-def process_data_message(payload: str):
+def process_data_message(message: dict):
     """Traite un message de données MQTT et l'enregistre en base de données."""
     try:
-        parts = payload.split('|')
-        if len(parts) != 6 or parts[0] != 'B' or parts[5] != 'E' or parts[1] != 'D':
-            print(f"[MQTT] Format de message invalide: {payload}")
-            return
-
-        _, _, timestamp_str, sensor_uid, datas_str, _ = parts
-        
-        try:
-            timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-        except ValueError:
-            timestamp = datetime.strptime(timestamp_str, "%Y-%m-%dT%H:%M:%S")
-
-        sensor_datas = datas_str.split(';')
-
+        print(f"[MQTT] Traitement du message de données: {message}")
         db = SessionLocal()
         try:
-            # On cherche le capteur correspondant à l'UID
-            # sensor_uid peut être par exemple "TC-A-TEMP-01"
-            sensor = db.query(Sensor).filter(Sensor.sensor_id == sensor_uid, Sensor.deleted_at.is_(None)).first()
+            uid = message.get("uid")
+            timestamp_str = message.get("timestamp")
+            payload = message.get("payload")
+            sensor = db.query(Sensor).filter(Sensor.sensor_id == uid).first()
             if not sensor or sensor.id is None:
-                print(f"[MQTT] Erreur: Capteur avec UID '{sensor_uid}' non trouvé. Message ignoré.")
+                print(f"[MQTT] Erreur: Capteur avec UID '{uid}' non trouvé. Message ignoré.")
                 return
             
             sensor_id = sensor.id
 
-            for data in sensor_datas:
-                # NUMCAPTEUR + INITIALS + VALEUR
-                # ex: 1TA32 -> num=1, initials=TA, value=32
-                sensor_num = data[0]
-                sensor_initials = data[1:3] if len(data) > 2 and data[1:3].isalpha() else data[1:2]
-                value_str = data[len(sensor_num) + len(sensor_initials):]
-
+            for key, value in payload.items():
                 # Le sensor_code est maintenant l'ID complet du capteur
                 sensor_code = sensor.sensor_id
-                
-                try:
-                    value = float(value_str)
-                except ValueError:
-                    print(f"[MQTT] Valeur invalide pour le capteur {sensor_code}: {value_str}")
-                    continue
 
                 analytic_data = AnalyticCreate(
-                    sensor_code=sensor_code,
+                    sensor_code=key,
                     value=value,
-                    timestamp=timestamp,
+                    timestamp=timestamp_str,
                     sensor_id=sensor_id # Le champ est déjà correct ici, mais on vérifie
                 )
                 
@@ -97,6 +73,7 @@ def connect_mqtt():
 
     try:
         mqtt_client.connect(settings.MQTT_BROKER, settings.MQTT_PORT, settings.MQTT_KEEPALIVE)
+        # mqtt_client.username_pw_set(settings.MQTT_USERNAME, settings.MQTT_PASSWORD)
         mqtt_client.loop_start()  # Lance le thread en arrière-plan
         print(f"[MQTT] Connexion au broker {settings.MQTT_BROKER}:{settings.MQTT_PORT}")
     except Exception as e:
@@ -110,6 +87,11 @@ def publish_message(topic: str, message: str):
         print(f"[MQTT] Message envoyé -> Topic: {topic}, Message: {message}")
     else:
         print(f"[MQTT] Échec envoi -> Topic: {topic}, Code: {status}")
+
+def initialize_topic(topic: str):
+    """Publie un message de test pour initialiser un topic MQTT."""
+    test_message = "Test de connexion au topic"
+    publish_message(topic, test_message)
 
 def disconnect_mqtt():
     """Déconnecte proprement le client MQTT."""
