@@ -18,6 +18,8 @@ class Settings():
     MQTT_PORT: int = 1883
     MQTT_KEEPALIVE: int = 60
     MQTT_TOPIC: str = "garden/analytics"
+    MQTT_TOPIC_CONFIG: str = "garden/config"
+    MQTT_TOPIC_CONFIG_ACK: str = "garden/config/ack"
     MQTT_USERNAME: Optional[str] = "mqtt_user"
     MQTT_PASSWORD: Optional[str] = "mqtt_password"
 

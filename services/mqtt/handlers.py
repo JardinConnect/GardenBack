@@ -4,6 +4,7 @@ from db.database import SessionLocal
 from services.analytics.repository import create_analytic as create_analytic_repo
 from services.analytics.schemas import AnalyticCreate
 from db.models import Sensor
+from services.mqtt.pending_acks import resolve_ack
 
 
 def handle_sensor_data(topic: str, raw_payload: str):
@@ -66,3 +67,35 @@ def handle_sensor_data(topic: str, raw_payload: str):
         traceback.print_exc()
     finally:
         db.close()
+
+
+def handle_config_ack(topic: str, raw_payload: str):
+    """
+    Handler pour les acquittements de configuration envoyés par le device.
+
+    Format attendu :
+        {
+            "ack_id": "<correlation-id>",
+            "status": "ok" | "error",
+            "message": "..."          (optionnel)
+        }
+
+    Résout l'asyncio.Event correspondant dans le registre pending_acks
+    pour débloquer le générateur SSE qui attend la confirmation.
+    """
+    try:
+        message = json.loads(raw_payload)
+    except (json.JSONDecodeError, TypeError):
+        print(f"[MQTT][handler] Config ack non-JSON ignoré: {raw_payload}")
+        return
+
+    ack_id = message.get("ack_id")
+    if not ack_id:
+        print(f"[MQTT][handler] Config ack sans ack_id, ignoré: {message}")
+        return
+
+    resolved = resolve_ack(ack_id, message)
+    if resolved:
+        print(f"[MQTT][handler] Config ack résolu: {ack_id} -> {message.get('status')}")
+    else:
+        print(f"[MQTT][handler] Config ack orphelin (pas de requête en attente): {ack_id}")
