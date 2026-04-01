@@ -16,12 +16,14 @@ from services.user.router import router as user_router
 from services.farm_state.router import public_router as farm_public_router, router as farm_state_router
 from services.cell.router import router as cell_router
 from services.network.router import router as network_router
-from services.mqtt.client import connect_mqtt
-
+from services.mqtt.client import connect_mqtt, register_handler
+from services.mqtt.handlers import handle_sensor_data
+from settings import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("[FASTAPI] Démarrage de l'application...")
+    register_handler(settings.MQTT_TOPIC, handle_sensor_data)
     connect_mqtt()
     purge_task = create_purge_task()
     try:
