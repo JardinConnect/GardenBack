@@ -3,12 +3,13 @@ from __future__ import annotations
 from typing import List, Optional
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sse_starlette.sse import EventSourceResponse
 import uuid
 
 from db.database import get_db
-from db.models import User
+from db.models import User, RoleEnum
 from services.auth.dependencies import get_current_user
 from services.audit.service import log_action
 from .schemas import (
@@ -276,3 +277,43 @@ def archive_event(
     result = service.archive_event(db, event_id)
     log_action(db, current_user, "archive", "alert", entity_label="Événement archivé")
     return result
+
+
+@router.get(
+    "/{alert_id}/push-config",
+    summary="Pousser la config d'une alerte vers le device IoT (SSE)",
+    responses={
+        status.HTTP_403_FORBIDDEN: {"description": "Accès refusé — droits admin requis"},
+        status.HTTP_404_NOT_FOUND: {"description": "Alerte non trouvée"},
+    },
+    tags=["alerts"],
+)
+async def push_alert_config(
+    alert_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Publie la configuration d'une alerte sur MQTT et attend l'acquittement
+    du device IoT via **Server-Sent Events**.
+
+    La connexion reste ouverte et émet les événements dans cet ordre :
+
+    | event       | step           | description                                |
+    |-------------|----------------|--------------------------------------------|
+    | `status`    | `publishing`   | config envoyée sur MQTT                    |
+    | `status`    | `waiting_ack`  | en attente de la réponse du device         |
+    | `completed` | `completed`    | ack reçu, config appliquée avec succès     |
+    | `error`     | `timeout`      | le device n'a pas répondu à temps          |
+    | `error`     | `device_error` | le device a répondu avec une erreur        |
+    | `error`     | `failed`       | erreur interne                             |
+
+    *Nécessite des droits d'administrateur (admin ou superadmin).*
+    """
+    if current_user.role not in [RoleEnum.ADMIN, RoleEnum.SUPERADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seul un administrateur peut pousser une configuration d'alerte.",
+        )
+
+    return EventSourceResponse(service.push_alert_config_stream(db, alert_id))

@@ -3,14 +3,17 @@ import uuid
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
-import services.alerts.service as alerts_service # Import the alerts service
+import services.alerts.service as alerts_service
 import services.cell.repository as repositoryCell
 from datetime import datetime
 import services.area.repository as repositoryArea
 import services.cell.schemas as schemas
 import services.cell.errors as errors
 from db.models import Analytic as AnalyticModel, AnalyticType
-import asyncio
+from services.mqtt.pending_acks import create_pending_ack, wait_for_ack, cancel_pending_ack
+from services.mqtt.client import publish
+from settings import settings
+
 import json
 from typing import AsyncGenerator
 
@@ -168,23 +171,6 @@ def update_multiple_cells_settings(db: Session, settings_data: schemas.CellSetti
 
     # 5. Appliquer la transaction
     db.commit()
-
-
-async def _stub_scan_mqtt() -> dict:
-    """
-    STUB : Simule la détection d'un device IoT via MQTT.
- 
-    ⚠️  TODO (ticket MQTT) : Remplacer par le vrai scan MQTT.
-          Cette fonction doit rester isolée ici pour faciliter le remplacement.
-          Elle doit retourner un dict avec les clés : device_id, name, firmware_version.
-    """
-    await asyncio.sleep(2)  # simule le délai réseau / scan
-    device_id = f"CELL-{uuid.uuid4().hex[:6].upper()}"
-    return {
-        "device_id": device_id,
-        "name": f"Cellule {device_id}",
-        "firmware_version": "1.0.0",
-    }
  
  
 async def pair_cell_stream(
@@ -210,26 +196,58 @@ async def pair_cell_stream(
             "event": event_type,
             "data": json.dumps({"step": step, "message": message, **extra}, default=str),
         }
+    
+    ack_id = str(uuid.uuid4())
  
     try:
         # ── Étape 1 : scan ────────────────────────────────────────────────
         yield _event("status", "scanning", "Recherche d'un device IoT en cours...")
  
-        # ── Étape 2 : détection device (MQTT stub) ────────────────────────
-        device_data = await _stub_scan_mqtt()
+        # ── Étape 2 : détection device ────────────────────────
+
+        config_payload = json.dumps({
+            "event" : "start", # MQTT Event
+            "ack_id": ack_id,
+        })
+
+        create_pending_ack(ack_id)
+        publish(settings.MQTT_TOPIC_PAIRING, config_payload)
+
+
+        result = await wait_for_ack(ack_id, timeout=15.0)
+        if result is None:
+            yield _event("error", "timeout", "Le device n'a pas répondu dans le délai imparti.")
+            return
+
+        if result.get("status") != "ok":
+            error_msg = result.get("message", "Erreur inconnue du device.")
+            yield _event("error", "device_error", error_msg, device_response=result)
+            return
+
+        uid = result.get("uid")
+        if not uid:
+            yield _event("error", "device_error", "UID manquant dans la réponse du device.", device_response=result)
+            return
+
+        device_data = {
+            "device_id": uid,
+            "ack_id": ack_id,
+            "status": result.get("status"),
+        }
+
         yield _event(
             "status",
             "device_found",
             f"Device détecté : {device_data['device_id']}",
             device=device_data,
         )
- 
+
         # ── Étape 3 : création en base ────────────────────────────────────
         yield _event("status", "creating", "Création de la cellule en base de données...")
  
         cell_data = schemas.CellCreate(
-            name=device_data["name"],
-            deviceID=device_data["device_id"],
+            name=uid,
+            deviceID=uid,
             area_id=area_id
         )
         
@@ -250,6 +268,6 @@ async def pair_cell_stream(
  
     except Exception as exc:
         # ── Rollback de la transaction en cas d'erreur ────────────────────
+        cancel_pending_ack(ack_id)
         db.rollback()
- 
         yield _event("error", "failed", str(exc))
