@@ -27,6 +27,45 @@ def get_cells(
     cells = service.get_cells(db)
     return [CellDTO.from_cell(cell) for cell in cells]
 
+@router.get(
+    "/pairing",
+    summary="Appairer une nouvelle cellule IoT",
+    responses={
+        status.HTTP_403_FORBIDDEN: {"description": "Accès refusé — droits admin requis"},
+    },
+    tags=["cells"],
+)
+async def pair_cell(
+    area_id: Optional[uuid.UUID] = Query(
+        None,
+        description="ID de la zone parente dans laquelle créer la cellule (optionnel)",
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Lance le processus de pairing d'une cellule IoT via **Server-Sent Events**.
+ 
+    La connexion reste ouverte et émet les événements dans cet ordre :
+ 
+    | event       | step           | description                        |
+    |-------------|----------------|------------------------------------|
+    | `status`    | `scanning`     | scan MQTT démarré                  |
+    | `status`    | `device_found` | device détecté, infos incluses     |
+    | `status`    | `creating`     | écriture en base                   |
+    | `completed` | `completed`    | cellule créée, payload `cell`      |
+    | `error`     | `failed`       | échec — rollback automatique       |
+ 
+    *Nécessite des droits d'administrateur (admin ou superadmin).*
+    """
+    if current_user.role not in [RoleEnum.ADMIN, RoleEnum.SUPERADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seul un administrateur peut appairer une cellule.",
+        )
+ 
+    return EventSourceResponse(service.pair_cell_stream(db, area_id))
+
 @router.get("/{cell_id}", response_model=CellDTO)
 def get_cell(
     cell_id: uuid.UUID = Path(..., title="The ID of the cell to get"),
@@ -139,42 +178,3 @@ def update_cell(
         return CellDTO.from_cell(cell)
     except CellNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-
-@router.get(
-    "/pairing",
-    summary="Appairer une nouvelle cellule IoT",
-    responses={
-        status.HTTP_403_FORBIDDEN: {"description": "Accès refusé — droits admin requis"},
-    },
-    tags=["cells"],
-)
-async def pair_cell(
-    area_id: Optional[uuid.UUID] = Query(
-        None,
-        description="ID de la zone parente dans laquelle créer la cellule (optionnel)",
-    ),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Lance le processus de pairing d'une cellule IoT via **Server-Sent Events**.
- 
-    La connexion reste ouverte et émet les événements dans cet ordre :
- 
-    | event       | step           | description                        |
-    |-------------|----------------|------------------------------------|
-    | `status`    | `scanning`     | scan MQTT démarré                  |
-    | `status`    | `device_found` | device détecté, infos incluses     |
-    | `status`    | `creating`     | écriture en base                   |
-    | `completed` | `completed`    | cellule créée, payload `cell`      |
-    | `error`     | `failed`       | échec — rollback automatique       |
- 
-    *Nécessite des droits d'administrateur (admin ou superadmin).*
-    """
-    if current_user.role not in [RoleEnum.ADMIN, RoleEnum.SUPERADMIN]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Seul un administrateur peut appairer une cellule.",
-        )
- 
-    return EventSourceResponse(service.pair_cell_stream(db, area_id))
