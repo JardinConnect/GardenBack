@@ -72,7 +72,7 @@ def test_process_data_message_success(db_session, capsys):
     db_session.commit()
     
     # Créer une cellule dans cette area
-    test_cell = Cell(name="Test Cell", area_id=test_area.id)
+    test_cell = Cell(name="Test Cell", area_id=test_area.id, deviceID="REPO-TEST-DEVICE-17")
     db_session.add(test_cell)
     db_session.commit()
     
@@ -183,7 +183,7 @@ def setup_test_sensor(db_session):
     db_session.add(area)
     db_session.commit()
     
-    cell = Cell(name="Test Cell", area_id=area.id)
+    cell = Cell(name="Test Cell", area_id=area.id, deviceID="REPO-TEST-DEVICE-17")
     db_session.add(cell)
     db_session.commit()
     

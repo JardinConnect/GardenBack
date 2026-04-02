@@ -229,11 +229,14 @@ def seed_garden_hierarchy(db: Session) -> list[Cell]:
     all_cells: list[Cell] = []
     all_sensors: list[Sensor] = []
 
+    cell_counter = 1
     for area_config in cells_config:
         area = area_config["area"]
         print(f"\n    📍 Area '{area.name}':")
         for cell_config in area_config["cells"]:
-            cell = Cell(name=cell_config["name"], area_id=area.id)
+            # Ajout du deviceID obligatoire
+            cell = Cell(name=cell_config["name"], area_id=area.id, deviceID=f"SEED-DEVICE-{cell_counter}")
+            cell_counter += 1
             db.add(cell)
             db.commit()
             db.refresh(cell)

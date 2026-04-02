@@ -115,6 +115,8 @@ class Cell(Base):
     is_tracked: Mapped[bool] = mapped_column(Boolean, default=False)
     settings: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    deviceID: Mapped[str] = mapped_column(String, unique=True, nullable=False)  # ID du dispositif physique associé à la cellule
+
 
     # Relation vers l'area parent
     area_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("areas.id"), nullable=True)

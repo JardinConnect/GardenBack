@@ -29,7 +29,7 @@ def setup_area(db_session):
 @pytest.fixture(scope="function")
 def setup_cell(db_session, setup_area):
     """Crée une cellule de test."""
-    cell = CellModel(name="Test Cell", area_id=setup_area.id, is_tracked=True)
+    cell = CellModel(name="Test Cell", area_id=setup_area.id, is_tracked=True, deviceID="REPO-TEST-DEVICE-1")
     db_session.add(cell)
     db_session.commit()
     return cell
@@ -64,8 +64,8 @@ def test_get_cell_by_id_not_found(db_session):
 
 def test_get_cells_success(db_session, setup_area):
     """Teste la récupération de toutes les cellules."""
-    cell1 = CellModel(name="Cell 1", area_id=setup_area.id, is_tracked=True)
-    cell2 = CellModel(name="Cell 2", area_id=setup_area.id, is_tracked=False)
+    cell1 = CellModel(name="Cell 1", area_id=setup_area.id, is_tracked=True, deviceID="REPO-TEST-DEVICE-2")
+    cell2 = CellModel(name="Cell 2", area_id=setup_area.id, is_tracked=False, deviceID="REPO-TEST-DEVICE-3")
     db_session.add_all([cell1, cell2])
     db_session.commit()
     
@@ -95,6 +95,7 @@ def test_create_cell_with_area(db_session, setup_area):
     cell_data = CellCreate(
         name="New Cell",
         area_id=setup_area.id,
+        deviceID="DEVICE-1"
     )
     
     result = create_cell(db_session, cell_data)
@@ -116,6 +117,7 @@ def test_create_cell_without_area(db_session):
     cell_data = CellCreate(
         name="Orphan Cell",
         area_id=None,
+        deviceID="DEVICE-2"
     )
     
     result = create_cell(db_session, cell_data)
@@ -126,6 +128,22 @@ def test_create_cell_without_area(db_session):
     assert result.is_tracked is False
     assert result.location == ""
 
+def test_create_cell_no_commit(db_session, setup_area):
+    """Teste que create_cell avec commit=False garde la transaction ouverte."""
+    cell_data = CellCreate(name="Uncommitted Cell", area_id=setup_area.id, deviceID="DEVICE-3")
+    
+    # On crée sans commit
+    result = create_cell(db_session, cell_data, commit=False)
+    
+    assert result is not None
+    assert result.id is not None  # L'ID a bien été généré par le flush
+    
+    # On simule une erreur et on annule la transaction
+    db_session.rollback()
+    
+    # La cellule ne doit pas exister en base
+    with pytest.raises(CellNotFoundError):
+        get_cell_by_id(db_session, result.id)
 
 # =========================================================
 # TESTS FOR delete_cell

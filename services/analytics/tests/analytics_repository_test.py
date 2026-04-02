@@ -14,7 +14,7 @@ def setup_sensor(db_session):
     db_session.add(test_area)
     db_session.commit()
 
-    test_cell = Cell(name="Test Cell", area_id=test_area.id)
+    test_cell = Cell(name="Test Cell", area_id=test_area.id, deviceID="REPO-TEST-DEVICE-10")
     db_session.add(test_cell)
     db_session.commit()
 
@@ -48,9 +48,9 @@ def setup_area_hierarchy(db_session):
     db_session.commit()
 
     # Cellule dans la sous-planche (niveau 3)
-    cell_cerises = Cell(name="Rangée A Cerises", area_id=section_cerises.id)
+    cell_cerises = Cell(name="Rangée A Cerises", area_id=section_cerises.id, deviceID="REPO-TEST-DEVICE-9")
     # Cellule dans la planche (niveau 2)
-    cell_salades = Cell(name="Section Laitues", area_id=planche_salades.id)
+    cell_salades = Cell(name="Section Laitues", area_id=planche_salades.id, deviceID="REPO-TEST-DEVICE-10")
     db_session.add_all([cell_cerises, cell_salades])
     db_session.commit()
 
