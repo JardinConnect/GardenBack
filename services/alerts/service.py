@@ -499,7 +499,7 @@ async def push_alert_config_stream(
         })
 
         create_pending_ack(ack_id)
-        publish(settings.MQTT_TOPIC_CONFIG, config_payload)
+        publish(settings.MQTT_TOPIC_ALERTS_CONFIG, config_payload)
 
         # ── Étape 3 : attente de l'ack ─────────────────────────────────
         yield _event("status", "waiting_ack", "En attente de la confirmation du device...")
