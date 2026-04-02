@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Optional
 from collections import defaultdict
 from sqlalchemy.orm import Session
-import uuid
+from sqlalchemy.orm import attributes
 
 from db.models import Alert, AlertEvent, Cell
 from .schemas import (
@@ -12,6 +12,39 @@ from .schemas import (
 from .errors import AlertNotFoundError, AlertEventNotFoundError, AlertConflictError
 from services.area.service import get_full_location_path_for_cell
 
+import uuid
+
+
+# ---------------------------------------------------------------------------
+# Helpers pour l'association d'alertes par défaut
+# ---------------------------------------------------------------------------
+
+def associate_cell_to_default_battery_alert(db: Session, cell_id: uuid.UUID):
+    """
+    Associe une cellule à l'alerte de batterie par défaut.
+    Crée l'alerte si elle n'existe pas.
+    Ne committe pas la transaction, pour permettre une gestion atomique par l'appelant.
+    """
+    default_alert_title = "Alerte Batterie Faible - " + str(cell_id)[:8]  # Ajout d'une partie de l'ID de la cellule pour différencier les alertes par défaut
+    
+    battery_alert_config = {
+        "title": default_alert_title,
+        "is_active": True,
+        "warning_enabled": True,
+        "sensors": [
+            {"type": "battery", "index": 0, "criticalRange": {"min": 0.0, "max": 10.0}, "warningRange": {"min": 10.1, "max": 20.0}}
+        ],
+    }
+
+    alert = db.query(Alert).filter(Alert.title == default_alert_title).first()
+
+    if alert:
+        if str(cell_id) not in alert.cell_ids:
+            alert.cell_ids.append(str(cell_id))
+            attributes.flag_modified(alert, "cell_ids")
+    else:
+        new_alert = Alert(**battery_alert_config, cell_ids=[str(cell_id)])
+        db.add(new_alert)
 
 # ---------------------------------------------------------------------------
 # Helpers internes
@@ -25,7 +58,7 @@ def _build_alert_response(alert: Alert, db: Session) -> AlertResponseSchema:
     - Résolvant les `cell_ids` pour récupérer les noms et localisations des cellules.
     - S'assurant que la structure des capteurs (`sensors`) est conforme au schéma Pydantic.
     """
-    cell_uuids = [uuid.UUID(c) if isinstance(c, str) else c for c in alert.cell_ids]
+    cell_uuids = [uuid.UUID(c) for c in alert.cell_ids if c is not None]
 
     cells_data: List[CellInfoSchema] = []
     for cid in cell_uuids:

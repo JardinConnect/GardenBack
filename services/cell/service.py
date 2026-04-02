@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
+import services.alerts.service as alerts_service # Import the alerts service
 import services.cell.repository as repositoryCell
 from datetime import datetime
 import services.area.repository as repositoryArea
@@ -22,8 +23,11 @@ def create_cell(db: Session, cell_data: schemas.CellCreate, commit: bool = True)
         if not area:
             raise errors.ParentCellNotFoundError
             
-    # On passe le paramètre 'commit' au repository
-    cell = repositoryCell.create_cell(db, cell_data, commit=commit) 
+    # On passe commit=False au repository pour gérer la transaction ici
+    cell = repositoryCell.create_cell(db, cell_data, commit=False)
+    
+    # Associer l'alerte de batterie par défaut à la nouvelle cellule
+    alerts_service.associate_cell_to_default_battery_alert(db, cell.id)
     
     return cell
 
