@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import List, Optional
+import json
+from typing import AsyncGenerator, List, Optional
 from collections import defaultdict
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import attributes
@@ -11,6 +12,9 @@ from .schemas import (
 )
 from .errors import AlertNotFoundError, AlertEventNotFoundError, AlertConflictError
 from services.area.service import get_full_location_path_for_cell
+from services.mqtt.client import publish
+from services.mqtt.pending_acks import create_pending_ack, wait_for_ack, cancel_pending_ack
+from settings import settings
 
 import uuid
 
@@ -45,6 +49,53 @@ def associate_cell_to_default_battery_alert(db: Session, cell_id: uuid.UUID):
     else:
         new_alert = Alert(**battery_alert_config, cell_ids=[str(cell_id)])
         db.add(new_alert)
+
+# ---------------------------------------------------------------------------
+# Helpers MQTT — publication de la config alerte
+# ---------------------------------------------------------------------------
+
+def _publish_alert_to_mqtt(alert: Alert, db: Session) -> None:
+    """
+    Publie la configuration d'une alerte sur MQTT au format attendu par le device.
+
+    Convertit :
+    - cell_ids (UUIDs internes) → deviceIDs physiques
+    - criticalRange/warningRange {min, max} → [min, max]
+    """
+    # Résoudre les UUIDs → deviceIDs
+    device_ids: List[str] = []
+    for cid_str in (alert.cell_ids or []):
+        cell = db.query(Cell).filter(Cell.id == cid_str).first()
+        if cell:
+            device_ids.append(cell.deviceID)
+        else:
+            print(f"[MQTT][alert] Cell {cid_str} introuvable, ignorée pour MQTT.")
+
+    # Formater les sensors avec ranges en arrays
+    mqtt_sensors = []
+    for s in (alert.sensors or []):
+        sensor_entry = {
+            "type": s["type"],
+            "index": s["index"],
+            "criticalRange": [s["criticalRange"]["min"], s["criticalRange"]["max"]],
+        }
+        if s.get("warningRange") and s["warningRange"].get("min") is not None:
+            sensor_entry["warningRange"] = [s["warningRange"]["min"], s["warningRange"]["max"]]
+        mqtt_sensors.append(sensor_entry)
+
+    payload = json.dumps({
+        "id": str(alert.id),
+        "is_active": alert.is_active,
+        "cell_ids": device_ids,
+        "sensors": mqtt_sensors,
+    })
+
+    try:
+        publish(settings.MQTT_TOPIC_ALERTS_CONFIG, payload)
+        print(f"[MQTT][alert] Config publiée pour alerte '{alert.title}' → {device_ids}")
+    except Exception as e:
+        print(f"[MQTT][alert] Erreur publication config: {e}")
+
 
 # ---------------------------------------------------------------------------
 # Helpers internes
@@ -291,6 +342,8 @@ def create_alert(db: Session, alert_data: AlertCreateUpdateSchema) -> dict:
     db.commit()
     db.refresh(new_alert)
 
+    _publish_alert_to_mqtt(new_alert, db)
+
     return {
         "id": new_alert.id,
         "title": new_alert.title,
@@ -333,6 +386,8 @@ def update_alert(db: Session, alert_id: uuid.UUID, alert_data: AlertCreateUpdate
 
     db.commit()
     db.refresh(alert)
+
+    _publish_alert_to_mqtt(alert, db)
 
     return {
         "id": alert.id,
@@ -444,3 +499,99 @@ def archive_events_by_cell(db: Session, cell_id: uuid.UUID) -> dict:
         "cellId": cell_id,
         "message": "Événements de la cellule archivés avec succès.",
     }
+
+
+# ---------------------------------------------------------------------------
+# Flux 2 : Push config alerte vers MQTT (SSE)
+# ---------------------------------------------------------------------------
+
+async def push_alert_config_stream(
+    db: Session,
+    alert_id: uuid.UUID,
+) -> AsyncGenerator[dict, None]:
+    """
+    Générateur SSE qui pousse la configuration d'une alerte sur MQTT
+    et attend l'acquittement du device.
+
+    Émet dans l'ordre :
+      - event:status  step:publishing    — envoi de la config sur MQTT
+      - event:status  step:waiting_ack   — en attente de l'ack du device
+      - event:completed step:completed   — ack reçu, config appliquée
+    En cas d'erreur ou timeout :
+      - event:error step:failed
+    """
+
+    def _event(event_type: str, step: str, message: str, **extra) -> dict:
+        return {
+            "event": event_type,
+            "data": json.dumps({"step": step, "message": message, **extra}, default=str),
+        }
+
+    ack_id = str(uuid.uuid4())
+
+    try:
+        # ── Étape 1 : récupérer l'alerte ───────────────────────────────
+        alert = db.query(Alert).filter(Alert.id == alert_id).first()
+        if not alert:
+            yield _event("error", "failed", f"Alerte {alert_id} non trouvée.")
+            return
+
+        # ── Étape 2 : publier la config sur MQTT ───────────────────────
+        yield _event("status", "publishing", "Envoi de la configuration sur MQTT...")
+
+        # Résoudre UUIDs → deviceIDs physiques
+        device_ids: List[str] = []
+        for cid_str in (alert.cell_ids or []):
+            cell = db.query(Cell).filter(Cell.id == cid_str).first()
+            if cell:
+                device_ids.append(cell.deviceID)
+
+        # Formater sensors avec ranges en arrays [min, max]
+        mqtt_sensors = []
+        for s in (alert.sensors or []):
+            sensor_entry = {
+                "type": s["type"],
+                "index": s["index"],
+                "criticalRange": [s["criticalRange"]["min"], s["criticalRange"]["max"]],
+            }
+            if s.get("warningRange") and s["warningRange"].get("min") is not None:
+                sensor_entry["warningRange"] = [s["warningRange"]["min"], s["warningRange"]["max"]]
+            mqtt_sensors.append(sensor_entry)
+
+        config_payload = json.dumps({
+            "ack_id": ack_id,
+            "id": str(alert.id),
+            "is_active": alert.is_active,
+            "cell_ids": device_ids,
+            "sensors": mqtt_sensors,
+        })
+
+        create_pending_ack(ack_id)
+        publish(settings.MQTT_TOPIC_ALERTS_CONFIG, config_payload)
+
+        # ── Étape 3 : attente de l'ack ─────────────────────────────────
+        yield _event("status", "waiting_ack", "En attente de la confirmation du device...")
+
+        result = await wait_for_ack(ack_id, timeout=15.0)
+
+        if result is None:
+            yield _event("error", "timeout", "Le device n'a pas répondu dans le délai imparti.")
+            return
+
+        if result.get("status") != "ok":
+            error_msg = result.get("message", "Erreur inconnue du device.")
+            yield _event("error", "device_error", error_msg, device_response=result)
+            return
+
+        # ── Étape 4 : succès ────────────────────────────────────────────
+        yield _event(
+            "completed",
+            "completed",
+            "Configuration appliquée avec succès.",
+            alert_id=str(alert.id),
+            device_response=result,
+        )
+
+    except Exception as exc:
+        cancel_pending_ack(ack_id)
+        yield _event("error", "failed", str(exc))
