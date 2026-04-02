@@ -408,6 +408,18 @@ def seed_alerts(db: Session, cells: list[Cell]):
             ],
             "warning_enabled": False,
         },
+        {
+            "title": "Alerte Batteries",
+            "sensors": [
+                {
+                    "type": "battery",
+                    "index": 0,
+                    "criticalRange": {"min": 0, "max": 10.0},
+                    "warningRange": {"min": 10.1, "max": 20.0},
+                }
+            ],
+            "warning_enabled": True,
+        },
     ]
 
     created_alerts: list[Alert] = []

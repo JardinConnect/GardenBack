@@ -44,9 +44,9 @@ def setup_cell(db_session, setup_area):
 @pytest.fixture
 def setup_multiple_cells_for_alerts(db_session, setup_area):
     """Crée plusieurs cellules de test pour les scénarios d'éclatement d'alertes."""
-    cell1 = Cell(name="Cell 1", area_id=setup_area.id)
-    cell2 = Cell(name="Cell 2", area_id=setup_area.id)
-    cell3 = Cell(name="Cell 3", area_id=setup_area.id)
+    cell1 = Cell(name="Cell 1", area_id=setup_area.id, deviceID="SVC-TEST-DEVICE-1")
+    cell2 = Cell(name="Cell 2", area_id=setup_area.id, deviceID="SVC-TEST-DEVICE-2")
+    cell3 = Cell(name="Cell 3", area_id=setup_area.id, deviceID="SVC-TEST-DEVICE-3")
     db_session.add_all([cell1, cell2, cell3])
     db_session.commit()
     db_session.refresh(cell1)
