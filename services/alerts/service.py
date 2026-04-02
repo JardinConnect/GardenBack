@@ -51,6 +51,53 @@ def associate_cell_to_default_battery_alert(db: Session, cell_id: uuid.UUID):
         db.add(new_alert)
 
 # ---------------------------------------------------------------------------
+# Helpers MQTT — publication de la config alerte
+# ---------------------------------------------------------------------------
+
+def _publish_alert_to_mqtt(alert: Alert, db: Session) -> None:
+    """
+    Publie la configuration d'une alerte sur MQTT au format attendu par le device.
+
+    Convertit :
+    - cell_ids (UUIDs internes) → deviceIDs physiques
+    - criticalRange/warningRange {min, max} → [min, max]
+    """
+    # Résoudre les UUIDs → deviceIDs
+    device_ids: List[str] = []
+    for cid_str in (alert.cell_ids or []):
+        cell = db.query(Cell).filter(Cell.id == cid_str).first()
+        if cell:
+            device_ids.append(cell.deviceID)
+        else:
+            print(f"[MQTT][alert] Cell {cid_str} introuvable, ignorée pour MQTT.")
+
+    # Formater les sensors avec ranges en arrays
+    mqtt_sensors = []
+    for s in (alert.sensors or []):
+        sensor_entry = {
+            "type": s["type"],
+            "index": s["index"],
+            "criticalRange": [s["criticalRange"]["min"], s["criticalRange"]["max"]],
+        }
+        if s.get("warningRange") and s["warningRange"].get("min") is not None:
+            sensor_entry["warningRange"] = [s["warningRange"]["min"], s["warningRange"]["max"]]
+        mqtt_sensors.append(sensor_entry)
+
+    payload = json.dumps({
+        "id": str(alert.id),
+        "is_active": alert.is_active,
+        "cell_ids": device_ids,
+        "sensors": mqtt_sensors,
+    })
+
+    try:
+        publish(settings.MQTT_TOPIC_ALERTS_CONFIG, payload)
+        print(f"[MQTT][alert] Config publiée pour alerte '{alert.title}' → {device_ids}")
+    except Exception as e:
+        print(f"[MQTT][alert] Erreur publication config: {e}")
+
+
+# ---------------------------------------------------------------------------
 # Helpers internes
 # ---------------------------------------------------------------------------
 
@@ -295,6 +342,8 @@ def create_alert(db: Session, alert_data: AlertCreateUpdateSchema) -> dict:
     db.commit()
     db.refresh(new_alert)
 
+    _publish_alert_to_mqtt(new_alert, db)
+
     return {
         "id": new_alert.id,
         "title": new_alert.title,
@@ -337,6 +386,8 @@ def update_alert(db: Session, alert_id: uuid.UUID, alert_data: AlertCreateUpdate
 
     db.commit()
     db.refresh(alert)
+
+    _publish_alert_to_mqtt(alert, db)
 
     return {
         "id": alert.id,
@@ -488,14 +539,31 @@ async def push_alert_config_stream(
         # ── Étape 2 : publier la config sur MQTT ───────────────────────
         yield _event("status", "publishing", "Envoi de la configuration sur MQTT...")
 
+        # Résoudre UUIDs → deviceIDs physiques
+        device_ids: List[str] = []
+        for cid_str in (alert.cell_ids or []):
+            cell = db.query(Cell).filter(Cell.id == cid_str).first()
+            if cell:
+                device_ids.append(cell.deviceID)
+
+        # Formater sensors avec ranges en arrays [min, max]
+        mqtt_sensors = []
+        for s in (alert.sensors or []):
+            sensor_entry = {
+                "type": s["type"],
+                "index": s["index"],
+                "criticalRange": [s["criticalRange"]["min"], s["criticalRange"]["max"]],
+            }
+            if s.get("warningRange") and s["warningRange"].get("min") is not None:
+                sensor_entry["warningRange"] = [s["warningRange"]["min"], s["warningRange"]["max"]]
+            mqtt_sensors.append(sensor_entry)
+
         config_payload = json.dumps({
             "ack_id": ack_id,
-            "alert_id": str(alert.id),
-            "title": alert.title,
+            "id": str(alert.id),
             "is_active": alert.is_active,
-            "warning_enabled": alert.warning_enabled,
-            "cell_ids": [str(cid) for cid in alert.cell_ids],
-            "sensors": alert.sensors,
+            "cell_ids": device_ids,
+            "sensors": mqtt_sensors,
         })
 
         create_pending_ack(ack_id)

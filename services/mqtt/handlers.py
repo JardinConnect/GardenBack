@@ -90,16 +90,17 @@ def handle_config_ack(topic: str, raw_payload: str):
         print(f"[MQTT][handler] Config ack non-JSON ignoré: {raw_payload}")
         return
 
-    ack_id = message.get("ack_id")
-    if not ack_id:
-        print(f"[MQTT][handler] Config ack sans ack_id, ignoré: {message}")
-        return
+    # ack_id = message.get("ack_id")
+    # if not ack_id:
+    #     print(f"[MQTT][handler] Config ack sans ack_id, ignoré: {message}")
+    #     return
 
-    resolved = resolve_ack(ack_id, message)
-    if resolved:
-        print(f"[MQTT][handler] Config ack résolu: {ack_id} -> {message.get('status')}")
+    # resolved = resolve_ack(ack_id, message)
+    resolve = message.get("status") == "received"
+    if resolve:
+        print(f"[MQTT][handler] Config ack résolu: {resolve}")
     else:
-        print(f"[MQTT][handler] Config ack orphelin (pas de requête en attente): {ack_id}")
+        print(f"[MQTT][handler] Config ack orphelin (pas de requête en attente): {message}")
 
 
 def handle_pairing_ack(topic: str, raw_payload: str):
