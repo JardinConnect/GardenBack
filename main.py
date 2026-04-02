@@ -11,7 +11,6 @@ from services.auth.router import router as auth_router
 from services.auth.bearer import JWTBearer
 from services.analytics.router import router as data_router
 from services.area.router import router as area_router
-from services.mqtt.router import router as mqtt_router
 from services.user.router import router as user_router
 from services.farm_state.router import public_router as farm_public_router, router as farm_state_router
 from services.cell.router import router as cell_router
@@ -56,7 +55,6 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 # The farm setup endpoint is public and should not require authentication.
 app.include_router(farm_public_router, prefix="/api/farm", tags=["Farm State"])
-app.include_router(mqtt_router, prefix="/api/mqtt", tags=["MQTT"])
 app.include_router(network_router, prefix="/api/network", tags=["Network"])
 
 # All routes below this line are protected by JWT authentication.

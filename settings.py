@@ -14,7 +14,8 @@ class Settings():
     DATABASE_URL: str = f"sqlite:///{DATABASE_PATH}"
 
     # MQTT
-    MQTT_BROKER: str = "127.0.0.1"
+    # MQTT_BROKER: str = "127.0.0.1"
+    MQTT_BROKER: str = "mosquitto"
     MQTT_PORT: int = 1883
     MQTT_KEEPALIVE: int = 60
     MQTT_TOPIC_ANALYTICS: str = "garden/analytics"
