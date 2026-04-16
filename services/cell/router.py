@@ -66,6 +66,52 @@ async def pair_cell(
  
     return EventSourceResponse(service.pair_cell_stream(db, area_id))
 
+@router.post(
+    "/refresh-analytics",
+    summary="Rafraîchir les analytiques de toutes les cellules IoT",
+    responses={
+        status.HTTP_403_FORBIDDEN: {"description": "Accès refusé — droits admin requis"},
+    },
+    tags=["cells"],
+)
+async def refresh_all_analytics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Déclenche un rafraîchissement immédiat des analytiques pour toutes les cellules IoT
+    via **Server-Sent Events**.
+
+    La connexion reste ouverte et émet les événements dans cet ordre :
+
+    | event       | step              | description                                |
+    |-------------|-------------------|--------------------------------------------|
+    | `status`    | `sending_command` | commande MQTT envoyée                      |
+    | `status`    | `waiting_ack`     | en attente de la réponse des devices       |
+    | `completed` | `completed`       | ack reçu, commande traitée, `device_count` |
+    | `error`     | `timeout`         | les devices n'ont pas répondu à temps      |
+    | `error`     | `device_error`    | un device a répondu avec une erreur        |
+    | `error`     | `failed`          | erreur interne                             |
+
+    *Nécessite des droits d'administrateur (admin ou superadmin).*
+    """
+    if current_user.role not in [RoleEnum.ADMIN, RoleEnum.SUPERADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seul un administrateur peut déclencher un rafraîchissement des analytiques.",
+        )
+
+    log_action(
+        db=db,
+        user=current_user,
+        action="trigger",
+        resource_type="analytics",
+        entity_name=None,
+        context="Rafraîchissement global des analytiques déclenché",
+    )
+
+    return EventSourceResponse(service.refresh_all_analytics_stream(db))
+
 @router.get("/{cell_id}", response_model=CellDTO)
 def get_cell(
     cell_id: uuid.UUID = Path(..., title="The ID of the cell to get"),

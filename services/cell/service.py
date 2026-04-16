@@ -189,6 +189,71 @@ def update_multiple_cells_settings(db: Session, settings_data: schemas.CellSetti
     db.commit()
  
  
+async def refresh_all_analytics_stream(
+    db: Session,
+) -> AsyncGenerator[dict, None]:
+    """
+    Générateur SSE pour déclencher un rafraîchissement des analytiques
+    sur tous les devices IoT et attendre leur acquittement.
+ 
+    Émet dans l'ordre :
+      - event:status  step:sending_command — envoi de la commande MQTT
+      - event:status  step:waiting_ack     — en attente de l'ack des devices
+      - event:completed step:completed     — ack reçu, commande traitée
+    En cas d'erreur à n'importe quelle étape :
+      - event:error step:failed
+    """
+ 
+    def _event(event_type: str, step: str, message: str, **extra) -> dict:
+        """Helper interne — construit un dict compatible EventSourceResponse."""
+        return {
+            "event": event_type,
+            "data": json.dumps({"step": step, "message": message, **extra}, default=str),
+        }
+ 
+    ack_id = str(uuid.uuid4())
+ 
+    try:
+        # ── Étape 1 : envoi de la commande MQTT ──────────────────────────
+        yield _event("status", "sending_command", "Envoi de la commande de rafraîchissement des analytiques...")
+ 
+        command_payload = json.dumps({
+            "command": "instant_analytics",
+            "ack_id": ack_id,
+        })
+ 
+        create_pending_ack(ack_id)
+        # Le topic MQTT pour les commandes est 'garden/devices/command'
+        publish(settings.MQTT_TOPIC_DEVICES_COMMAND, command_payload)
+ 
+        # ── Étape 2 : attente de l'acquittement ──────────────────────────
+        yield _event("status", "waiting_ack", "En attente de l'acquittement des devices...")
+ 
+        result = await wait_for_ack(ack_id, timeout=30.0) # Augmentation du timeout pour plusieurs devices
+ 
+        if result is None:
+            yield _event("error", "timeout", "Les devices n'ont pas répondu dans le délai imparti.")
+            return
+ 
+        if result.get("status") != "OK": # Vérification du statut "OK" comme spécifié
+            error_msg = result.get("message", "Erreur inconnue des devices.")
+            yield _event("error", "device_error", error_msg, device_response=result)
+            return
+ 
+        device_count = result.get("device_count", 0)
+ 
+        # ── Étape 3 : succès ────────────────────────────────────────────
+        yield _event(
+            "completed",
+            "completed",
+            f"Rafraîchissement des analytiques terminé pour {device_count} device(s).",
+            device_count=device_count,
+            device_response=result,
+        )
+ 
+    except Exception as exc:
+        cancel_pending_ack(ack_id)
+        yield _event("error", "failed", str(exc))
 async def pair_cell_stream(
     db: Session,
     area_id: Optional[uuid.UUID] = None,

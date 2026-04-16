@@ -143,6 +143,40 @@ def handle_pairing_ack(topic: str, raw_payload: str):
         print(f"[MQTT][handler] Pairing ack orphelin (pas de requête en attente): {ack_id}")
 
 
+def handle_refresh_ack(topic: str, raw_payload: str):
+    """
+    Handler pour les acquittements de commandes envoyés par le device.
+    Spécifiquement pour la commande "instant_analytics".
+
+    Format attendu :
+        {
+            "ack_id": "<correlation-id>",
+            "status": "OK" | "error",
+            "device_count": N,        (optionnel, pour instant_analytics)
+            "message": "..."          (optionnel)
+        }
+
+    Résout l'asyncio.Event correspondant dans le registre pending_acks
+    pour débloquer le générateur SSE qui attend la confirmation.
+    """
+    try:
+        message = json.loads(raw_payload)
+    except (json.JSONDecodeError, TypeError):
+        print(f"[MQTT][handler] Command ack non-JSON ignoré: {raw_payload}")
+        return
+
+    ack_id = message.get("ack_id")
+    if not ack_id:
+        print(f"[MQTT][handler] Command ack sans ack_id, ignoré: {message}")
+        return
+
+    resolved = resolve_ack(ack_id, message)
+    if resolved:
+        print(f"[MQTT][handler] Command ack résolu: {ack_id} -> {message.get('status')}")
+    else:
+        print(f"[MQTT][handler] Command ack orphelin (pas de requête en attente): {ack_id}")
+
+
 def handle_alert_trigger(topic: str, raw_payload: str):
     """
     Handler pour les triggers d'alertes envoyés par le device.
