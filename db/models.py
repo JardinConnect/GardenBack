@@ -142,7 +142,7 @@ class Sensor(Base):
     __tablename__ = "sensors"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    sensor_id: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    sensor_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
     sensor_type: Mapped[str] = mapped_column(String, nullable=False)  # 'temperature', 'humidity', etc.
     status: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 'active', 'inactive', 'error'
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
@@ -183,7 +183,8 @@ class AnalyticType(str, PyEnum):
             "HS": cls.SOIL_HUMIDITY,
             "DHS": cls.DEEP_SOIL_HUMIDITY,
             "L": cls.LIGHT,
-            "B": cls.BATTERY,
+            "VB": cls.BATTERY,
+            "SB": cls.BATTERY,
         }
         try:
             return prefix_map[prefix.upper()]
