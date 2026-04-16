@@ -116,7 +116,7 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> PaginatedAnalyticRes
 def create_analytic(db: Session, analytic_input: AnalyticCreate) -> AnalyticSchema:
     """Crée une nouvelle entrée d'analytique."""
 
-    analytic_type_prefix = analytic_input.sensor_code.split('-')[0]
+    analytic_type_prefix = analytic_input.sensor_code[1:]
     
     try:
         analytic_type = AnalyticType.from_prefix(analytic_type_prefix)

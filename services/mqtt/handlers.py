@@ -28,13 +28,13 @@ def handle_sensor_data(topic: str, raw_payload: str):
         return
 
     # Ignorer les acquittements / événements simples
-    if "event" in message and "payload" not in message:
+    if "event" in message and "data" not in message:
         print(f"[MQTT][handler] Événement reçu (ack): {message}")
         return
 
     uid = message.get("uid")
     timestamp_str = message.get("timestamp")
-    data = message.get("payload")
+    data = message.get("data")
 
     if not uid or not timestamp_str or not data:
         print(f"[MQTT][handler] Message incomplet, ignoré: {message}")
@@ -42,19 +42,25 @@ def handle_sensor_data(topic: str, raw_payload: str):
 
     db = SessionLocal()
     try:
-        sensor = db.query(Sensor).filter(Sensor.sensor_id == uid).first()
-        if not sensor or sensor.id is None:
-            print(f"[MQTT][handler] Capteur avec UID '{uid}' non trouvé. Message ignoré.")
+        cell = db.query(Cell).filter(Cell.deviceID == uid).first()
+        if not cell or cell.id is None:
+            print(f"[MQTT][handler] Cellule avec UID '{uid}' non trouvée. Message ignoré.")
+            return
+        sensors = db.query(Sensor).filter(Sensor.cell_id == cell.id).all()
+        if not sensors or len(sensors) == 0:
+            print(f"[MQTT][handler] Capteurs avec cell_id '{cell.id}' non trouvés. Message ignoré.")
             return
 
-        sensor_id = sensor.id
-
         for sensor_code, value in data.items():
+            sensor = next((s for s in sensors if s.sensor_id == sensor_code.upper()), None)
+            if not sensor:
+                print(f"[MQTT][handler] Capteur avec code '{sensor_code}' non trouvé. Message ignoré.")
+                continue
             analytic_data = AnalyticCreate(
-                sensor_code=sensor_code,
+                sensor_code=sensor.sensor_id,
                 value=float(value),
                 timestamp=timestamp_str,
-                sensor_id=sensor_id,
+                sensor_id=sensor.id,
             )
             try:
                 create_analytic_repo(db, analytic_data)
