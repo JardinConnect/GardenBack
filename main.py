@@ -16,11 +16,10 @@ from services.user.router import router as user_router
 from services.farm_state.router import public_router as farm_public_router, router as farm_state_router
 from services.cell.router import router as cell_router
 from services.network.router import router as network_router
-from services.mqtt.client import connect_mqtt
+from services.mqtt.client import connect_mqtt, register_handler
 from services.sse.manager import SSEConnectionManager
 from services.sse.runtime import clear_sse_runtime, configure_sse_runtime
 from services.sse.router import router as sse_router
-from services.mqtt.client import connect_mqtt, register_handler
 from services.mqtt.handlers import handle_sensor_data, handle_config_ack, handle_alert_trigger, handle_pairing_ack
 from settings import settings
 
