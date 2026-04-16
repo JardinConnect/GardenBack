@@ -5,6 +5,7 @@ import re
 from datetime import datetime
 from db.models import AnalyticType
 from services.analytics.schemas import AnalyticSchema
+from enum import Enum
 
 
 # =========================================================
@@ -29,6 +30,7 @@ class Cell(BaseModel):
     """Schéma interne avec toutes les relations de la base de données."""
     id: uuid.UUID
     name: str
+    deviceID: str
     area_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime
@@ -81,6 +83,7 @@ class CellDTO(BaseModel):
 class CellCreate(BaseModel):
     """Schéma pour créer une nouvelle cellule."""
     name: str = Field(..., min_length=1, description="Nom de la cellule")
+    deviceID: str = Field(..., description="ID du dispositif physique (ex: 'DEVICE1')")
     area_id: Optional[uuid.UUID] = Field(default=None, description="ID de la zone parente")
 
 
@@ -116,3 +119,28 @@ class CellSettingsUpdate(BaseModel):
             }
         }
     )
+
+class PairingStep(str, Enum):
+    SCANNING = "scanning"
+    DEVICE_FOUND = "device_found"
+    CREATING = "creating"
+    COMPLETED = "completed"
+    FAILED = "failed"
+ 
+ 
+class DeviceInfo(BaseModel):
+    """Informations du device IoT détecté (données issues du MQTT stub)."""
+    device_id: str
+    name: str
+    firmware_version: str
+ 
+ 
+class PairingEventData(BaseModel):
+    """
+    Structure des données envoyées dans chaque événement SSE.
+    Les champs `device` et `cell` sont présents selon l'étape.
+    """
+    step: PairingStep
+    message: str
+    device: Optional[DeviceInfo] = None
+    cell: Optional["CellDTO"] = None

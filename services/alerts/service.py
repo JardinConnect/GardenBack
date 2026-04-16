@@ -1,32 +1,114 @@
 from __future__ import annotations
 
-from typing import List, Optional
-from collections import defaultdict
-from sqlalchemy.orm import Session
+import json
 import uuid
+from collections import defaultdict
+from typing import AsyncGenerator, List, Optional
+
+from sqlalchemy.orm import Session, attributes
 
 from db.models import Alert, AlertEvent, Cell, SeverityEnum
-from .schemas import (
-    AlertCreateUpdateSchema, AlertSensorSchema, AlertToggleSchema, AlertValidateInputSchema, AlertResponseSchema, CellInfoSchema
-)
-from .errors import AlertNotFoundError, AlertEventNotFoundError, AlertConflictError
 from services.area.service import get_full_location_path_for_cell
+from services.mqtt.client import publish
+from services.mqtt.pending_acks import cancel_pending_ack, create_pending_ack, wait_for_ack
 from services.sse.runtime import notify_alert_event_if_configured
+from settings import settings
+
+from .errors import AlertConflictError, AlertEventNotFoundError, AlertNotFoundError
+from .schemas import (
+    AlertCreateUpdateSchema,
+    AlertResponseSchema,
+    AlertSensorSchema,
+    AlertToggleSchema,
+    AlertValidateInputSchema,
+    CellInfoSchema,
+)
 
 
 # ---------------------------------------------------------------------------
-# Helpers internes
+# Alerte batterie par défaut
 # ---------------------------------------------------------------------------
+
+
+def associate_cell_to_default_battery_alert(db: Session, cell_id: uuid.UUID) -> None:
+    """Associe une cellule à l’alerte batterie faible par défaut (sans commit)."""
+    default_alert_title = "Alerte Batterie Faible - " + str(cell_id)[:8]
+
+    battery_alert_config = {
+        "title": default_alert_title,
+        "is_active": True,
+        "warning_enabled": True,
+        "sensors": [
+            {
+                "type": "battery",
+                "index": 0,
+                "criticalRange": {"min": 0.0, "max": 10.0},
+                "warningRange": {"min": 10.1, "max": 20.0},
+            }
+        ],
+    }
+
+    alert = db.query(Alert).filter(Alert.title == default_alert_title).first()
+
+    if alert:
+        if str(cell_id) not in alert.cell_ids:
+            alert.cell_ids.append(str(cell_id))
+            attributes.flag_modified(alert, "cell_ids")
+    else:
+        new_alert = Alert(**battery_alert_config, cell_ids=[str(cell_id)])
+        db.add(new_alert)
+
+
+# ---------------------------------------------------------------------------
+# Publication MQTT de la config alerte
+# ---------------------------------------------------------------------------
+
+
+def _publish_alert_to_mqtt(alert: Alert, db: Session) -> None:
+    """Publie la configuration d’une alerte (deviceIDs + plages)."""
+    device_ids: List[str] = []
+    for cid_raw in alert.cell_ids or []:
+        cid = uuid.UUID(cid_raw) if isinstance(cid_raw, str) else cid_raw
+        cell = db.query(Cell).filter(Cell.id == cid).first()
+        if cell:
+            device_ids.append(cell.deviceID)
+        else:
+            print(f"[MQTT][alert] Cell {cid_raw} introuvable, ignorée pour MQTT.")
+
+    mqtt_sensors = []
+    for s in alert.sensors or []:
+        sensor_entry = {
+            "type": s["type"],
+            "index": s["index"],
+            "criticalRange": [s["criticalRange"]["min"], s["criticalRange"]["max"]],
+        }
+        if s.get("warningRange") and s["warningRange"].get("min") is not None:
+            sensor_entry["warningRange"] = [s["warningRange"]["min"], s["warningRange"]["max"]]
+        mqtt_sensors.append(sensor_entry)
+
+    payload = json.dumps(
+        {
+            "id": str(alert.id),
+            "is_active": alert.is_active,
+            "cell_ids": device_ids,
+            "sensors": mqtt_sensors,
+        }
+    )
+
+    try:
+        publish(settings.MQTT_TOPIC_ALERTS_CONFIG, payload)
+        print(f"[MQTT][alert] Config publiée pour alerte '{alert.title}' → {device_ids}")
+    except Exception as e:
+        print(f"[MQTT][alert] Erreur publication config: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Construction de réponses et conflits
+# ---------------------------------------------------------------------------
+
 
 def _build_alert_response(alert: Alert, db: Session) -> AlertResponseSchema:
-    """
-    Construit un schéma de réponse `AlertResponseSchema` à partir d'un modèle `Alert`.
-
-    Cette fonction enrichit l'objet en :
-    - Résolvant les `cell_ids` pour récupérer les noms et localisations des cellules.
-    - S'assurant que la structure des capteurs (`sensors`) est conforme au schéma Pydantic.
-    """
-    cell_uuids = [uuid.UUID(c) if isinstance(c, str) else c for c in alert.cell_ids]
+    cell_uuids = [uuid.UUID(c) for c in alert.cell_ids if c is not None]
 
     cells_data: List[CellInfoSchema] = []
     for cid in cell_uuids:
@@ -64,22 +146,12 @@ def _build_alert_response(alert: Alert, db: Session) -> AlertResponseSchema:
     )
 
 
-def _detect_conflicts(db: Session, cell_ids: List[uuid.UUID], sensor_types: List[str], exclude_alert_id: Optional[uuid.UUID] = None) -> List[dict]:
-    """
-    Détecte les conflits entre une configuration d'alerte potentielle et les alertes existantes.
-
-    Un conflit se produit si une alerte existante surveille déjà le même type de capteur
-    sur l'une des mêmes cellules.
-
-    Args:
-        db: La session de base de données.
-        cell_ids: Liste des IDs de cellules pour la nouvelle alerte/mise à jour.
-        sensor_types: Liste des types de capteurs pour la nouvelle alerte/mise à jour.
-        exclude_alert_id: ID d'une alerte à exclure de la détection (utile lors d'une mise à jour).
-
-    Returns:
-        Une liste de dictionnaires, chaque dictionnaire représentant un conflit trouvé.
-    """
+def _detect_conflicts(
+    db: Session,
+    cell_ids: List[uuid.UUID],
+    sensor_types: List[str],
+    exclude_alert_id: Optional[uuid.UUID] = None,
+) -> List[dict]:
     conflicts: List[dict] = []
 
     query = db.query(Alert)
@@ -90,8 +162,7 @@ def _detect_conflicts(db: Session, cell_ids: List[uuid.UUID], sensor_types: List
 
     for alert in all_alerts:
         existing_cell_ids = {
-            uuid.UUID(c) if isinstance(c, str) else c
-            for c in alert.cell_ids
+            uuid.UUID(c) if isinstance(c, str) else c for c in alert.cell_ids
         }
         existing_sensor_types = {s["type"] for s in (alert.sensors or [])}
 
@@ -101,7 +172,6 @@ def _detect_conflicts(db: Session, cell_ids: List[uuid.UUID], sensor_types: List
             for stype in sensor_types:
                 if stype not in existing_sensor_types:
                     continue
-                # Conflict trouvé
                 cell = db.query(Cell).filter(Cell.id == cid).first()
                 cell_name = cell.name if cell else str(cid)
                 conflicts.append(
@@ -120,32 +190,16 @@ def _detect_conflicts(db: Session, cell_ids: List[uuid.UUID], sensor_types: List
     return conflicts
 
 
-def _resolve_conflicts(db: Session, conflicts: List[dict], new_alert_cell_ids: List[uuid.UUID]) -> List[uuid.UUID]:
-    """
-    Résout les conflits en "éclatant" l'alerte existante.
-
-    Pour une alerte existante A sur (c1, c2, c3) pour le capteur S, si une nouvelle alerte B
-    est créée sur (c1) pour le capteur S avec overwrite=true :
-    1. La configuration du capteur S est retirée de l'alerte A.
-    2. Une nouvelle alerte A' est créée, avec la configuration de S, pour les cellules (c2, c3) restantes.
-       Son nom est "Nom de A (conflit)".
-    3. Si l'alerte A devient vide (plus de capteurs), elle est supprimée.
-
-    Args:
-        db: La session de base de données.
-        conflicts: La liste des conflits détectés par `_detect_conflicts`.
-        new_alert_cell_ids: Liste des IDs de cellules de la nouvelle alerte en cours de création.
-
-    Returns:
-        La liste des IDs des alertes qui ont été entièrement supprimées (car devenues vides).
-    """
+def _resolve_conflicts(
+    db: Session, conflicts: List[dict], new_alert_cell_ids: List[uuid.UUID]
+) -> List[uuid.UUID]:
     deleted_alert_ids: List[uuid.UUID] = []
     if not conflicts:
         return deleted_alert_ids
 
     conflicts_by_alert_id = defaultdict(list)
     for conflict in conflicts:
-        conflicts_by_alert_id[conflict['existingAlertId']].append(conflict)
+        conflicts_by_alert_id[conflict["existingAlertId"]].append(conflict)
 
     new_alert_cell_ids_set = set(new_alert_cell_ids)
 
@@ -155,16 +209,15 @@ def _resolve_conflicts(db: Session, conflicts: List[dict], new_alert_cell_ids: L
         if not existing_alert:
             continue
 
-        conflicting_sensor_types = {c['sensorType'] for c in alert_conflicts}
+        conflicting_sensor_types = {c["sensorType"] for c in alert_conflicts}
         original_cell_ids = {uuid.UUID(cid) for cid in existing_alert.cell_ids}
         original_sensors = existing_alert.sensors or []
 
         remaining_cell_ids = original_cell_ids - new_alert_cell_ids_set
 
         if remaining_cell_ids:
-            # Regrouper tous les capteurs en conflit qui doivent être éclatés
             split_off_sensors = [
-                s for s in original_sensors if s.get('type') in conflicting_sensor_types
+                s for s in original_sensors if s.get("type") in conflicting_sensor_types
             ]
             if split_off_sensors:
                 split_off_alert = Alert(
@@ -176,7 +229,7 @@ def _resolve_conflicts(db: Session, conflicts: List[dict], new_alert_cell_ids: L
                 )
                 db.add(split_off_alert)
 
-        updated_sensors = [s for s in original_sensors if s.get('type') not in conflicting_sensor_types]
+        updated_sensors = [s for s in original_sensors if s.get("type") not in conflicting_sensor_types]
 
         if not updated_sensors:
             deleted_alert_ids.append(existing_alert.id)
@@ -188,26 +241,22 @@ def _resolve_conflicts(db: Session, conflicts: List[dict], new_alert_cell_ids: L
 
 
 # ---------------------------------------------------------------------------
-# Alertes — CRUD
+# CRUD alertes
 # ---------------------------------------------------------------------------
 
+
 def get_all_alerts(db: Session, cell_id: Optional[uuid.UUID] = None) -> List[AlertResponseSchema]:
-    """Récupère toutes les alertes, avec un filtre optionnel par cellule."""
     query = db.query(Alert)
     alerts = query.all()
 
     if cell_id:
         cell_id_str = str(cell_id)
-        alerts = [
-            a for a in alerts
-            if cell_id_str in [str(c) for c in a.cell_ids]
-        ]
+        alerts = [a for a in alerts if cell_id_str in [str(c) for c in a.cell_ids]]
 
     return [_build_alert_response(a, db) for a in alerts]
 
 
 def get_alert_by_id(db: Session, alert_id: uuid.UUID) -> AlertResponseSchema:
-    """Récupère une alerte par son ID."""
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise AlertNotFoundError(alert_id)
@@ -215,10 +264,6 @@ def get_alert_by_id(db: Session, alert_id: uuid.UUID) -> AlertResponseSchema:
 
 
 def validate_alert(db: Session, payload: AlertValidateInputSchema) -> dict:
-    """
-    Valide une configuration d'alerte potentielle pour détecter les conflits.
-    Utilisé par le front-end avant de soumettre une création ou une mise à jour.
-    """
     conflicts = _detect_conflicts(
         db, payload.cell_ids, payload.sensor_types, exclude_alert_id=payload.alert_id
     )
@@ -229,14 +274,6 @@ def validate_alert(db: Session, payload: AlertValidateInputSchema) -> dict:
 
 
 def create_alert(db: Session, alert_data: AlertCreateUpdateSchema) -> dict:
-    """
-    Crée une nouvelle alerte.
-
-    Gère les conflits avec les alertes existantes :
-    - Si `overwriteExisting` est `False`, lève une exception `AlertConflictError`.
-    - Si `overwriteExisting` est `True`, résout les conflits en modifiant ou supprimant
-      les parties conflictuelles des alertes existantes via `_resolve_conflicts`.
-    """
     sensor_types = [s.type for s in alert_data.sensors]
     conflicts = _detect_conflicts(db, alert_data.cell_ids, sensor_types)
 
@@ -259,6 +296,8 @@ def create_alert(db: Session, alert_data: AlertCreateUpdateSchema) -> dict:
     db.commit()
     db.refresh(new_alert)
 
+    _publish_alert_to_mqtt(new_alert, db)
+
     return {
         "id": new_alert.id,
         "title": new_alert.title,
@@ -268,14 +307,6 @@ def create_alert(db: Session, alert_data: AlertCreateUpdateSchema) -> dict:
 
 
 def update_alert(db: Session, alert_id: uuid.UUID, alert_data: AlertCreateUpdateSchema) -> dict:
-    """
-    Met à jour une alerte existante.
-
-    Gère les conflits avec d'autres alertes de la même manière que `create_alert` :
-    - Si `overwriteExisting` est `False`, lève une exception `AlertConflictError`.
-    - Si `overwriteExisting` est `True`, résout les conflits en modifiant ou supprimant
-      les parties conflictuelles des autres alertes via `_resolve_conflicts`.
-    """
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise AlertNotFoundError(alert_id)
@@ -302,6 +333,8 @@ def update_alert(db: Session, alert_id: uuid.UUID, alert_data: AlertCreateUpdate
     db.commit()
     db.refresh(alert)
 
+    _publish_alert_to_mqtt(alert, db)
+
     return {
         "id": alert.id,
         "title": alert.title,
@@ -311,7 +344,6 @@ def update_alert(db: Session, alert_id: uuid.UUID, alert_data: AlertCreateUpdate
 
 
 def toggle_alert(db: Session, alert_id: uuid.UUID, payload: AlertToggleSchema) -> dict:
-    """Active ou désactive une alerte."""
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise AlertNotFoundError(alert_id)
@@ -328,7 +360,6 @@ def toggle_alert(db: Session, alert_id: uuid.UUID, payload: AlertToggleSchema) -
 
 
 def delete_alert(db: Session, alert_id: uuid.UUID) -> None:
-    """Supprime une alerte et ses événements associés (via cascade)."""
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise AlertNotFoundError(alert_id)
@@ -337,8 +368,9 @@ def delete_alert(db: Session, alert_id: uuid.UUID) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Événements d'alerte
+# Événements d’alerte (historique + SSE)
 # ---------------------------------------------------------------------------
+
 
 def get_alert_events(
     db: Session,
@@ -347,7 +379,6 @@ def get_alert_events(
     start_date=None,
     end_date=None,
 ) -> List[AlertEvent]:
-    """Récupère l'historique des événements d'alerte non archivés, avec filtres."""
     query = db.query(AlertEvent).filter(AlertEvent.is_archived == False)  # noqa: E712
 
     if cell_id:
@@ -376,7 +407,7 @@ def create_alert_event(
     threshold_min: float,
     threshold_max: float,
 ) -> AlertEvent:
-    """Persiste un événement d’alerte et notifie les clients SSE."""
+    """Persiste un événement et notifie les abonnés SSE."""
     event = AlertEvent(
         alert_id=alert_id,
         alert_title=alert_title,
@@ -397,7 +428,6 @@ def create_alert_event(
 
 
 def archive_event(db: Session, event_id: uuid.UUID) -> dict:
-    """Archive un événement d'alerte spécifique."""
     event = db.query(AlertEvent).filter(AlertEvent.id == event_id).first()
     if not event:
         raise AlertEventNotFoundError(event_id)
@@ -412,7 +442,6 @@ def archive_event(db: Session, event_id: uuid.UUID) -> dict:
 
 
 def archive_all_events(db: Session) -> dict:
-    """Archive tous les événements d'alerte non encore archivés."""
     result = (
         db.query(AlertEvent)
         .filter(AlertEvent.is_archived == False)  # noqa: E712
@@ -430,7 +459,6 @@ def archive_all_events(db: Session) -> dict:
 
 
 def archive_events_by_cell(db: Session, cell_id: uuid.UUID) -> dict:
-    """Archive tous les événements non archivés pour une cellule spécifique."""
     result = (
         db.query(AlertEvent)
         .filter(AlertEvent.cell_id == cell_id, AlertEvent.is_archived == False)  # noqa: E712
@@ -446,3 +474,87 @@ def archive_events_by_cell(db: Session, cell_id: uuid.UUID) -> dict:
         "cellId": cell_id,
         "message": "Événements de la cellule archivés avec succès.",
     }
+
+
+# ---------------------------------------------------------------------------
+# Streaming : push config MQTT + attente d’ack device
+# ---------------------------------------------------------------------------
+
+
+async def push_alert_config_stream(
+    db: Session,
+    alert_id: uuid.UUID,
+) -> AsyncGenerator[dict, None]:
+    """Étapes de publication MQTT et attente d’acquittement (événements pour le client stream)."""
+
+    def _event(event_type: str, step: str, message: str, **extra) -> dict:
+        return {
+            "event": event_type,
+            "data": json.dumps({"step": step, "message": message, **extra}, default=str),
+        }
+
+    ack_id = str(uuid.uuid4())
+
+    try:
+        alert = db.query(Alert).filter(Alert.id == alert_id).first()
+        if not alert:
+            yield _event("error", "failed", f"Alerte {alert_id} non trouvée.")
+            return
+
+        yield _event("status", "publishing", "Envoi de la configuration sur MQTT...")
+
+        device_ids: List[str] = []
+        for cid_raw in alert.cell_ids or []:
+            cid = uuid.UUID(cid_raw) if isinstance(cid_raw, str) else cid_raw
+            cell = db.query(Cell).filter(Cell.id == cid).first()
+            if cell:
+                device_ids.append(cell.deviceID)
+
+        mqtt_sensors = []
+        for s in alert.sensors or []:
+            sensor_entry = {
+                "type": s["type"],
+                "index": s["index"],
+                "criticalRange": [s["criticalRange"]["min"], s["criticalRange"]["max"]],
+            }
+            if s.get("warningRange") and s["warningRange"].get("min") is not None:
+                sensor_entry["warningRange"] = [s["warningRange"]["min"], s["warningRange"]["max"]]
+            mqtt_sensors.append(sensor_entry)
+
+        config_payload = json.dumps(
+            {
+                "ack_id": ack_id,
+                "id": str(alert.id),
+                "is_active": alert.is_active,
+                "cell_ids": device_ids,
+                "sensors": mqtt_sensors,
+            }
+        )
+
+        create_pending_ack(ack_id)
+        publish(settings.MQTT_TOPIC_ALERTS_CONFIG, config_payload)
+
+        yield _event("status", "waiting_ack", "En attente de la confirmation du device...")
+
+        result = await wait_for_ack(ack_id, timeout=15.0)
+
+        if result is None:
+            yield _event("error", "timeout", "Le device n'a pas répondu dans le délai imparti.")
+            return
+
+        if result.get("status") != "ok":
+            error_msg = result.get("message", "Erreur inconnue du device.")
+            yield _event("error", "device_error", error_msg, device_response=result)
+            return
+
+        yield _event(
+            "completed",
+            "completed",
+            "Configuration appliquée avec succès.",
+            alert_id=str(alert.id),
+            device_response=result,
+        )
+
+    except Exception as exc:
+        cancel_pending_ack(ack_id)
+        yield _event("error", "failed", str(exc))

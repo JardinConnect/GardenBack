@@ -17,7 +17,7 @@ def test_get_summary_counts_populated_db(db_session):
         User(email="user2@test.com", password="pwd", role=RoleEnum.EMPLOYEES, first_name="f", last_name="l"),
     ]
     areas = [Area(name="Area 1"), Area(name="Area 2"), Area(name="Area 3")]
-    cells = [Cell(name="Cell 1"), Cell(name="Cell 2")]
+    cells = [Cell(name="Cell 1", deviceID="SVC-TEST-DEVICE-14"), Cell(name="Cell 2", deviceID="SVC-TEST-DEVICE-15")]
     db_session.add_all(users + areas + cells)
     db_session.commit()
 
@@ -113,7 +113,7 @@ def test_get_farm_returns_first_if_multiple_exist(db_session):
 def test_get_all_sensor_types_populated(db_session):
     """Vérifie que get_all_sensor_types retourne une liste de types de capteurs."""
     # Arrange
-    cell = Cell(name="C1")
+    cell = Cell(name="C1", deviceID="SVC-TEST-DEVICE-14")
     db_session.add(cell)
     db_session.commit()
     sensors = [
@@ -148,7 +148,7 @@ def test_get_all_sensor_types_empty(db_session):
 def test_get_average_analytics_by_type_populated(db_session):
     """Vérifie que get_average_analytics_by_type calcule correctement les moyennes."""
     # Arrange
-    cell = Cell(name="C1")
+    cell = Cell(name="C1", deviceID="SVC-TEST-DEVICE-16")
     db_session.add(cell)
     db_session.commit()
     sensor = Sensor(sensor_id="S1", sensor_type="multi", cell_id=cell.id)

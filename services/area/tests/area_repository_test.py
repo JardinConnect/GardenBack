@@ -27,7 +27,7 @@ def setup_hierarchy(db_session):
     db_session.add(planche)
     db_session.commit()  # Commit pour obtenir l'ID de la planche
 
-    cellule = Cell(name="Cellule Test", area_id=planche.id)
+    cellule = Cell(name="Cellule Test", area_id=planche.id, deviceID="REPO-TEST-DEVICE-12")
     db_session.add(cellule)
     db_session.commit()  # Commit pour obtenir l'ID de la cellule
 
@@ -83,7 +83,7 @@ def test_get_by_id_success(db_session, setup_hierarchy):
 def test_get_analytics_for_areas_success(db_session):
     """Vérifie que la fonction récupère bien les analytiques des 7 derniers jours."""
     area = Area(name="Test Area")
-    cell = Cell(name="Test Cell", area=area)
+    cell = Cell(name="Test Cell", area=area, deviceID="REPO-TEST-DEVICE-13")
     sensor = Sensor(sensor_id="S1", sensor_type="temp", cell=cell)
     db_session.add_all([area, cell, sensor])
     db_session.commit()
@@ -205,7 +205,7 @@ def test_delete_hierarchy_repository(db_session):
     child = Area(name="Child to delete", parent_id=root.id)
     db_session.add(child)
     db_session.commit()
-    cell_on_child = Cell(name="Cell to detach", area_id=child.id)
+    cell_on_child = Cell(name="Cell to detach", area_id=child.id, deviceID="REPO-TEST-DEVICE-11")
     db_session.add(cell_on_child)
     db_session.commit()
 

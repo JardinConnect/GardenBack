@@ -44,7 +44,7 @@ def test_get_farm_details_with_data_no_analytics(db_session):
     area = Area(name="A1")
     db_session.add(area)
     db_session.commit()
-    cell = Cell(name="C1", area_id=area.id)
+    cell = Cell(name="C1", area_id=area.id, deviceID="SVC-TEST-DEVICE-14")
     db_session.add(cell)
     db_session.commit()
     db_session.add(Sensor(sensor_id="T1", sensor_type="temperature", cell_id=cell.id))
@@ -77,7 +77,7 @@ def test_get_farm_details_with_analytics(db_session):
         zip_code="12345",
         city="Testville",
         phone_number="0123456789"))
-    cell = Cell(name="C1")
+    cell = Cell(name="C1", deviceID="SVC-TEST-DEVICE-16")
     db_session.add(cell)
     db_session.commit()
     sensor = Sensor(sensor_id="S1", sensor_type="multi", cell_id=cell.id)
@@ -108,7 +108,7 @@ def test_get_farm_details_with_analytics(db_session):
 def test_get_farm_details_with_analytics_rounding(db_session):
     """Vérifie que les moyennes des analytiques sont correctement arrondies."""
     # Arrange
-    cell = Cell(name="C1")
+    cell = Cell(name="C1", deviceID="SVC-TEST-DEVICE-16")
     db_session.add(cell)
     db_session.commit()
     sensor = Sensor(sensor_id="S1", sensor_type="multi", cell_id=cell.id)

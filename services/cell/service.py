@@ -3,14 +3,21 @@ import uuid
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
+import services.alerts.service as alerts_service
 import services.cell.repository as repositoryCell
 from datetime import datetime
 import services.area.repository as repositoryArea
 import services.cell.schemas as schemas
 import services.cell.errors as errors
 from db.models import Analytic as AnalyticModel, AnalyticType
+from services.mqtt.pending_acks import create_pending_ack, wait_for_ack, cancel_pending_ack
+from services.mqtt.client import publish
+from settings import settings
 
-def create_cell(db: Session, cell_data: schemas.CellCreate) -> schemas.Cell:
+import json
+from typing import AsyncGenerator
+
+def create_cell(db: Session, cell_data: schemas.CellCreate, commit: bool = True) -> schemas.Cell:
     """
     Crée une nouvelle cellule (Cell) dans la base de données.
     """
@@ -18,7 +25,12 @@ def create_cell(db: Session, cell_data: schemas.CellCreate) -> schemas.Cell:
         area = repositoryArea.get_by_id(db, cell_data.area_id)
         if not area:
             raise errors.ParentCellNotFoundError
-    cell = repositoryCell.create_cell(db, cell_data)
+            
+    # On passe commit=False au repository pour gérer la transaction ici
+    cell = repositoryCell.create_cell(db, cell_data, commit=False)
+    
+    # Associer l'alerte de batterie par défaut à la nouvelle cellule
+    alerts_service.associate_cell_to_default_battery_alert(db, cell.id)
     
     return cell
 
@@ -159,3 +171,103 @@ def update_multiple_cells_settings(db: Session, settings_data: schemas.CellSetti
 
     # 5. Appliquer la transaction
     db.commit()
+ 
+ 
+async def pair_cell_stream(
+    db: Session,
+    area_id: Optional[uuid.UUID] = None,
+) -> AsyncGenerator[dict, None]:
+    """
+    Générateur SSE pour le pairing d'une cellule IoT.
+ 
+    Émet dans l'ordre :
+      - event:status  step:scanning      — début du scan MQTT
+      - event:status  step:device_found  — device détecté (données IoT)
+      - event:status  step:creating      — écriture en base
+      - event:completed step:completed   — cellule créée, payload complet
+    En cas d'erreur à n'importe quelle étape :
+      - rollback automatique de la transaction (annule l'insertion en base)
+      - event:error step:failed
+    """
+ 
+    def _event(event_type: str, step: str, message: str, **extra) -> dict:
+        """Helper interne — construit un dict compatible EventSourceResponse."""
+        return {
+            "event": event_type,
+            "data": json.dumps({"step": step, "message": message, **extra}, default=str),
+        }
+    
+    ack_id = str(uuid.uuid4())
+ 
+    try:
+        # ── Étape 1 : scan ────────────────────────────────────────────────
+        yield _event("status", "scanning", "Recherche d'un device IoT en cours...")
+ 
+        # ── Étape 2 : détection device ────────────────────────
+
+        config_payload = json.dumps({
+            "event" : "start", # MQTT Event
+            "ack_id": ack_id,
+        })
+
+        create_pending_ack(ack_id)
+        publish(settings.MQTT_TOPIC_PAIRING, config_payload)
+
+
+        result = await wait_for_ack(ack_id, timeout=15.0)
+        if result is None:
+            yield _event("error", "timeout", "Le device n'a pas répondu dans le délai imparti.")
+            return
+
+        if result.get("status") != "ok":
+            error_msg = result.get("message", "Erreur inconnue du device.")
+            yield _event("error", "device_error", error_msg, device_response=result)
+            return
+
+        uid = result.get("uid")
+        if not uid:
+            yield _event("error", "device_error", "UID manquant dans la réponse du device.", device_response=result)
+            return
+
+        device_data = {
+            "device_id": uid,
+            "ack_id": ack_id,
+            "status": result.get("status"),
+        }
+
+        yield _event(
+            "status",
+            "device_found",
+            f"Device détecté : {device_data['device_id']}",
+            device=device_data,
+        )
+
+        # ── Étape 3 : création en base ────────────────────────────────────
+        yield _event("status", "creating", "Création de la cellule en base de données...")
+ 
+        cell_data = schemas.CellCreate(
+            name=uid,
+            deviceID=uid,
+            area_id=area_id
+        )
+        
+        # On passe commit=False pour garder la transaction ouverte
+        cell = create_cell(db, cell_data, commit=False)  # peut lever ParentCellNotFoundError
+ 
+        cell_dto = schemas.CellDTO.from_cell(cell)
+        
+        # ── Étape 4 : Validation finale de la transaction ─────────────────
+        db.commit()
+        
+        yield _event(
+            "completed",
+            "completed",
+            "Cellule créée avec succès.",
+            cell=cell_dto.model_dump(mode="json"),
+        )
+ 
+    except Exception as exc:
+        # ── Rollback de la transaction en cas d'erreur ────────────────────
+        cancel_pending_ack(ack_id)
+        db.rollback()
+        yield _event("error", "failed", str(exc))

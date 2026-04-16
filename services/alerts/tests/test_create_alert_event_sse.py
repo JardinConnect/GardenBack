@@ -14,7 +14,7 @@ def setup_area(db_session):
 
 @pytest.fixture
 def setup_cell(db_session, setup_area):
-    cell = Cell(name="Cell SSE", area_id=setup_area.id)
+    cell = Cell(name="Cell SSE", area_id=setup_area.id, deviceID="SSE-TEST-DEVICE-1")
     db_session.add(cell)
     db_session.commit()
     return cell

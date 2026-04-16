@@ -153,13 +153,6 @@ def seed_garden_hierarchy(db: Session) -> list[Cell]:
     db.refresh(sous_planche_tomates_cerises)
     db.refresh(sous_planche_tomates_coeur)
 
-    # Compteurs sensor_id
-    sensor_counters = {"TA": 1, "TS": 1, "HA": 1, "HS": 1, "DHS": 1, "L": 1, "B": 1}
-    def get_sensor_id(prefix: str) -> str:
-        num = sensor_counters[prefix]
-        sensor_counters[prefix] += 1
-        return f"{prefix}-{num}"
-
     # Cellules & capteurs
     print("\n  📦 Création des cellules et capteurs...")
     cells_config = [
@@ -167,17 +160,18 @@ def seed_garden_hierarchy(db: Session) -> list[Cell]:
             "area": sous_planche_tomates_cerises,
             "cells": [
                 {"name": "Rangée A - Tomates Cerises", "sensors": [
-                    {"prefix": "TA", "type": "air_temperature"},
-                    {"prefix": "HA", "type": "air_humidity"},
-                    {"prefix": "L", "type": "light"},
-                    {"prefix": "TS", "type": "soil_temperature"},
-                    {"prefix": "HS", "type": "soil_humidity"},
-                    {"prefix": "DHS", "type": "deep_soil_humidity"},
-                    {"prefix": "B", "type": "battery"},
+                    {"sensor_id": "1TA", "type": "air_temperature"},
+                    {"sensor_id": "1HA", "type": "air_humidity"},
+                    {"sensor_id": "1L", "type": "light"},
+                    {"sensor_id": "1TS", "type": "soil_temperature"},
+                    {"sensor_id": "1HS", "type": "soil_humidity"},
+                    {"sensor_id": "2HS", "type": "deep_soil_humidity"},
+                    {"sensor_id": "1VB", "type": "battery_voltage"},
+                    {"sensor_id": "1SB", "type": "battery_soc"},
                 ]},
                 {"name": "Rangée B - Tomates Cerises", "sensors": [
-                    {"prefix": "TA", "type": "air_temperature"},
-                    {"prefix": "HA", "type": "air_humidity"},
+                    {"sensor_id": "1TA", "type": "air_temperature"},
+                    {"sensor_id": "1HA", "type": "air_humidity"},
                 ]},
             ],
         },
@@ -185,8 +179,8 @@ def seed_garden_hierarchy(db: Session) -> list[Cell]:
             "area": sous_planche_tomates_coeur,
             "cells": [
                 {"name": "Rangée A - Coeur de Boeuf", "sensors": [
-                    {"prefix": "TA", "type": "air_temperature"},
-                    {"prefix": "HA", "type": "air_humidity"},
+                    {"sensor_id": "1TA", "type": "air_temperature"},
+                    {"sensor_id": "1HA", "type": "air_humidity"},
                 ]},
             ],
         },
@@ -194,11 +188,11 @@ def seed_garden_hierarchy(db: Session) -> list[Cell]:
             "area": planche_salades,
             "cells": [
                 {"name": "Section Laitues", "sensors": [
-                    {"prefix": "TA", "type": "air_temperature"},
-                    {"prefix": "HA", "type": "air_humidity"},
+                    {"sensor_id": "1TA", "type": "air_temperature"},
+                    {"sensor_id": "1HA", "type": "air_humidity"},
                 ]},
                 {"name": "Section Roquette", "sensors": [
-                    {"prefix": "TA", "type": "air_temperature"},
+                    {"sensor_id": "1TA", "type": "air_temperature"},
                 ]},
             ],
         },
@@ -206,8 +200,8 @@ def seed_garden_hierarchy(db: Session) -> list[Cell]:
             "area": planche_carottes,
             "cells": [
                 {"name": "Carottes Nantaises", "sensors": [
-                    {"prefix": "TA", "type": "air_temperature"},
-                    {"prefix": "HA", "type": "air_humidity"},
+                    {"sensor_id": "1TA", "type": "air_temperature"},
+                    {"sensor_id": "1HA", "type": "air_humidity"},
                 ]},
             ],
         },
@@ -215,12 +209,12 @@ def seed_garden_hierarchy(db: Session) -> list[Cell]:
             "area": planche_herbes,
             "cells": [
                 {"name": "Section Basilic", "sensors": [
-                    {"prefix": "TA", "type": "air_temperature"},
-                    {"prefix": "HA", "type": "air_humidity"},
-                    {"prefix": "L", "type": "light"},
+                    {"sensor_id": "1TA", "type": "air_temperature"},
+                    {"sensor_id": "1HA", "type": "air_humidity"},
+                    {"sensor_id": "1L", "type": "light"},
                 ]},
                 {"name": "Section Persil", "sensors": [
-                    {"prefix": "TA", "type": "air_temperature"},
+                    {"sensor_id": "1TA", "type": "air_temperature"},
                 ]},
             ],
         },
@@ -229,11 +223,14 @@ def seed_garden_hierarchy(db: Session) -> list[Cell]:
     all_cells: list[Cell] = []
     all_sensors: list[Sensor] = []
 
+    cell_counter = 1
     for area_config in cells_config:
         area = area_config["area"]
         print(f"\n    📍 Area '{area.name}':")
         for cell_config in area_config["cells"]:
-            cell = Cell(name=cell_config["name"], area_id=area.id)
+            # Ajout du deviceID obligatoire
+            cell = Cell(name=cell_config["name"], area_id=area.id, deviceID=f"SEED-DEVICE-{cell_counter}")
+            cell_counter += 1
             db.add(cell)
             db.commit()
             db.refresh(cell)
@@ -241,7 +238,7 @@ def seed_garden_hierarchy(db: Session) -> list[Cell]:
             print(f"      ✓ Cellule '{cell.name}' (ID: {cell.id})")
             for sensor_config in cell_config["sensors"]:
                 sensor = Sensor(
-                    sensor_id=get_sensor_id(sensor_config["prefix"]),
+                    sensor_id=sensor_config["sensor_id"],
                     sensor_type=sensor_config["type"],
                     status="active",
                     cell_id=cell.id,
@@ -268,7 +265,7 @@ def seed_analytics(db: Session):
 
     for sensor in sensors:
         try:
-            prefix = sensor.sensor_id.split("-")[0]
+            prefix = sensor.sensor_id[1:]
             analytic_type = AnalyticType.from_prefix(prefix)
         except (ValueError, IndexError):
             analytic_type = AnalyticType.AIR_TEMPERATURE
@@ -404,6 +401,18 @@ def seed_alerts(db: Session, cells: list[Cell]):
                 }
             ],
             "warning_enabled": False,
+        },
+        {
+            "title": "Alerte Batteries",
+            "sensors": [
+                {
+                    "type": "battery",
+                    "index": 0,
+                    "criticalRange": {"min": 0, "max": 10.0},
+                    "warningRange": {"min": 10.1, "max": 20.0},
+                }
+            ],
+            "warning_enabled": True,
         },
     ]
 

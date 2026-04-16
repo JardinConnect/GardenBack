@@ -14,10 +14,20 @@ class Settings():
     DATABASE_URL: str = f"sqlite:///{DATABASE_PATH}"
 
     # MQTT
-    MQTT_BROKER: str = "mosquitto"
+    MQTT_BROKER: str = "127.0.0.1"
+    # MQTT_BROKER: str = "mosquitto"
     MQTT_PORT: int = 1883
     MQTT_KEEPALIVE: int = 60
-    MQTT_TOPIC: str = "test/topic"
+    MQTT_TOPIC_ANALYTICS: str = "garden/analytics"
+    MQTT_TOPIC_ALERTS_CONFIG: str = "garden/alerts/config"
+    MQTT_TOPIC_PAIRING_ACK: str = "garden/pairing/ack"
+    MQTT_TOPIC_PAIRING: str = "garden/pairing"
+    MQTT_TOPIC_ALERTS_TRIGGER: str = "garden/alerts/trigger"
+    MQTT_TOPIC_ALERTS_CONFIG_ACK: str = "garden/alerts/config/ack"
+    MQTT_TOPIC_DEVICES_COMMAND: str = "garden/devices/command"
+    MQTT_TOPIC_DEVICES_SETTINGS: str = "garden/devices/settings"
+    MQTT_USERNAME: Optional[str] = "mqtt_user"
+    MQTT_PASSWORD: Optional[str] = "mqtt_password"
 
     NETWORK_PROVIDER: str = "linux"
 

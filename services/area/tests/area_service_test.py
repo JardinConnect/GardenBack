@@ -106,7 +106,7 @@ def test_delete_area_single_with_cell(db_session):
     db_session.add(area)
     db_session.commit()
 
-    cell = CellModel(name="Cell to detach", area_id=area.id)
+    cell = CellModel(name="Cell to detach", area_id=area.id, deviceID="SVC-TEST-DEVICE-5")
     db_session.add(cell)
     db_session.commit()
 
@@ -144,8 +144,8 @@ def test_delete_area_with_hierarchy(db_session):
     db_session.commit()
 
     # Cellules attachées à chaque niveau
-    cell_parent = CellModel(name="Cell Parent", area_id=parent.id)
-    cell_child = CellModel(name="Cell Child", area_id=child.id)
+    cell_parent = CellModel(name="Cell Parent", area_id=parent.id, deviceID="SVC-TEST-DEVICE-6")
+    cell_child = CellModel(name="Cell Child", area_id=child.id, deviceID="SVC-TEST-DEVICE-7")
     db_session.add_all([cell_parent, cell_child])
     db_session.commit()
 
@@ -183,7 +183,7 @@ def test_get_full_location_path_for_cell_with_deep_hierarchy(db_session):
     db_session.commit()
 
     # 2. Create cell
-    cell = CellModel(name="Rangée A", area_id=section.id)
+    cell = CellModel(name="Rangée A", area_id=section.id, deviceID="SVC-TEST-DEVICE-8")
     db_session.add(cell)
     db_session.commit()
 
@@ -200,7 +200,7 @@ def test_get_full_location_path_for_cell_with_root_area(db_session):
     db_session.add(parcelle)
     db_session.commit()
 
-    cell = CellModel(name="Carottes", area_id=parcelle.id)
+    cell = CellModel(name="Carottes", area_id=parcelle.id, deviceID="SVC-TEST-DEVICE-9")
     db_session.add(cell)
     db_session.commit()
 
@@ -212,7 +212,7 @@ def test_get_full_location_path_for_cell_with_no_area(db_session):
     """
     Tests that an empty string is returned for a cell with no associated area.
     """
-    cell = CellModel(name="Orphan Cell", area_id=None)
+    cell = CellModel(name="Orphan Cell", area_id=None, deviceID="SVC-TEST-DEVICE-10")
     db_session.add(cell)
     db_session.commit()
 
@@ -252,8 +252,7 @@ def test_calculate_daily_averages_empty_input():
     """Vérifie que la fonction gère une liste d'analytiques vide."""
     result = _calculate_daily_averages([])
     for analytic_type in AnalyticType:
-        assert len(result[analytic_type]) == 7
-        assert all(avg.value == 0.0 for avg in result[analytic_type])
+        assert len(result[analytic_type]) == 0
 
 def test_calculate_daily_averages_rounding():
     """Vérifie que les valeurs moyennes sont bien arrondies à 2 décimales."""
@@ -278,7 +277,7 @@ def setup_hierarchy_for_service(db_session):
     db_session.add(planche)
     db_session.commit()
 
-    cellule = CellModel(name="Cellule Test", area_id=planche.id)
+    cellule = CellModel(name="Cellule Test", area_id=planche.id, deviceID="SVC-TEST-DEVICE-11")
     db_session.add(cellule)
     db_session.commit()
 
@@ -325,7 +324,7 @@ def test_get_area_single_level_with_analytics(db_session):
     db_session.add(area1)
     db_session.commit()
 
-    cell1 = CellModel(name="Cell 1", area_id=area1.id)
+    cell1 = CellModel(name="Cell 1", area_id=area1.id, deviceID="SVC-TEST-DEVICE-12")
     db_session.add(cell1)
     db_session.commit()
 
@@ -374,7 +373,7 @@ def test_get_area_multi_level_aggregation(db_session):
     parent_area = AreaModel(name="Parent Area")
     db_session.add(parent_area)
     db_session.commit()
-    cell_parent = CellModel(name="Cell Parent", area_id=parent_area.id)
+    cell_parent = CellModel(name="Cell Parent", area_id=parent_area.id, deviceID="SVC-TEST-DEVICE-13")
     db_session.add(cell_parent)
     db_session.commit()
     sensor_parent = SensorModel(sensor_id="TP", sensor_type="temperature", cell_id=cell_parent.id)
@@ -388,7 +387,7 @@ def test_get_area_multi_level_aggregation(db_session):
     child_area = AreaModel(name="Child Area", parent_id=parent_area.id)
     db_session.add(child_area)
     db_session.commit()
-    cell_child = CellModel(name="Cell Child", area_id=child_area.id)
+    cell_child = CellModel(name="Cell Child", area_id=child_area.id, deviceID="SVC-TEST-DEVICE-14")
     db_session.add(cell_child)
     db_session.commit()
     sensor_child = SensorModel(sensor_id="TC", sensor_type="temperature", cell_id=cell_child.id)
@@ -429,7 +428,7 @@ def test_get_area_uses_latest_analytic_only(db_session):
     area1 = AreaModel(name="Area 1")
     db_session.add(area1)
     db_session.commit()
-    cell1 = CellModel(name="Cell 1", area_id=area1.id)
+    cell1 = CellModel(name="Cell 1", area_id=area1.id, deviceID="SVC-TEST-DEVICE-15")
     db_session.add(cell1)
     db_session.commit()
     sensor1 = SensorModel(sensor_id="T1", sensor_type="temperature", cell_id=cell1.id)
