@@ -26,6 +26,14 @@ class Settings():
         int(_retention) if _retention and str(_retention).isdigit() else None
     )
 
+    _sse_max = os.environ.get("SSE_MAX_CONNECTIONS")
+    SSE_MAX_CONNECTIONS: int = int(_sse_max) if _sse_max and str(_sse_max).isdigit() else 100
+    _sse_hb = os.environ.get("SSE_HEARTBEAT_INTERVAL_SECONDS")
+    try:
+        SSE_HEARTBEAT_INTERVAL_SECONDS: float = float(_sse_hb) if _sse_hb is not None else 20.0
+    except ValueError:
+        SSE_HEARTBEAT_INTERVAL_SECONDS = 20.0
+
     class Config:
         env_file = ".env" 
 

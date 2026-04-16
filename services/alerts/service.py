@@ -5,12 +5,13 @@ from collections import defaultdict
 from sqlalchemy.orm import Session
 import uuid
 
-from db.models import Alert, AlertEvent, Cell
+from db.models import Alert, AlertEvent, Cell, SeverityEnum
 from .schemas import (
     AlertCreateUpdateSchema, AlertSensorSchema, AlertToggleSchema, AlertValidateInputSchema, AlertResponseSchema, CellInfoSchema
 )
 from .errors import AlertNotFoundError, AlertEventNotFoundError, AlertConflictError
 from services.area.service import get_full_location_path_for_cell
+from services.sse.runtime import notify_alert_event_if_configured
 
 
 # ---------------------------------------------------------------------------
@@ -359,6 +360,40 @@ def get_alert_events(
         query = query.filter(AlertEvent.timestamp <= end_date)
 
     return query.order_by(AlertEvent.timestamp.desc()).all()
+
+
+def create_alert_event(
+    db: Session,
+    *,
+    alert_id: uuid.UUID,
+    alert_title: str,
+    cell_id: uuid.UUID,
+    cell_name: str,
+    cell_location: str,
+    sensor_type: str,
+    severity: SeverityEnum,
+    value: float,
+    threshold_min: float,
+    threshold_max: float,
+) -> AlertEvent:
+    """Persiste un événement d’alerte et notifie les clients SSE."""
+    event = AlertEvent(
+        alert_id=alert_id,
+        alert_title=alert_title,
+        cell_id=cell_id,
+        cell_name=cell_name,
+        cell_location=cell_location,
+        sensor_type=sensor_type,
+        severity=severity,
+        value=value,
+        threshold_min=threshold_min,
+        threshold_max=threshold_max,
+    )
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    notify_alert_event_if_configured(event)
+    return event
 
 
 def archive_event(db: Session, event_id: uuid.UUID) -> dict:

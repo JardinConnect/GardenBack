@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Depends
@@ -17,16 +18,25 @@ from services.farm_state.router import public_router as farm_public_router, rout
 from services.cell.router import router as cell_router
 from services.network.router import router as network_router
 from services.mqtt.client import connect_mqtt
+from services.sse.manager import SSEConnectionManager
+from services.sse.runtime import clear_sse_runtime, configure_sse_runtime
+from services.sse.router import router as sse_router
+from settings import settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("[FASTAPI] Démarrage de l'application...")
     connect_mqtt()
+    loop = asyncio.get_running_loop()
+    sse_manager = SSEConnectionManager(settings.SSE_MAX_CONNECTIONS)
+    configure_sse_runtime(loop, sse_manager)
+    app.state.sse_manager = sse_manager
     purge_task = create_purge_task()
     try:
         yield
     finally:
+        clear_sse_runtime()
         await cancel_purge_task(purge_task)
 
 
@@ -63,3 +73,4 @@ app.include_router(area_router, prefix="/api/area", tags=["Area"], dependencies=
 app.include_router(user_router, prefix="/api/user", tags=["User"], dependencies=[auth_dependency])
 app.include_router(farm_state_router, prefix="/api/farm", tags=["Farm State"], dependencies=[auth_dependency])
 app.include_router(cell_router, prefix="/api/cell", tags=["Cell"], dependencies=[auth_dependency])
+app.include_router(sse_router, prefix="/api/sse", tags=["SSE"])
