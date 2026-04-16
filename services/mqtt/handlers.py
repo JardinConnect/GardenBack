@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from db.database import SessionLocal
 from services.analytics.repository import create_analytic as create_analytic_repo
@@ -185,10 +186,16 @@ def handle_alert_trigger(topic: str, raw_payload: str):
         print(f"[MQTT][handler] trigger_type inconnu '{trigger_type}', ignoré.")
         return
 
+    try:
+        alert_uuid = uuid.UUID(alert_id)
+    except (ValueError, AttributeError):
+        print(f"[MQTT][handler] alert_id invalide '{alert_id}', ignoré.")
+        return
+
     db = SessionLocal()
     try:
         # Récupérer l'alerte
-        alert = db.query(Alert).filter(Alert.id == alert_id).first()
+        alert = db.query(Alert).filter(Alert.id == alert_uuid).first()
         if not alert:
             print(f"[MQTT][handler] Alerte '{alert_id}' non trouvée. Trigger ignoré.")
             return

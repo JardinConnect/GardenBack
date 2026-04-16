@@ -65,7 +65,12 @@ def _publish_alert_to_mqtt(alert: Alert, db: Session) -> None:
     # Résoudre les UUIDs → deviceIDs
     device_ids: List[str] = []
     for cid_str in (alert.cell_ids or []):
-        cell = db.query(Cell).filter(Cell.id == cid_str).first()
+        try:
+            cid_uuid = uuid.UUID(cid_str) if isinstance(cid_str, str) else cid_str
+        except (ValueError, AttributeError):
+            print(f"[MQTT][alert] cell_id invalide '{cid_str}', ignoré.")
+            continue
+        cell = db.query(Cell).filter(Cell.id == cid_uuid).first()
         if cell:
             device_ids.append(cell.deviceID)
         else:
@@ -542,7 +547,11 @@ async def push_alert_config_stream(
         # Résoudre UUIDs → deviceIDs physiques
         device_ids: List[str] = []
         for cid_str in (alert.cell_ids or []):
-            cell = db.query(Cell).filter(Cell.id == cid_str).first()
+            try:
+                cid_uuid = uuid.UUID(cid_str) if isinstance(cid_str, str) else cid_str
+            except (ValueError, AttributeError):
+                continue
+            cell = db.query(Cell).filter(Cell.id == cid_uuid).first()
             if cell:
                 device_ids.append(cell.deviceID)
 
