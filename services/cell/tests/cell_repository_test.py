@@ -1,7 +1,7 @@
 import pytest
 import uuid
 from datetime import datetime, UTC
-from db.models import Cell as CellModel, Area as AreaModel, Sensor as SensorModel
+from db.models import Cell as CellModel, Area as AreaModel, Sensor as SensorModel, User as UserModel, RoleEnum
 from services.cell.repository import (
     get_cell_by_id,
     get_cells,
@@ -34,6 +34,21 @@ def setup_cell(db_session, setup_area):
     db_session.commit()
     return cell
 
+@pytest.fixture(scope="function")
+def setup_user(db_session):
+    """Crée un utilisateur de test."""
+    # Utilise un email unique pour éviter les conflits entre les tests
+    email = f"test.user.{uuid.uuid4()}@example.com"
+    user = UserModel(
+        first_name="Test",
+        last_name="User",
+        email=email,
+        password="password",
+        role=RoleEnum.ADMIN
+    )
+    db_session.add(user)
+    db_session.commit()
+    return user
 
 # =========================================================
 # TESTS FOR get_cell_by_id
@@ -90,15 +105,15 @@ def test_get_cells_empty_database(db_session):
 # TESTS FOR create_cell
 # =========================================================
 
-def test_create_cell_with_area(db_session, setup_area):
+def test_create_cell_with_area(db_session, setup_area, setup_user):
     """Teste la création d'une cellule avec une area."""
     cell_data = CellCreate(
         name="New Cell",
         area_id=setup_area.id,
         deviceID="DEVICE-1"
     )
-    
-    result = create_cell(db_session, cell_data)
+
+    result = create_cell(db_session, cell_data, setup_user)
     
     assert result is not None
     assert isinstance(result, CellSchema)
@@ -106,21 +121,23 @@ def test_create_cell_with_area(db_session, setup_area):
     assert result.area_id == setup_area.id
     assert result.is_tracked is False  # Default value in DB model
     assert result.location == "Test Area"
+    assert result.originator.id == setup_user.id
+    assert result.updater.id == setup_user.id
     
     db_cell = db_session.query(CellModel).filter(CellModel.id == result.id).first()
     assert db_cell is not None
     assert db_cell.name == "New Cell"
 
 
-def test_create_cell_without_area(db_session):
+def test_create_cell_without_area(db_session, setup_user):
     """Teste la création d'une cellule sans area."""
     cell_data = CellCreate(
         name="Orphan Cell",
         area_id=None,
         deviceID="DEVICE-2"
     )
-    
-    result = create_cell(db_session, cell_data)
+
+    result = create_cell(db_session, cell_data, setup_user)
     
     assert result is not None
     assert result.name == "Orphan Cell"
@@ -128,12 +145,12 @@ def test_create_cell_without_area(db_session):
     assert result.is_tracked is False
     assert result.location == ""
 
-def test_create_cell_no_commit(db_session, setup_area):
+def test_create_cell_no_commit(db_session, setup_area, setup_user):
     """Teste que create_cell avec commit=False garde la transaction ouverte."""
     cell_data = CellCreate(name="Uncommitted Cell", area_id=setup_area.id, deviceID="DEVICE-3")
     
     # On crée sans commit
-    result = create_cell(db_session, cell_data, commit=False)
+    result = create_cell(db_session, cell_data, setup_user, commit=False)
     
     assert result is not None
     assert result.id is not None  # L'ID a bien été généré par le flush
@@ -190,20 +207,22 @@ def test_delete_cell_with_sensors(db_session, setup_cell):
 # TESTS FOR update_cell
 # =========================================================
 
-def test_update_cell_name(db_session, setup_cell):
+def test_update_cell_name(db_session, setup_cell, setup_user):
     """Teste la mise à jour du nom d'une cellule."""
     update_data = CellUpdate(name="Updated Cell Name") # type: ignore
     
-    result = update_cell(db_session, setup_cell.id, update_data)
+    result = update_cell(db_session, setup_cell.id, update_data, setup_user)
     
     assert result.name == "Updated Cell Name"
     assert result.location == "Test Area"
+    assert result.updater.id == setup_user.id
     
     db_session.refresh(setup_cell)
     assert setup_cell.name == "Updated Cell Name"
+    assert setup_cell.updater_id == setup_user.id
 
 
-def test_update_cell_area(db_session, setup_cell):
+def test_update_cell_area(db_session, setup_cell, setup_user):
     """Teste le changement d'area d'une cellule."""
     new_area = AreaModel(name="New Area", color="#654321")
     db_session.add(new_area)
@@ -211,29 +230,31 @@ def test_update_cell_area(db_session, setup_cell):
     
     update_data = CellUpdate(area_id=new_area.id) # type: ignore
     
-    result = update_cell(db_session, setup_cell.id, update_data)
+    result = update_cell(db_session, setup_cell.id, update_data, setup_user)
     
     assert result.area_id == new_area.id
     assert result.location == "New Area"
+    assert result.updater.id == setup_user.id
     
     db_session.refresh(setup_cell)
     assert setup_cell.area_id == new_area.id
 
 
-def test_update_cell_is_tracked(db_session, setup_cell):
+def test_update_cell_is_tracked(db_session, setup_cell, setup_user):
     """Teste la mise à jour du statut is_tracked."""
     update_data = CellUpdate(is_tracked=False) # type: ignore
     
-    result = update_cell(db_session, setup_cell.id, update_data)
+    result = update_cell(db_session, setup_cell.id, update_data, setup_user)
     
     assert result.is_tracked is False
     assert result.location == "Test Area"
+    assert result.updater.id == setup_user.id
     
     db_session.refresh(setup_cell)
     assert setup_cell.is_tracked is False
 
 
-def test_update_cell_multiple_fields(db_session, setup_cell):
+def test_update_cell_multiple_fields(db_session, setup_cell, setup_user):
     """Teste la mise à jour de plusieurs champs en même temps."""
     new_area = AreaModel(name="Another Area")
     db_session.add(new_area)
@@ -244,8 +265,8 @@ def test_update_cell_multiple_fields(db_session, setup_cell):
         area_id=new_area.id,
         is_tracked=False
     )
-    
-    result = update_cell(db_session, setup_cell.id, update_data)
+
+    result = update_cell(db_session, setup_cell.id, update_data, setup_user)
     
     assert result.name == "Multi Update Cell"
     assert result.area_id == new_area.id
@@ -253,19 +274,19 @@ def test_update_cell_multiple_fields(db_session, setup_cell):
     assert result.location == "Another Area"
 
 
-def test_update_cell_not_found(db_session):
+def test_update_cell_not_found(db_session, setup_user):
     """Teste que update_cell lève une erreur si la cellule n'existe pas."""
     update_data = CellUpdate(name="Ghost Cell") # type: ignore
     
     with pytest.raises(CellNotFoundError):
-        update_cell(db_session, uuid.uuid4(), update_data)
+        update_cell(db_session, uuid.uuid4(), update_data, setup_user)
 
 
-def test_update_cell_remove_area(db_session, setup_cell):
+def test_update_cell_remove_area(db_session, setup_cell, setup_user):
     """Teste le détachement d'une cellule de son area."""
     update_data = CellUpdate(area_id=None) # type: ignore
     
-    result = update_cell(db_session, setup_cell.id, update_data)
+    result = update_cell(db_session, setup_cell.id, update_data, setup_user)
     
     assert result.area_id is None
     assert result.location == ""

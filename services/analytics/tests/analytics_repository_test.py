@@ -108,7 +108,7 @@ def test_get_analytics_success(db_session, setup_sensor):
     """Cas nominal : retourne un résultat valide."""
     now = datetime.now()
     analytic = Analytic(
-        sensor_code="TA-1",
+        sensor_code="1TA",
         analytic_type=AnalyticType.AIR_TEMPERATURE,
         value=22.5,
         occurred_at=now,
@@ -118,7 +118,7 @@ def test_get_analytics_success(db_session, setup_sensor):
     db_session.commit()
 
     request = AnalyticsFilter(
-        sensor_code="TA-1",
+        sensor_code="1TA",
         analytic_type=AnalyticType.AIR_TEMPERATURE,
         start_date=now - timedelta(hours=1),
         end_date=now + timedelta(hours=1),
@@ -136,7 +136,7 @@ def test_get_analytics_success(db_session, setup_sensor):
     assert AnalyticType.AIR_TEMPERATURE in result.data
     data = result.data[AnalyticType.AIR_TEMPERATURE][0]
     assert data.value == 22.5
-    assert data.sensorCode == "TA-1"
+    assert data.sensorCode == "1TA"
     assert isinstance(data.occurred_at, datetime)
 
 
@@ -149,7 +149,7 @@ def test_get_analytics_filters_work(db_session, setup_sensor):
     db_session.commit()
 
     data = [
-        Analytic(sensor_code="TA-1", analytic_type=AnalyticType.AIR_TEMPERATURE, value=21.7, occurred_at=now, sensor_id=setup_sensor.id),
+        Analytic(sensor_code="1TA", analytic_type=AnalyticType.AIR_TEMPERATURE, value=21.7, occurred_at=now, sensor_id=setup_sensor.id),
         Analytic(sensor_code="HS-1", analytic_type=AnalyticType.SOIL_HUMIDITY, value=61.3, occurred_at=now, sensor_id=other_sensor.id),
     ]
     db_session.add_all(data)
@@ -359,7 +359,7 @@ def test_get_analytics_pagination(db_session, setup_sensor):
 
     for i in range(5):
         db_session.add(Analytic(
-            sensor_code="TA-1",
+            sensor_code="1TA",
             analytic_type=AnalyticType.AIR_TEMPERATURE,
             value=float(20 + i),
             occurred_at=now - timedelta(minutes=i),
@@ -369,7 +369,7 @@ def test_get_analytics_pagination(db_session, setup_sensor):
 
     # Page 1 : 3 éléments
     request_p1 = AnalyticsFilter(
-        sensor_code="TA-1",
+        sensor_code="1TA",
         start_date=now - timedelta(hours=1),
         end_date=now + timedelta(hours=1), sensor_id=None,
         analytic_type=None, area_id=None, cell_id=None,
@@ -381,7 +381,7 @@ def test_get_analytics_pagination(db_session, setup_sensor):
 
     # Page 2 : 2 éléments restants
     request_p2 = AnalyticsFilter(
-        sensor_code="TA-1",
+        sensor_code="1TA",
         start_date=now - timedelta(hours=1),
         end_date=now + timedelta(hours=1), sensor_id=None,
         analytic_type=None, area_id=None, cell_id=None,
@@ -399,7 +399,7 @@ def test_get_analytics_no_limit(db_session, setup_sensor):
     # Ajouter plus de données qu'une limite habituelle
     for i in range(25):
         db_session.add(Analytic(
-            sensor_code="TA-1",
+            sensor_code="1TA",
             analytic_type=AnalyticType.AIR_TEMPERATURE,
             value=float(20 + i),
             occurred_at=now - timedelta(minutes=i),
@@ -408,7 +408,7 @@ def test_get_analytics_no_limit(db_session, setup_sensor):
     db_session.commit()
 
     request = AnalyticsFilter(
-        sensor_code="TA-1",
+        sensor_code="1TA",
         start_date=now - timedelta(hours=1),
         end_date=now + timedelta(hours=1),
         sensor_id=None, analytic_type=None, area_id=None,
@@ -428,7 +428,7 @@ def test_get_analytics_no_limit(db_session, setup_sensor):
 def test_create_analytic_success(db_session, setup_sensor):
     """Teste la création réussie d'une entrée analytique via le repository."""
     analytic_data = AnalyticCreate(
-        sensor_code="TA-1",
+        sensor_code="1TA",
         value=25.5,
         timestamp=datetime(2023, 10, 27, 10, 0, 0),
         sensor_id=setup_sensor.id
@@ -438,9 +438,9 @@ def test_create_analytic_success(db_session, setup_sensor):
 
     assert isinstance(result_schema, AnalyticSchema)
     assert result_schema.value == 25.5
-    assert result_schema.sensorCode == "TA-1"
+    assert result_schema.sensorCode == "1TA"
 
-    created_analytic = db_session.query(Analytic).filter_by(sensor_code="TA-1").one()
+    created_analytic = db_session.query(Analytic).filter_by(sensor_code="1TA").one()
     assert created_analytic is not None
     assert created_analytic.value == 25.5
     assert created_analytic.analytic_type == AnalyticType.AIR_TEMPERATURE

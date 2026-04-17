@@ -63,7 +63,7 @@ async def pair_cell(
             detail="Seul un administrateur peut appairer une cellule.",
         )
  
-    return EventSourceResponse(service.pair_cell_stream(db, area_id))
+    return EventSourceResponse(service.pair_cell_stream(db=db, current_user=current_user, area_id=area_id))
 
 @router.post(
     "/refresh-analytics",
@@ -140,7 +140,7 @@ def create_cell(
     Crée une nouvelle cellule.
     """
     try:
-        cell = service.create_cell(db, cell_data)
+        cell = service.create_cell(db, cell_data, current_user)
         log_action(db, current_user, "create", "cell", entity_name=cell.name)
         return CellDTO.from_cell(cell)
     except ParentCellNotFoundError as e:
@@ -217,7 +217,7 @@ def update_cell(
     current_user: User = Depends(get_current_user),
 ) -> CellDTO:
     try:
-        cell = service.update_cell(db, cell_id, cell_data)
+        cell = service.update_cell(db, cell_id, cell_data, current_user)
         log_action(db, current_user, "update", "cell", entity_name=cell.name)
         return CellDTO.from_cell(cell)
     except CellNotFoundError as e:

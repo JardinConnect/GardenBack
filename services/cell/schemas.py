@@ -23,6 +23,15 @@ class Sensor(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# This should ideally be in a shared user schemas file to avoid duplication.
+class UserInfo(BaseModel):
+    id: uuid.UUID
+    first_name: str
+    last_name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # =========================================================
 # CELL SCHEMAS - Internal (Full Model)
 # =========================================================
@@ -39,6 +48,8 @@ class Cell(BaseModel):
     analytics: Dict[AnalyticType, List[AnalyticSchema]] = Field(default_factory=dict)
     location: Optional[str] = None
     settings: Optional[Dict] = None
+    originator: Optional[UserInfo] = None
+    updater: Optional[UserInfo] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -51,11 +62,14 @@ class CellDTO(BaseModel):
     id: uuid.UUID
     name: str
     parent_id: Optional[uuid.UUID] = None
+    created_at: datetime
     updated_at: datetime
     is_tracked: bool
     analytics: Dict[AnalyticType, List[AnalyticSchema]] = Field(default_factory=dict)
     location: Optional[str] = None  # Champ calculé pour l'affichage de la localisation de la cellule
     settings: Optional[Dict] = None # Ajouté pour les administrateurs
+    created_by: Optional[UserInfo] = None
+    updated_by: Optional[UserInfo] = None
     
     model_config = ConfigDict(from_attributes=True)
     
@@ -66,10 +80,13 @@ class CellDTO(BaseModel):
             "id": cell.id,
             "name": cell.name,
             "parent_id": cell.area_id,
+            "created_at": cell.created_at,
             "updated_at": cell.updated_at,
             "is_tracked": cell.is_tracked,
             "analytics": cell.analytics,
-            "location": cell.location
+            "location": cell.location,
+            "created_by": cell.originator,
+            "updated_by": cell.updater,
         }
         if include_settings:
             data['settings'] = cell.settings

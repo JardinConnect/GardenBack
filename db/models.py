@@ -117,6 +117,10 @@ class Cell(Base):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     deviceID: Mapped[str] = mapped_column(String, unique=True, nullable=False)  # ID du dispositif physique associé à la cellule
 
+    # Foreign keys for users
+    originator_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    updater_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
 
     # Relation vers l'area parent
     area_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("areas.id"), nullable=True)
@@ -130,9 +134,13 @@ class Cell(Base):
             back_populates="cell",
             cascade="all, delete-orphan"
         )
+        originator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[originator_id])
+        updater: Mapped[Optional["User"]] = relationship("User", foreign_keys=[updater_id])
     else:
         area = relationship("Area", back_populates="cells")
         sensors = relationship("Sensor", primaryjoin="and_(Cell.id==Sensor.cell_id, Sensor.deleted_at==None)", back_populates="cell", cascade="all, delete-orphan")
+        originator = relationship("User", foreign_keys=[originator_id])
+        updater = relationship("User", foreign_keys=[updater_id])
 
 
 # =========================================================
