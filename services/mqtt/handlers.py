@@ -7,6 +7,8 @@ from services.analytics.schemas import AnalyticCreate
 from db.models import Sensor, Alert, AlertEvent, Cell, SeverityEnum
 from services.mqtt.pending_acks import resolve_ack
 from services.area.service import get_full_location_path_for_cell
+from services.alerts.schemas import AlertEventResponseSchema
+from services.alerts.event_broadcast import notify_alert_event
 
 
 def handle_sensor_data(topic: str, raw_payload: str):
@@ -271,8 +273,16 @@ def handle_alert_trigger(topic: str, raw_payload: str):
         )
         db.add(event)
         db.commit()
+        db.refresh(event)
         print(f"[MQTT][handler] AlertEvent créé: alert={alert.title}, cell={cell.name}, "
               f"type={sensor_type}, severity={severity.value}, value={value}")
+        try:
+            payload = AlertEventResponseSchema.model_validate(event).model_dump(
+                mode="json", by_alias=True
+            )
+            notify_alert_event(payload)
+        except Exception as notify_exc:
+            print(f"[MQTT][handler] Notification SSE alerte ignorée: {notify_exc}")
 
     except Exception as e:
         print(f"[MQTT][handler] Erreur traitement alert trigger: {e}")

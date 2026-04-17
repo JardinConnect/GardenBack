@@ -16,6 +16,7 @@ from services.area.service import get_full_location_path_for_cell
 from services.mqtt.client import publish
 from services.mqtt.pending_acks import create_pending_ack, wait_for_ack, cancel_pending_ack
 from settings import settings
+from .event_broadcast import subscribe, unsubscribe
 import uuid
 
 
@@ -504,6 +505,53 @@ def archive_events_by_cell(db: Session, cell_id: uuid.UUID) -> dict:
         "cellId": cell_id,
         "message": "Événements de la cellule archivés avec succès.",
     }
+
+
+async def alert_events_stream() -> AsyncGenerator[dict, None]:
+    """
+    Générateur SSE longue durée : chaque nouvel AlertEvent (MQTT trigger) est poussé
+    aux abonnés via event_broadcast.
+
+    Émet :
+      - event:status   step:connected   — connexion prête
+      - event:ping     step:ping        — heartbeat périodique (timeout d'attente)
+      - event:alert_event step:new_alert_event — payload API dans alertEvent
+      - event:error    step:capacity    — trop de connexions simultanées
+    """
+
+    def _event(event_type: str, step: str, message: str, **extra) -> dict:
+        return {
+            "event": event_type,
+            "data": json.dumps({"step": step, "message": message, **extra}, default=str),
+        }
+
+    queue = subscribe()
+    if queue is None:
+        yield _event("error", "capacity", "Trop de connexions SSE simultanées.")
+        return
+
+    try:
+        yield _event("status", "connected", "Flux événements d'alerte prêt.")
+        while True:
+            try:
+                payload = await asyncio.wait_for(queue.get(), timeout=25.0)
+            except asyncio.TimeoutError:
+                yield _event("ping", "ping", "")
+                continue
+
+            yield {
+                "event": "alert_event",
+                "data": json.dumps(
+                    {
+                        "step": "new_alert_event",
+                        "message": "Nouvel événement d'alerte",
+                        "alertEvent": payload,
+                    },
+                    default=str,
+                ),
+            }
+    finally:
+        unsubscribe(queue)
 
 
 async def _mock_mqtt_alert_config_ack(ack_id: str) -> dict:
