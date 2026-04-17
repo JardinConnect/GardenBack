@@ -210,6 +210,25 @@ def get_alert_events(
     return service.get_alert_events(db, cell_id, severity, start_date, end_date)
 
 
+@router.get(
+    "/events/stream",
+    summary="Flux temps réel des événements d'alerte (SSE)",
+)
+async def stream_alert_events():
+    """
+    Connexion **Server-Sent Events** : chaque déclenchement MQTT
+    (`garden/alerts/trigger`) qui crée un `AlertEvent` est poussé aux clients connectés.
+
+    | event         | step              | description                                      |
+    |---------------|-------------------|--------------------------------------------------|
+    | `status`      | `connected`       | flux prêt                                      |
+    | `ping`        | `ping`            | heartbeat (en l'absence d'événement ~25 s)     |
+    | `alert_event` | `new_alert_event` | champ `alertEvent` = même schéma que `GET /events/` |
+    | `error`       | `capacity`        | trop de connexions SSE simultanées             |
+    """
+    return EventSourceResponse(service.alert_events_stream())
+
+
 @router.post(
     "/events/archive-all",
     response_model=AlertEventsArchiveAllResponseSchema,
