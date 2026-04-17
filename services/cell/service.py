@@ -352,3 +352,20 @@ async def pair_cell_stream(
         cancel_pending_ack(ack_id)
         db.rollback()
         yield _event("error", "failed", str(exc))
+
+
+# async def _stub_scan_mqtt() -> dict:
+#     """
+#     STUB : Simule la détection d'un device IoT via MQTT.
+ 
+#     ⚠️  TODO (ticket MQTT) : Remplacer par le vrai scan MQTT.
+#           Cette fonction doit rester isolée ici pour faciliter le remplacement.
+#           Elle doit retourner un dict avec les clés : device_id, name, firmware_version.
+#     """
+#     await asyncio.sleep(2)  # simule le délai réseau / scan
+#     device_id = f"CELL-{uuid.uuid4().hex[:6].upper()}"
+#     return {
+#         "device_id": device_id,
+#         "name": f"Cellule {device_id}",
+#         "firmware_version": "1.0.0",
+#     }

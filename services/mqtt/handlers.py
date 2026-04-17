@@ -29,13 +29,13 @@ def handle_sensor_data(topic: str, raw_payload: str):
         return
 
     # Ignorer les acquittements / événements simples
-    if "event" in message and "data" not in message:
+    if "event" in message and "payload" not in message:
         print(f"[MQTT][handler] Événement reçu (ack): {message}")
         return
 
     uid = message.get("uid")
     timestamp_str = message.get("timestamp")
-    data = message.get("data")
+    data = message.get("payload")
 
     if not uid or not timestamp_str or not data:
         print(f"[MQTT][handler] Message incomplet, ignoré: {message}")
