@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import AsyncGenerator, List, Optional
 from collections import defaultdict
@@ -15,7 +16,6 @@ from services.area.service import get_full_location_path_for_cell
 from services.mqtt.client import publish
 from services.mqtt.pending_acks import create_pending_ack, wait_for_ack, cancel_pending_ack
 from settings import settings
-
 import uuid
 
 
@@ -506,6 +506,14 @@ def archive_events_by_cell(db: Session, cell_id: uuid.UUID) -> dict:
     }
 
 
+async def _mock_mqtt_alert_config_ack(ack_id: str) -> dict:
+    """
+    Simule la réponse d'un device IoT pour la configuration d'une alerte.
+    """
+    await asyncio.sleep(1)
+    return {"status": "ok", "message": "Mock ACK for alert config received", "ack_id": ack_id}
+
+
 # ---------------------------------------------------------------------------
 # Flux 2 : Push config alerte vers MQTT (SSE)
 # ---------------------------------------------------------------------------
@@ -540,48 +548,51 @@ async def push_alert_config_stream(
         if not alert:
             yield _event("error", "failed", f"Alerte {alert_id} non trouvée.")
             return
-
+        
         # ── Étape 2 : publier la config sur MQTT ───────────────────────
         yield _event("status", "publishing", "Envoi de la configuration sur MQTT...")
+        
+        if settings.MOCK_MQTT:
+            print(f"[MQTT Mock] Simulating alert config push for ack_id: {ack_id}")
+            result = await _mock_mqtt_alert_config_ack(ack_id)
+        else:
+            # Résoudre UUIDs → deviceIDs physiques
+            device_ids: List[str] = []
+            for cid_str in (alert.cell_ids or []):
+                try:
+                    cid_uuid = uuid.UUID(cid_str) if isinstance(cid_str, str) else cid_str
+                except (ValueError, AttributeError):
+                    continue
+                cell = db.query(Cell).filter(Cell.id == cid_uuid).first()
+                if cell:
+                    device_ids.append(cell.deviceID)
 
-        # Résoudre UUIDs → deviceIDs physiques
-        device_ids: List[str] = []
-        for cid_str in (alert.cell_ids or []):
-            try:
-                cid_uuid = uuid.UUID(cid_str) if isinstance(cid_str, str) else cid_str
-            except (ValueError, AttributeError):
-                continue
-            cell = db.query(Cell).filter(Cell.id == cid_uuid).first()
-            if cell:
-                device_ids.append(cell.deviceID)
+                # Formater sensors avec ranges en arrays [min, max]
+                mqtt_sensors = []
+                for s in (alert.sensors or []):
+                    sensor_entry = {
+                        "type": s["type"],
+                        "index": s["index"],
+                        "criticalRange": [s["criticalRange"]["min"], s["criticalRange"]["max"]],
+                    }
+                    if s.get("warningRange") and s["warningRange"].get("min") is not None:
+                        sensor_entry["warningRange"] = [s["warningRange"]["min"], s["warningRange"]["max"]]
+                    mqtt_sensors.append(sensor_entry)
 
-        # Formater sensors avec ranges en arrays [min, max]
-        mqtt_sensors = []
-        for s in (alert.sensors or []):
-            sensor_entry = {
-                "type": s["type"],
-                "index": s["index"],
-                "criticalRange": [s["criticalRange"]["min"], s["criticalRange"]["max"]],
-            }
-            if s.get("warningRange") and s["warningRange"].get("min") is not None:
-                sensor_entry["warningRange"] = [s["warningRange"]["min"], s["warningRange"]["max"]]
-            mqtt_sensors.append(sensor_entry)
+                config_payload = json.dumps({
+                    "ack_id": ack_id,
+                    "id": str(alert.id),
+                    "is_active": alert.is_active,
+                    "cell_ids": device_ids,
+                    "sensors": mqtt_sensors,
+                })
 
-        config_payload = json.dumps({
-            "ack_id": ack_id,
-            "id": str(alert.id),
-            "is_active": alert.is_active,
-            "cell_ids": device_ids,
-            "sensors": mqtt_sensors,
-        })
+                create_pending_ack(ack_id)
+                publish(settings.MQTT_TOPIC_ALERTS_CONFIG, config_payload)
 
-        create_pending_ack(ack_id)
-        publish(settings.MQTT_TOPIC_ALERTS_CONFIG, config_payload)
-
-        # ── Étape 3 : attente de l'ack ─────────────────────────────────
-        yield _event("status", "waiting_ack", "En attente de la confirmation du device...")
-
-        result = await wait_for_ack(ack_id, timeout=15.0)
+                # ── Étape 3 : attente de l'ack ─────────────────────────────────
+                yield _event("status", "waiting_ack", "En attente de la confirmation du device...")
+                result = await wait_for_ack(ack_id, timeout=15.0)
 
         if result is None:
             yield _event("error", "timeout", "Le device n'a pas répondu dans le délai imparti.")

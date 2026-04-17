@@ -27,8 +27,12 @@ class Settings():
     MQTT_TOPIC_ALERTS_CONFIG_ACK: str = "garden/alerts/config/ack"
     MQTT_TOPIC_DEVICES_COMMAND: str = "garden/devices/command"
     MQTT_TOPIC_DEVICES_SETTINGS: str = "garden/devices/settings"
+    
     MQTT_USERNAME: Optional[str] = "mqtt_user"
     MQTT_PASSWORD: Optional[str] = "mqtt_password"
+
+    # Mock MQTT
+    MOCK_MQTT: bool = True  # Set to True to enable MQTT mocking, False to use real MQTT connection
 
     NETWORK_PROVIDER: str = "linux"
 

@@ -70,7 +70,7 @@ async def wait_for_ack(ack_id: str, timeout: float = 15.0) -> Optional[dict]:
     except asyncio.TimeoutError:
         return None
     finally:
-        _pending.pop(ack_id, None)
+        cancel_pending_ack(ack_id) # S'assure que l'entrée est toujours nettoyée
 
 
 def cancel_pending_ack(ack_id: str) -> None:

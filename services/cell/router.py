@@ -33,7 +33,6 @@ def get_cells(
     responses={
         status.HTTP_403_FORBIDDEN: {"description": "Accès refusé — droits admin requis"},
     },
-    tags=["cells"],
 )
 async def pair_cell(
     area_id: Optional[uuid.UUID] = Query(
@@ -72,7 +71,6 @@ async def pair_cell(
     responses={
         status.HTTP_403_FORBIDDEN: {"description": "Accès refusé — droits admin requis"},
     },
-    tags=["cells"],
 )
 async def refresh_all_analytics(
     db: Session = Depends(get_db),
