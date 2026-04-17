@@ -116,7 +116,7 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> PaginatedAnalyticRes
 def create_analytic(db: Session, analytic_input: AnalyticCreate) -> AnalyticSchema:
     """Crée une nouvelle entrée d'analytique."""
 
-    analytic_type_prefix = analytic_input.sensor_code.split("-")[0].upper()  # Extrait le préfixe du code du capteur (ex: "TA" de "TA-01")
+    analytic_type_prefix = analytic_input.sensor_code[1:].upper()  # Supprime le premier caractère numérique (ex: "TA" de "1TA", "HS" de "2HS")
     
     try:
         analytic_type = AnalyticType.from_prefix(analytic_type_prefix)

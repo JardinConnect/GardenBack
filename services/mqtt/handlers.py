@@ -17,7 +17,7 @@ def handle_sensor_data(topic: str, raw_payload: str):
         {
             "uid": "TA-SENSOR-01",
             "timestamp": "2025-11-20T18:32:41Z",
-            "payload": { "TA-01": 25.0, "HS-01": 60.0 }
+            "data": { "TA-01": 25.0, "HS-01": 60.0 }
         }
 
     Un message contenant uniquement "event" (acquittement) est ignoré.
@@ -29,13 +29,13 @@ def handle_sensor_data(topic: str, raw_payload: str):
         return
 
     # Ignorer les acquittements / événements simples
-    if "event" in message and "payload" not in message:
+    if "event" in message and "data" not in message:
         print(f"[MQTT][handler] Événement reçu (ack): {message}")
         return
 
     uid = message.get("uid")
     timestamp_str = message.get("timestamp")
-    data = message.get("payload")
+    data = message.get("data")
 
     if not uid or not timestamp_str or not data:
         print(f"[MQTT][handler] Message incomplet, ignoré: {message}")
@@ -45,7 +45,7 @@ def handle_sensor_data(topic: str, raw_payload: str):
     try:
         cell = db.query(Cell).filter(Cell.deviceID == uid).first()
         if not cell or cell.id is None:
-            print(f"[MQTT][handler] Cellule avec UID '{uid}' non trouvée. Message ignoré.")
+            print(f"[MQTT][handler] Cellule avec DeviceID '{uid}' non trouvée. Message ignoré.")
             return
         sensors = db.query(Sensor).filter(Sensor.cell_id == cell.id).all()
         if not sensors or len(sensors) == 0:

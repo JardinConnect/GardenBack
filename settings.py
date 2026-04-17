@@ -21,7 +21,7 @@ class Settings():
     MQTT_TOPIC_ANALYTICS: str = "garden/analytics"
     MQTT_TOPIC_ALERTS_CONFIG: str = "garden/alerts/config"
     MQTT_TOPIC_PAIRING_ACK: str = "garden/pairing/ack"
-    MQTT_TOPIC_PAIRING: str = "garden/pairing"
+    MQTT_TOPIC_PAIRING: str = "garden/pairing/request"
     MQTT_TOPIC_ALERTS_TRIGGER: str = "garden/alerts/trigger"
     MQTT_TOPIC_COMMAND_ACK: str = "garden/command/ack"
     MQTT_TOPIC_ALERTS_CONFIG_ACK: str = "garden/alerts/config/ack"
