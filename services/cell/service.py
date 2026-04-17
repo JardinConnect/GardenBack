@@ -162,12 +162,28 @@ def update_multiple_cells_settings(db: Session, settings_data: schemas.CellSetti
         "measurement_frequency": settings_data.measurement_frequency,
     }
 
+    # 3.5 Préparer le dictionnaire de settings IoT à appliquer
+    device_send_interval = (24 / max(settings_data.daily_update_count, 1)) * 60 * 60
+    settings_payload_iot = {
+        "device.send_interval": device_send_interval,
+        "power.sleep_interval": settings_data.measurement_frequency,
+    }
+
     # 4. Mettre à jour le champ 'settings' de chaque cellule
     for cell in cells_to_update:
         if cell.settings is None:
             cell.settings = {}
         cell.settings.update(settings_payload)
         flag_modified(cell, "settings")
+        try:
+            payload = json.dumps({
+                "uid": str(cell.deviceID),
+                "data": settings_payload_iot,
+            })
+            publish(settings.MQTT_TOPIC_DEVICES_SETTINGS, payload)
+            print(f"[MQTT][cell] Device {cell.deviceID} settings published: {payload}")
+        except Exception as e:
+            print(f"[MQTT][cell] Error publishing device settings: {e}")
 
     # 5. Appliquer la transaction
     db.commit()
