@@ -14,7 +14,7 @@ from .schemas import (
 from .errors import AlertNotFoundError, AlertEventNotFoundError, AlertConflictError
 from services.area.service import get_full_location_path_for_cell
 from services.mqtt.client import publish
-from services.mqtt.pending_acks import create_pending_ack, wait_for_ack, cancel_pending_ack
+from services.mqtt.pending_acks import create_pending_ack, wait_for_ack
 from settings import settings
 from .event_broadcast import subscribe, unsubscribe
 import uuid
@@ -463,7 +463,7 @@ def get_alert_events(
         query = query.filter(AlertEvent.timestamp <= end_date)
 
     if not include_archived:
-        query = query.filter(AlertEvent.is_archived == False)
+        query = query.filter(AlertEvent.is_archived == False)  # noqa: E712
 
     return query.order_by(AlertEvent.timestamp.desc()).all()
 
