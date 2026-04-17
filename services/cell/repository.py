@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List
 import uuid
 from datetime import datetime, UTC
-from db.models import Cell as CellModel, Sensor
+from db.models import Cell as CellModel, Sensor, User
 from .schemas import Cell as CellSchema, CellUpdate, CellCreate
 from .errors import CellNotFoundError
 from services.area.service import get_full_location_path_for_cell
@@ -11,7 +11,11 @@ def get_cell_by_id(db: Session, cell_id: uuid.UUID) -> CellSchema:
     """
     Récupère une seule cellule par son ID, si elle n'est pas "soft-deleted".
     """
-    cell = db.query(CellModel).options(joinedload(CellModel.area)).filter(
+    cell = db.query(CellModel).options(
+        joinedload(CellModel.area),
+        joinedload(CellModel.originator),
+        joinedload(CellModel.updater)
+    ).filter(
         CellModel.id == cell_id, CellModel.deleted_at.is_(None)).first()
     if not cell:
         raise CellNotFoundError
@@ -24,7 +28,11 @@ def get_cells(db: Session) -> List[CellSchema]:
     """
     Récupère toutes les cellules non "soft-deleted".
     """
-    cells = db.query(CellModel).options(joinedload(CellModel.area)).filter(CellModel.deleted_at.is_(None)).all()
+    cells = db.query(CellModel).options(
+        joinedload(CellModel.area),
+        joinedload(CellModel.originator),
+        joinedload(CellModel.updater)
+    ).filter(CellModel.deleted_at.is_(None)).all()
     
     cell_schemas = []
     for cell in cells:
@@ -34,12 +42,16 @@ def get_cells(db: Session) -> List[CellSchema]:
 
     return cell_schemas
 
-def create_cell(db: Session, cell_data: CellCreate, commit: bool = True) -> CellSchema:
+def create_cell(db: Session, cell_data: CellCreate, current_user: User, commit: bool = True) -> CellSchema:
     """
     Crée une nouvelle cellule.
     Si commit=False, effectue un flush au lieu d'un commit pour permettre une transaction globale.
     """
-    cell = CellModel(**cell_data.model_dump())
+    cell = CellModel(
+        **cell_data.model_dump(),
+        originator_id=current_user.id,
+        updater_id=current_user.id
+    )
     db.add(cell)
     
     if commit:
@@ -67,16 +79,19 @@ def delete_cell(db: Session, cell_id: uuid.UUID) -> None:
     
     return None
 
-def update_cell(db: Session, cell_id: uuid.UUID, cell_data: CellUpdate) -> CellSchema:
+def update_cell(db: Session, cell_id: uuid.UUID, cell_data: CellUpdate, current_user: User) -> CellSchema:
     cell = db.query(CellModel).filter(CellModel.id == cell_id, CellModel.deleted_at.is_(None)).first()
     if not cell:
         raise CellNotFoundError
     
     # Update only the fields that were explicitly set in the request data.
     # This prevents accidentally setting non-nullable fields to None.
-    for field, value in cell_data.model_dump(exclude_unset=True).items():
-        setattr(cell, field, value)
-    
+    update_data = cell_data.model_dump(exclude_unset=True)
+    if update_data:
+        for field, value in update_data.items():
+            setattr(cell, field, value)
+        cell.updater_id = current_user.id
+
     db.commit()
     
     return get_cell_by_id(db, cell.id)
