@@ -3,7 +3,12 @@ from typing import Callable, Dict, List
 from settings import settings
 
 # Client MQTT global
-mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+if not settings.MOCK_MQTT:
+    mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+else:
+    # En mode mock, on n'a pas besoin d'un vrai client.
+    # On le met à None pour éviter des erreurs si on essaie de l'utiliser.
+    mqtt_client = None
 
 # Registre : topic_pattern → liste de callbacks
 _handlers: Dict[str, List[Callable[[str, str], None]]] = {}
@@ -48,6 +53,10 @@ def on_message(client, userdata, msg):
 
 def connect_mqtt():
     """Initialise et connecte le client MQTT."""
+    if settings.MOCK_MQTT:
+        print("[MQTT Mock] Skipping actual MQTT connection.")
+        return
+
     mqtt_client.on_connect = on_connect
     mqtt_client.on_message = on_message
 
@@ -61,6 +70,10 @@ def connect_mqtt():
 
 def publish(topic: str, message: str):
     """Publie un message sur un topic MQTT. Peut être appelé par n'importe quel service."""
+    if settings.MOCK_MQTT:
+        print(f"[MQTT Mock] Simulating publish to topic '{topic}': {message[:150]}...")
+        return
+
     result = mqtt_client.publish(topic, message)
     status = result.rc
     if status == 0:
@@ -71,6 +84,9 @@ def publish(topic: str, message: str):
 
 def disconnect_mqtt():
     """Déconnecte proprement le client MQTT."""
+    if settings.MOCK_MQTT or not mqtt_client:
+        return
+
     mqtt_client.loop_stop()
     mqtt_client.disconnect()
     print("[MQTT] Déconnecté du broker")

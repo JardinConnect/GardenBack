@@ -286,7 +286,6 @@ def archive_event(
         status.HTTP_403_FORBIDDEN: {"description": "Accès refusé — droits admin requis"},
         status.HTTP_404_NOT_FOUND: {"description": "Alerte non trouvée"},
     },
-    tags=["alerts"],
 )
 async def push_alert_config(
     alert_id: uuid.UUID,

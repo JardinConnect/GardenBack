@@ -23,11 +23,18 @@ class Settings():
     MQTT_TOPIC_PAIRING_ACK: str = "garden/pairing/ack"
     MQTT_TOPIC_PAIRING: str = "garden/pairing"
     MQTT_TOPIC_ALERTS_TRIGGER: str = "garden/alerts/trigger"
+    MQTT_TOPIC_COMMAND_ACK: str = "garden/command/ack"
     MQTT_TOPIC_ALERTS_CONFIG_ACK: str = "garden/alerts/config/ack"
     MQTT_TOPIC_DEVICES_COMMAND: str = "garden/devices/command"
     MQTT_TOPIC_DEVICES_SETTINGS: str = "garden/devices/settings"
+    
     MQTT_USERNAME: Optional[str] = "mqtt_user"
     MQTT_PASSWORD: Optional[str] = "mqtt_password"
+
+    # Mock MQTT
+    # Lit la variable d'environnement MOCK_MQTT. Par défaut à 'False' si non définie.
+    _mock_mqtt_str: str = os.environ.get("MOCK_MQTT", "False")
+    MOCK_MQTT: bool = _mock_mqtt_str.lower() in ('true')
 
     NETWORK_PROVIDER: str = "linux"
 

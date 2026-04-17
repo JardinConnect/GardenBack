@@ -2,8 +2,8 @@ from enum import Enum as PyEnum
 from typing import Optional, List, TYPE_CHECKING
 import uuid
 from sqlalchemy import (
-    String, DateTime, Float, ForeignKey, UUID, JSON, Boolean
-) 
+    String, DateTime, Float, ForeignKey, UUID, JSON, Boolean, UniqueConstraint
+)
 from sqlalchemy.types import TypeDecorator
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
@@ -142,7 +142,7 @@ class Sensor(Base):
     __tablename__ = "sensors"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    sensor_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    sensor_id: Mapped[str] = mapped_column(String, nullable=False)
     sensor_type: Mapped[str] = mapped_column(String, nullable=False)  # 'temperature', 'humidity', etc.
     status: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 'active', 'inactive', 'error'
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
@@ -151,7 +151,7 @@ class Sensor(Base):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Relation vers la cellule
-    cell_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cells.id"), nullable=False)
+    cell_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cells.id"), nullable=False, index=True)
 
     # Relations
     if TYPE_CHECKING:
@@ -160,6 +160,11 @@ class Sensor(Base):
     else:
         cell = relationship("Cell", back_populates="sensors")
         analytics = relationship("Analytic", back_populates="sensor")
+
+    __table_args__ = (
+        # Assure qu'un sensor_id est unique POUR UNE CELLULE DONNÉE, mais peut être réutilisé dans d'autres cellules.
+        UniqueConstraint('cell_id', 'sensor_id', name='_cell_sensor_uc'),
+    )
 
 
 # =========================================================

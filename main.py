@@ -16,17 +16,21 @@ from services.farm_state.router import public_router as farm_public_router, rout
 from services.cell.router import router as cell_router
 from services.network.router import router as network_router
 from services.mqtt.client import connect_mqtt, register_handler
-from services.mqtt.handlers import handle_sensor_data, handle_config_ack, handle_alert_trigger, handle_pairing_ack
+from services.mqtt.handlers import handle_sensor_data, handle_config_ack, handle_alert_trigger, handle_pairing_ack, handle_refresh_ack
 from settings import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("[FASTAPI] Démarrage de l'application...")
-    register_handler(settings.MQTT_TOPIC_ANALYTICS, handle_sensor_data)
-    register_handler(settings.MQTT_TOPIC_ALERTS_CONFIG_ACK, handle_config_ack)
-    register_handler(settings.MQTT_TOPIC_PAIRING_ACK, handle_pairing_ack)
-    register_handler(settings.MQTT_TOPIC_ALERTS_TRIGGER, handle_alert_trigger)
-    connect_mqtt()
+    if not settings.MOCK_MQTT:
+        register_handler(settings.MQTT_TOPIC_ANALYTICS, handle_sensor_data)
+        register_handler(settings.MQTT_TOPIC_ALERTS_CONFIG_ACK, handle_config_ack)
+        register_handler(settings.MQTT_TOPIC_PAIRING_ACK, handle_pairing_ack)
+        register_handler(settings.MQTT_TOPIC_ALERTS_TRIGGER, handle_alert_trigger)
+        register_handler(settings.MQTT_TOPIC_COMMAND_ACK, handle_refresh_ack)
+        connect_mqtt()
+    else:
+        print("[MQTT Mock] MQTT mocking is enabled. Skipping actual MQTT connection and handlers.")
     purge_task = create_purge_task()
     try:
         yield

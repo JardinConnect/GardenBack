@@ -67,30 +67,30 @@ def test_handle_sensor_data_success(db_session, capsys):
     db_session.add(test_area)
     db_session.commit()
 
-    test_cell = Cell(name="Test Cell", area_id=test_area.id)
+    test_cell = Cell(name="Test Cell", area_id=test_area.id, deviceID="TEST-DEVICE-001")
     db_session.add(test_cell)
     db_session.commit()
 
-    sensor_uid_test = "TA-SENSOR-01"
-    test_sensor = Sensor(
-        sensor_id=sensor_uid_test,
-        sensor_type="temperature",
-        cell_id=test_cell.id
-    )
-    db_session.add(test_sensor)
+    # Create sensors that match the payload keys
+    sensor_codes = ["TA-01", "HS-01", "L-01", "SB-01"]
+    for code in sensor_codes:
+        sensor = Sensor(
+            sensor_id=code,
+            sensor_type="generic",
+            cell_id=test_cell.id
+        )
+        db_session.add(sensor)
     db_session.commit()
-    db_session.refresh(test_sensor)
-    test_sensor_id = test_sensor.id
 
     # Message MQTT au format JSON
     payload = json.dumps({
-        "uid": sensor_uid_test,
+        "uid": test_cell.deviceID,
         "timestamp": "2025-11-20T18:32:41Z",
         "payload": {
             "TA-01": 32.0,
             "HS-01": 45.0,
             "L-01": 200.0,
-            "B-01": 97.0
+            "SB-01": 97.0
         }
     })
 
@@ -114,8 +114,6 @@ def test_handle_sensor_data_success(db_session, capsys):
 
     assert len(analytics) == 4, f"Expected 4 analytics, got {len(analytics)}."
 
-    for analytic in analytics:
-        assert analytic.sensor_id == test_sensor_id
     print("✅ Test handle_sensor_data JSON passé avec succès !")
 
 
@@ -179,7 +177,7 @@ def setup_test_sensor(db_session):
     db_session.add(area)
     db_session.commit()
 
-    cell = Cell(name="Test Cell", area_id=area.id)
+    cell = Cell(name="Test Cell", area_id=area.id, deviceID="TEST-DEVICE-001")
     db_session.add(cell)
     db_session.commit()
 
@@ -197,9 +195,10 @@ def setup_test_sensor(db_session):
 def test_with_fixture(db_session, setup_test_sensor, capsys):
     """Test avec fixture — message JSON"""
     sensor = setup_test_sensor["sensor"]
+    cell = setup_test_sensor["cell"]
 
     payload = json.dumps({
-        "uid": sensor.sensor_id,
+        "uid": cell.deviceID,
         "timestamp": "2025-11-20T18:32:41Z",
         "payload": {"TA-01": 25.0}
     })
