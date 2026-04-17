@@ -199,15 +199,16 @@ def get_alert_events(
     severity: Optional[str] = None,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    include_archived: bool = False,
     db: Session = Depends(get_db),
 ):
     """
-    Récupère l'historique des événements d'alerte non archivés.
+    Récupère l'historique des événements d'alerte.
 
-    Filtres disponibles : **cellId**, **severity** (`critical` | `warning`),
-    **startDate** et **endDate** (ISO 8601).
+    Filtres disponibles : **cellId**, **severity** (`critical` | `warning`), **startDate**,
+    **endDate** (ISO 8601), et **include_archived** (pour inclure les événements archivés).
     """
-    return service.get_alert_events(db, cell_id, severity, start_date, end_date)
+    return service.get_alert_events(db, cell_id, severity, start_date, end_date, include_archived)
 
 
 @router.get(
