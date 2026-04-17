@@ -32,7 +32,9 @@ class Settings():
     MQTT_PASSWORD: Optional[str] = "mqtt_password"
 
     # Mock MQTT
-    MOCK_MQTT: bool = True  # Set to True to enable MQTT mocking, False to use real MQTT connection
+    # Lit la variable d'environnement MOCK_MQTT. Par défaut à 'False' si non définie.
+    _mock_mqtt_str: str = os.environ.get("MOCK_MQTT", "False")
+    MOCK_MQTT: bool = _mock_mqtt_str.lower() in ('true')
 
     NETWORK_PROVIDER: str = "linux"
 
