@@ -439,9 +439,10 @@ def get_alert_events(
     severity: Optional[str] = None,
     start_date=None,
     end_date=None,
+    include_archived: bool = False,
 ) -> List[AlertEvent]:
     """Récupère l'historique des événements d'alerte non archivés, avec filtres."""
-    query = db.query(AlertEvent).filter(AlertEvent.is_archived == False)  # noqa: E712
+    query = db.query(AlertEvent)
 
     if cell_id:
         query = query.filter(AlertEvent.cell_id == cell_id)
@@ -451,6 +452,9 @@ def get_alert_events(
         query = query.filter(AlertEvent.timestamp >= start_date)
     if end_date:
         query = query.filter(AlertEvent.timestamp <= end_date)
+
+    if not include_archived:
+        query = query.filter(AlertEvent.is_archived == False)
 
     return query.order_by(AlertEvent.timestamp.desc()).all()
 
