@@ -17,3 +17,4 @@ paho-mqtt>=2.0.0
 httpx
 sse-starlette
 pytest-asyncio
+psutil

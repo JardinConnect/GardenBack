@@ -15,6 +15,7 @@ from services.user.router import router as user_router
 from services.farm_state.router import public_router as farm_public_router, router as farm_state_router
 from services.cell.router import router as cell_router
 from services.network.router import router as network_router
+from services.system.router import router as system_router
 from services.mqtt.client import connect_mqtt, register_handler
 from services.mqtt.handlers import handle_sensor_data, handle_config_ack, handle_alert_trigger, handle_pairing_ack, handle_refresh_ack
 from settings import settings
@@ -79,3 +80,4 @@ app.include_router(area_router, prefix="/api/area", tags=["Area"], dependencies=
 app.include_router(user_router, prefix="/api/user", tags=["User"], dependencies=[auth_dependency])
 app.include_router(farm_state_router, prefix="/api/farm", tags=["Farm State"], dependencies=[auth_dependency])
 app.include_router(cell_router, prefix="/api/cell", tags=["Cell"], dependencies=[auth_dependency])
+app.include_router(system_router, prefix="/api/system", tags=["System"], dependencies=[auth_dependency])
