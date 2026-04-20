@@ -14,8 +14,9 @@ from .schemas import (
 from .errors import AlertNotFoundError, AlertEventNotFoundError, AlertConflictError
 from services.area.service import get_full_location_path_for_cell
 from services.mqtt.client import publish
-from services.mqtt.pending_acks import create_pending_ack, wait_for_ack, cancel_pending_ack
+from services.mqtt.pending_acks import create_pending_ack, wait_for_ack
 from settings import settings
+from .event_broadcast import subscribe, unsubscribe
 import uuid
 
 
@@ -113,6 +114,18 @@ def _build_alert_response(alert: Alert, db: Session) -> AlertResponseSchema:
     - Résolvant les `cell_ids` pour récupérer les noms et localisations des cellules.
     - S'assurant que la structure des capteurs (`sensors`) est conforme au schéma Pydantic.
     """
+    # Ordre de tri
+    sensor_type_order = {
+        "air_temperature": 1,
+        "air_humidity": 2,
+        "light": 3,
+        "soil_temperature": 4,
+        "soil_humidity": 5,
+        "deep_soil_humidity": 6,
+        "battery": 7,
+    }
+
+
     cell_uuids = [uuid.UUID(c) for c in alert.cell_ids if c is not None]
 
     cells_data: List[CellInfoSchema] = []
@@ -129,15 +142,11 @@ def _build_alert_response(alert: Alert, db: Session) -> AlertResponseSchema:
             )
 
     sensors = [
-        AlertSensorSchema(
-            type=s["type"],
-            index=s["index"],
-            sensor_id=s.get("sensor_id"),
-            criticalRange=s["criticalRange"],
-            warningRange=s.get("warningRange"),
-        )
-        for s in (alert.sensors or [])
+        AlertSensorSchema.model_validate(s) for s in (alert.sensors or [])
     ]
+
+    # Trier les capteurs selon l'ordre défini
+    sensors.sort(key=lambda s: sensor_type_order.get(s.type, 999)) # 999 pour les types non définis
 
     return AlertResponseSchema(
         id=alert.id,
@@ -439,9 +448,10 @@ def get_alert_events(
     severity: Optional[str] = None,
     start_date=None,
     end_date=None,
+    include_archived: bool = False,
 ) -> List[AlertEvent]:
     """Récupère l'historique des événements d'alerte non archivés, avec filtres."""
-    query = db.query(AlertEvent).filter(AlertEvent.is_archived == False)  # noqa: E712
+    query = db.query(AlertEvent)
 
     if cell_id:
         query = query.filter(AlertEvent.cell_id == cell_id)
@@ -451,6 +461,9 @@ def get_alert_events(
         query = query.filter(AlertEvent.timestamp >= start_date)
     if end_date:
         query = query.filter(AlertEvent.timestamp <= end_date)
+
+    if not include_archived:
+        query = query.filter(AlertEvent.is_archived == False)  # noqa: E712
 
     return query.order_by(AlertEvent.timestamp.desc()).all()
 
@@ -505,6 +518,53 @@ def archive_events_by_cell(db: Session, cell_id: uuid.UUID) -> dict:
         "cellId": cell_id,
         "message": "Événements de la cellule archivés avec succès.",
     }
+
+
+async def alert_events_stream() -> AsyncGenerator[dict, None]:
+    """
+    Générateur SSE longue durée : chaque nouvel AlertEvent (MQTT trigger) est poussé
+    aux abonnés via event_broadcast.
+
+    Émet :
+      - event:status   step:connected   — connexion prête
+      - event:ping     step:ping        — heartbeat périodique (timeout d'attente)
+      - event:alert_event step:new_alert_event — payload API dans alertEvent
+      - event:error    step:capacity    — trop de connexions simultanées
+    """
+
+    def _event(event_type: str, step: str, message: str, **extra) -> dict:
+        return {
+            "event": event_type,
+            "data": json.dumps({"step": step, "message": message, **extra}, default=str),
+        }
+
+    queue = subscribe()
+    if queue is None:
+        yield _event("error", "capacity", "Trop de connexions SSE simultanées.")
+        return
+
+    try:
+        yield _event("status", "connected", "Flux événements d'alerte prêt.")
+        while True:
+            try:
+                payload = await asyncio.wait_for(queue.get(), timeout=25.0)
+            except asyncio.TimeoutError:
+                yield _event("ping", "ping", "")
+                continue
+
+            yield {
+                "event": "alert_event",
+                "data": json.dumps(
+                    {
+                        "step": "new_alert_event",
+                        "message": "Nouvel événement d'alerte",
+                        "alertEvent": payload,
+                    },
+                    default=str,
+                ),
+            }
+    finally:
+        unsubscribe(queue)
 
 
 async def _mock_mqtt_alert_config_ack(ack_id: str) -> dict:
@@ -568,39 +628,41 @@ async def push_alert_config_stream(
                 if cell:
                     device_ids.append(cell.deviceID)
 
-                # Formater sensors avec ranges en arrays [min, max]
-                mqtt_sensors = []
-                for s in (alert.sensors or []):
-                    sensor_entry = {
-                        "type": s["type"],
-                        "index": s["index"],
-                        "criticalRange": [s["criticalRange"]["min"], s["criticalRange"]["max"]],
-                    }
-                    if s.get("warningRange") and s["warningRange"].get("min") is not None:
-                        sensor_entry["warningRange"] = [s["warningRange"]["min"], s["warningRange"]["max"]]
-                    mqtt_sensors.append(sensor_entry)
+            # Formater sensors avec ranges en arrays [min, max]
+            mqtt_sensors = []
+            for s in (alert.sensors or []):
+                sensor_entry = {
+                    "type": s["type"],
+                    "index": s["index"],
+                    "criticalRange": [s["criticalRange"]["min"], s["criticalRange"]["max"]],
+                }
+                if s.get("warningRange") and s["warningRange"].get("min") is not None:
+                    sensor_entry["warningRange"] = [s["warningRange"]["min"], s["warningRange"]["max"]]
+                mqtt_sensors.append(sensor_entry)
 
-                config_payload = json.dumps({
-                    "ack_id": ack_id,
-                    "id": str(alert.id),
-                    "is_active": alert.is_active,
-                    "cell_ids": device_ids,
-                    "sensors": mqtt_sensors,
-                })
+            config_payload = json.dumps({
+                "ack_id": ack_id,
+                "id": str(alert.id),
+                "is_active": alert.is_active,
+                "cell_ids": device_ids,
+                "sensors": mqtt_sensors,
+            })
 
-                create_pending_ack(ack_id)
-                publish(settings.MQTT_TOPIC_ALERTS_CONFIG, config_payload)
+            create_pending_ack(ack_id)
+            publish(settings.MQTT_TOPIC_ALERTS_CONFIG, config_payload)
 
-                # ── Étape 3 : attente de l'ack ─────────────────────────────────
-                yield _event("status", "waiting_ack", "En attente de la confirmation du device...")
-                result = await wait_for_ack(ack_id, timeout=15.0)
+            # ── Étape 3 : attente de l'ack ─────────────────────────────────
+            yield _event("status", "waiting_ack", "En attente de la confirmation du device...")
+            result = await wait_for_ack(ack_id, timeout=15.0)
 
         if result is None:
+            db.rollback() # Rollback explicite en cas de timeout
             yield _event("error", "timeout", "Le device n'a pas répondu dans le délai imparti.")
             return
 
         if result.get("status") != "ok":
             error_msg = result.get("message", "Erreur inconnue du device.")
+            db.rollback() # Rollback explicite en cas d'erreur du device
             yield _event("error", "device_error", error_msg, device_response=result)
             return
 
@@ -614,5 +676,5 @@ async def push_alert_config_stream(
         )
 
     except Exception as exc:
-        cancel_pending_ack(ack_id)
+        db.rollback() # Rollback pour toute exception non gérée
         yield _event("error", "failed", str(exc))

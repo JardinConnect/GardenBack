@@ -6,7 +6,7 @@ from sqlalchemy.orm.attributes import flag_modified
 import services.alerts.service as alerts_service
 import services.cell.repository as repositoryCell
 from datetime import datetime
-import services.area.repository as repositoryArea
+import services.area.repository as repositoryArea 
 import services.cell.schemas as schemas
 import services.cell.errors as errors
 from db.models import Analytic as AnalyticModel, AnalyticType
@@ -17,8 +17,9 @@ from settings import settings
 import json
 import asyncio
 from typing import AsyncGenerator
+from db.models import User
 
-def create_cell(db: Session, cell_data: schemas.CellCreate, commit: bool = True) -> schemas.Cell:
+def create_cell(db: Session, cell_data: schemas.CellCreate, current_user: User, commit: bool = True) -> schemas.Cell:
     """
     Crée une nouvelle cellule (Cell) dans la base de données.
     """
@@ -26,13 +27,18 @@ def create_cell(db: Session, cell_data: schemas.CellCreate, commit: bool = True)
         area = repositoryArea.get_by_id(db, cell_data.area_id)
         if not area:
             raise errors.ParentCellNotFoundError
-            
+
     # On passe commit=False au repository pour gérer la transaction ici
-    cell = repositoryCell.create_cell(db, cell_data, commit=False)
-    
+    cell = repositoryCell.create_cell(db, cell_data, current_user, commit=False)
+
     # Associer l'alerte de batterie par défaut à la nouvelle cellule
     alerts_service.associate_cell_to_default_battery_alert(db, cell.id)
-    
+
+    if commit:
+        db.commit()
+        # Re-fetch to get all relationships correctly loaded after commit
+        return repositoryCell.get_cell_by_id(db, cell.id)
+
     return cell
 
 def delete_cell(db: Session, cell_id: uuid.UUID) -> bool:
@@ -41,7 +47,7 @@ def delete_cell(db: Session, cell_id: uuid.UUID) -> bool:
     """
     return repositoryCell.delete_cell(db, cell_id)
 
-def update_cell(db: Session, cell_id: uuid.UUID, cell_data: schemas.CellUpdate) -> schemas.Cell:
+def update_cell(db: Session, cell_id: uuid.UUID, cell_data: schemas.CellUpdate, current_user: User) -> schemas.Cell:
     """
     Met à jour une cellule de la base de données.
     """
@@ -51,7 +57,7 @@ def update_cell(db: Session, cell_id: uuid.UUID, cell_data: schemas.CellUpdate) 
         if not area:
             raise errors.ParentCellNotFoundError
     
-    return repositoryCell.update_cell(db, cell_id, cell_data)
+    return repositoryCell.update_cell(db, cell_id, cell_data, current_user)
 
 def get_cell(db: Session, cell_id: uuid.UUID, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None) -> schemas.Cell:
     """
@@ -280,6 +286,7 @@ async def refresh_all_analytics_stream(
         yield _event("error", "failed", str(exc))
 async def pair_cell_stream(
     db: Session,
+    current_user: User,
     area_id: Optional[uuid.UUID] = None,
 ) -> AsyncGenerator[dict, None]:
     """
@@ -358,7 +365,7 @@ async def pair_cell_stream(
         )
         
         # On passe commit=False pour garder la transaction ouverte
-        cell = create_cell(db, cell_data, commit=False)  # peut lever ParentCellNotFoundError
+        cell = create_cell(db, cell_data, current_user, commit=False)  # peut lever ParentCellNotFoundError
  
         cell_dto = schemas.CellDTO.from_cell(cell)
         

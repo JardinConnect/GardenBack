@@ -2,6 +2,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from typing import List, Dict, cast, Set
+import re
 import uuid
 from db.models import Analytic, Sensor, Cell, Area
 
@@ -116,7 +117,8 @@ def get_analytics(db: Session, request: AnalyticsFilter) -> PaginatedAnalyticRes
 def create_analytic(db: Session, analytic_input: AnalyticCreate) -> AnalyticSchema:
     """Crée une nouvelle entrée d'analytique."""
 
-    analytic_type_prefix = analytic_input.sensor_code[1:].upper()  # Supprime le premier caractère numérique (ex: "TA" de "1TA", "HS" de "2HS")
+    # Extrait la partie alphabétique du code capteur (ex: 'TA' de '1TA' ou 'TA-1')
+    analytic_type_prefix = re.sub(r'[^A-Z]', '', analytic_input.sensor_code.upper())
     
     try:
         analytic_type = AnalyticType.from_prefix(analytic_type_prefix)

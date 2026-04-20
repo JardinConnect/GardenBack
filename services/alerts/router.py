@@ -199,15 +199,35 @@ def get_alert_events(
     severity: Optional[str] = None,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    include_archived: bool = False,
     db: Session = Depends(get_db),
 ):
     """
-    Récupère l'historique des événements d'alerte non archivés.
+    Récupère l'historique des événements d'alerte.
 
-    Filtres disponibles : **cellId**, **severity** (`critical` | `warning`),
-    **startDate** et **endDate** (ISO 8601).
+    Filtres disponibles : **cellId**, **severity** (`critical` | `warning`), **startDate**,
+    **endDate** (ISO 8601), et **include_archived** (pour inclure les événements archivés).
     """
-    return service.get_alert_events(db, cell_id, severity, start_date, end_date)
+    return service.get_alert_events(db, cell_id, severity, start_date, end_date, include_archived)
+
+
+@router.get(
+    "/events/stream",
+    summary="Flux temps réel des événements d'alerte (SSE)",
+)
+async def stream_alert_events():
+    """
+    Connexion **Server-Sent Events** : chaque déclenchement MQTT
+    (`garden/alerts/trigger`) qui crée un `AlertEvent` est poussé aux clients connectés.
+
+    | event         | step              | description                                      |
+    |---------------|-------------------|--------------------------------------------------|
+    | `status`      | `connected`       | flux prêt                                      |
+    | `ping`        | `ping`            | heartbeat (en l'absence d'événement ~25 s)     |
+    | `alert_event` | `new_alert_event` | champ `alertEvent` = même schéma que `GET /events/` |
+    | `error`       | `capacity`        | trop de connexions SSE simultanées             |
+    """
+    return EventSourceResponse(service.alert_events_stream())
 
 
 @router.post(

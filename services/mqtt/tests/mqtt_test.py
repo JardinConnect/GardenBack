@@ -72,7 +72,7 @@ def test_handle_sensor_data_success(db_session, capsys):
     db_session.commit()
 
     # Create sensors that match the payload keys
-    sensor_codes = ["TA-01", "HS-01", "L-01", "SB-01"]
+    sensor_codes = ["1TA", "1HS", "1L", "1SB"]
     for code in sensor_codes:
         sensor = Sensor(
             sensor_id=code,
@@ -86,11 +86,11 @@ def test_handle_sensor_data_success(db_session, capsys):
     payload = json.dumps({
         "uid": test_cell.deviceID,
         "timestamp": "2025-11-20T18:32:41Z",
-        "payload": {
-            "TA-01": 32.0,
-            "HS-01": 45.0,
-            "L-01": 200.0,
-            "SB-01": 97.0
+        "data": {
+            "1TA": 32.0,
+            "1HS": 45.0,
+            "1L": 200.0,
+            "1SB": 97.0
         }
     })
 
@@ -124,7 +124,7 @@ def test_handle_sensor_data_sensor_not_found(db_session):
     payload = json.dumps({
         "uid": "UNKNOWN-SENSOR",
         "timestamp": "2025-11-20T18:32:41Z",
-        "payload": {"TA-01": 32.0}
+        "data": {"TA-01": 32.0}
     })
 
     with patch('services.mqtt.handlers.SessionLocal', return_value=db_session):
@@ -182,7 +182,7 @@ def setup_test_sensor(db_session):
     db_session.commit()
 
     sensor = Sensor(
-        sensor_id="TA-01",
+        sensor_id="1TA",
         sensor_type="temperature",
         cell_id=cell.id
     )
@@ -200,7 +200,7 @@ def test_with_fixture(db_session, setup_test_sensor, capsys):
     payload = json.dumps({
         "uid": cell.deviceID,
         "timestamp": "2025-11-20T18:32:41Z",
-        "payload": {"TA-01": 25.0}
+        "data": {"1TA": 25.0}
     })
 
     def mock_session_local():

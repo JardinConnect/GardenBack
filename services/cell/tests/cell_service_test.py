@@ -8,7 +8,8 @@ from db.models import (
     Area as AreaModel,
     Sensor as SensorModel,
     Analytic as AnalyticModel,
-    AnalyticType
+    AnalyticType,
+    User as UserModel, RoleEnum
 )
 from services.cell.service import (
     create_cell,
@@ -39,6 +40,21 @@ def setup_area(db_session):
     db_session.commit()
     return area
 
+@pytest.fixture(scope="function")
+def setup_user(db_session):
+    """Crée un utilisateur de test."""
+    # Utilise un email unique pour éviter les conflits entre les tests
+    email = f"test.user.{uuid.uuid4()}@example.com"
+    user = UserModel(
+        first_name="Test",
+        last_name="User",
+        email=email,
+        password="password",
+        role=RoleEnum.ADMIN
+    )
+    db_session.add(user)
+    db_session.commit()
+    return user
 
 @pytest.fixture(scope="function")
 def setup_cell_with_sensors(db_session, setup_area):
@@ -89,11 +105,11 @@ def setup_multiple_cells(db_session):
 # TESTS FOR create_cell
 # =========================================================
 
-def test_create_cell_with_valid_area(db_session, setup_area):
+def test_create_cell_with_valid_area(db_session, setup_area, setup_user):
     """Teste la création d'une cellule avec une area valide."""
     cell_data = CellCreate(name="New Cell", area_id=setup_area.id, deviceID="DEVICE-123")
-    
-    result = create_cell(db_session, cell_data)
+
+    result = create_cell(db_session, cell_data, setup_user)
     
     assert result is not None
     assert result.name == "New Cell"
@@ -103,23 +119,23 @@ def test_create_cell_with_valid_area(db_session, setup_area):
     assert db_cell is not None
 
 
-def test_create_cell_without_area(db_session):
+def test_create_cell_without_area(db_session, setup_user):
     """Teste la création d'une cellule sans area."""
     cell_data = CellCreate(name="Orphan Cell", area_id=None, deviceID="DEVICE-456")
     
-    result = create_cell(db_session, cell_data)
+    result = create_cell(db_session, cell_data, setup_user)
     
     assert result is not None
     assert result.name == "Orphan Cell"
     assert result.area_id is None
 
 
-def test_create_cell_with_invalid_area(db_session):
+def test_create_cell_with_invalid_area(db_session, setup_user):
     """Teste que la création échoue si l'area n'existe pas."""
     cell_data = CellCreate(name="Invalid Cell", area_id=uuid.uuid4(), deviceID="789")
     
     with pytest.raises(ParentCellNotFoundError):
-        create_cell(db_session, cell_data)
+        create_cell(db_session, cell_data, setup_user)
 
 
 # =========================================================
@@ -150,7 +166,7 @@ def test_delete_cell_not_found(db_session):
 # TESTS FOR update_cell
 # =========================================================
 
-def test_update_cell_name(db_session, setup_area):
+def test_update_cell_name(db_session, setup_area, setup_user):
     """Teste la mise à jour du nom d'une cellule."""
     cell = CellModel(name="Old Name", area_id=setup_area.id, deviceID="SVC-TEST-DEVICE-3")
     db_session.add(cell)
@@ -158,12 +174,12 @@ def test_update_cell_name(db_session, setup_area):
     
     update_data = CellUpdate(name="New Name") # type: ignore
     
-    result = update_cell(db_session, cell.id, update_data)
+    result = update_cell(db_session, cell.id, update_data, setup_user)
     
     assert result.name == "New Name"
 
 
-def test_update_cell_change_area(db_session, setup_area):
+def test_update_cell_change_area(db_session, setup_area, setup_user):
     """Teste le changement d'area d'une cellule."""
     cell = CellModel(name="Cell", area_id=setup_area.id, deviceID="SVC-TEST-DEVICE-4")
     db_session.add(cell)
@@ -175,12 +191,12 @@ def test_update_cell_change_area(db_session, setup_area):
     
     update_data = CellUpdate(area_id=new_area.id) # type: ignore
     
-    result = update_cell(db_session, cell.id, update_data)
+    result = update_cell(db_session, cell.id, update_data, setup_user)
     
     assert result.area_id == new_area.id
 
 
-def test_update_cell_with_invalid_area(db_session, setup_area):
+def test_update_cell_with_invalid_area(db_session, setup_area, setup_user):
     """Teste que la mise à jour échoue si l'area n'existe pas."""
     cell = CellModel(name="Cell", area_id=setup_area.id, deviceID="SVC-TEST-DEVICE-5")
     db_session.add(cell)
@@ -189,15 +205,15 @@ def test_update_cell_with_invalid_area(db_session, setup_area):
     update_data = CellUpdate(area_id=uuid.uuid4()) # type: ignore
     
     with pytest.raises(ParentCellNotFoundError):
-        update_cell(db_session, cell.id, update_data)
+        update_cell(db_session, cell.id, update_data, setup_user)
 
 
-def test_update_cell_not_found(db_session):
+def test_update_cell_not_found(db_session, setup_user):
     """Teste que update_cell lève une erreur si la cellule n'existe pas."""
     update_data = CellUpdate(name="Ghost Cell") # type: ignore
     
     with pytest.raises(CellNotFoundError):
-        update_cell(db_session, uuid.uuid4(), update_data)
+        update_cell(db_session, uuid.uuid4(), update_data, setup_user)
 
 
 # =========================================================
@@ -439,13 +455,13 @@ class TestPairCellStream:
         return [json.loads(event["data"]) async for event in stream]
 
     @patch("services.cell.service.settings.MOCK_MQTT", True)
-    async def test_pair_cell_stream_mock_mode_success(self, db_session, setup_area):
+    async def test_pair_cell_stream_mock_mode_success(self, db_session, setup_area, setup_user):
         """
         Teste le flux de pairing en mode MOCK_MQTT=True.
         Vérifie que les événements sont corrects et que la cellule est créée.
         """
         # Act
-        stream = service.pair_cell_stream(db_session, area_id=setup_area.id)
+        stream = service.pair_cell_stream(db_session, current_user=setup_user, area_id=setup_area.id)
         events = await self._collect_events(stream)
 
         # Assert
@@ -468,7 +484,7 @@ class TestPairCellStream:
     @patch("services.cell.service.publish")
     @patch("services.cell.service.create_pending_ack")
     @patch("services.cell.service.settings.MOCK_MQTT", False)
-    async def test_pair_cell_stream_real_mode_success(self, mock_create_ack, mock_publish, mock_wait_for_ack, db_session, setup_area):
+    async def test_pair_cell_stream_real_mode_success(self, mock_create_ack, mock_publish, mock_wait_for_ack, db_session, setup_area, setup_user):
         """
         Teste le flux de pairing en mode MQTT réel (MOCK_MQTT=False).
         Vérifie que les fonctions MQTT sont appelées et que le flux réussit.
@@ -485,7 +501,7 @@ class TestPairCellStream:
         }
 
         # Act
-        stream = service.pair_cell_stream(db_session, area_id=setup_area.id)
+        stream = service.pair_cell_stream(db_session, current_user=setup_user, area_id=setup_area.id)
         events = await self._collect_events(stream)
 
         # Assert
