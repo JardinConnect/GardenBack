@@ -37,6 +37,7 @@ class AlertSensorSchema(BaseModel):
 
     type: str
     index: int
+    sensor_id: Optional[str] = None
     critical_range: RangeSchema = Field(..., alias="criticalRange")
     warning_range: Optional[RangeOptionalSchema] = Field(None, alias="warningRange")
 
@@ -45,6 +46,7 @@ class AlertSensorSchema(BaseModel):
         return {
             "type": self.type,
             "index": self.index,
+            "sensor_id": self.sensor_id,
             "criticalRange": self.critical_range.model_dump(),
             "warningRange": self.warning_range.model_dump() if self.warning_range else None,
         }

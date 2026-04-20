@@ -18,6 +18,7 @@ from services.network.router import router as network_router
 from services.mqtt.client import connect_mqtt, register_handler
 from services.mqtt.handlers import handle_sensor_data, handle_config_ack, handle_alert_trigger, handle_pairing_ack, handle_refresh_ack
 from settings import settings
+from fastapi.middleware.cors import CORSMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -39,6 +40,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="GardenConnect API", version="1.0.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*"],
+)
 
 
 @app.exception_handler(HTTPException)

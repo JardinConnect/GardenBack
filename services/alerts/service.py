@@ -36,7 +36,7 @@ def associate_cell_to_default_battery_alert(db: Session, cell_id: uuid.UUID):
         "is_active": True,
         "warning_enabled": True,
         "sensors": [
-            {"type": "battery", "index": 0, "criticalRange": {"min": 0.0, "max": 10.0}, "warningRange": {"min": 10.1, "max": 20.0}}
+            {"type": "battery", "index": 0, "sensor_id": "1SB", "criticalRange": {"min": 0.0, "max": 10.0}, "warningRange": {"min": 10.1, "max": 20.0}}
         ],
     }
 
@@ -80,8 +80,7 @@ def _publish_alert_to_mqtt(alert: Alert, db: Session) -> None:
     mqtt_sensors = []
     for s in (alert.sensors or []):
         sensor_entry = {
-            "type": s["type"],
-            "index": s["index"],
+            "sensorId": s["sensor_id"],
             "criticalRange": [s["criticalRange"]["min"], s["criticalRange"]["max"]],
         }
         if s.get("warningRange") and s["warningRange"].get("min") is not None:
@@ -133,6 +132,7 @@ def _build_alert_response(alert: Alert, db: Session) -> AlertResponseSchema:
         AlertSensorSchema(
             type=s["type"],
             index=s["index"],
+            sensor_id=s.get("sensor_id"),
             criticalRange=s["criticalRange"],
             warningRange=s.get("warningRange"),
         )
@@ -325,6 +325,7 @@ def create_alert(db: Session, alert_data: AlertCreateUpdateSchema) -> dict:
     - Si `overwriteExisting` est `True`, résout les conflits en modifiant ou supprimant
       les parties conflictuelles des alertes existantes via `_resolve_conflicts`.
     """
+    print("Creating alert:", alert_data)
     sensor_types = [s.type for s in alert_data.sensors]
     conflicts = _detect_conflicts(db, alert_data.cell_ids, sensor_types)
 
