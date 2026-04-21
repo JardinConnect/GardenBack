@@ -9,7 +9,7 @@ from datetime import datetime
 import services.area.repository as repositoryArea 
 import services.cell.schemas as schemas
 import services.cell.errors as errors
-from db.models import Analytic as AnalyticModel, AnalyticType
+from db.models import Analytic as AnalyticModel, AnalyticType, Sensor as SensorModel
 from services.mqtt.pending_acks import create_pending_ack, wait_for_ack, cancel_pending_ack
 from services.mqtt.client import publish
 from settings import settings
@@ -18,6 +18,31 @@ import json
 import asyncio
 from typing import AsyncGenerator
 from db.models import User
+
+def _create_default_sensors_for_cell(db: Session, cell_id: uuid.UUID) -> None:
+    """
+    Crée les capteurs par défaut pour une cellule nouvellement créée.
+    """
+    default_sensors = [
+        {"sensor_id": "1TS", "sensor_type": "soil_temperature"},
+        {"sensor_id": "1TA", "sensor_type": "air_temperature"},
+        {"sensor_id": "1L", "sensor_type": "light"},
+        {"sensor_id": "1HS", "sensor_type": "soil_humidity"},
+        {"sensor_id": "1HA", "sensor_type": "air_humidity"},
+        {"sensor_id": "2HS", "sensor_type": "deep_soil_humidity"},
+        {"sensor_id": "1VB", "sensor_type": "volt_battery"},
+        {"sensor_id": "1SB", "sensor_type": "status_battery"},
+    ]
+
+    for sensor_data in default_sensors:
+        sensor = SensorModel(
+            sensor_id=sensor_data["sensor_id"],
+            sensor_type=sensor_data["sensor_type"],
+            status="active",
+            cell_id=cell_id,
+        )
+        db.add(sensor)
+
 
 def create_cell(db: Session, cell_data: schemas.CellCreate, current_user: User, commit: bool = True) -> schemas.Cell:
     """
@@ -30,6 +55,9 @@ def create_cell(db: Session, cell_data: schemas.CellCreate, current_user: User, 
 
     # On passe commit=False au repository pour gérer la transaction ici
     cell = repositoryCell.create_cell(db, cell_data, current_user, commit=False)
+
+    # Créer les capteurs par défaut associés à la cellule
+    _create_default_sensors_for_cell(db, cell.id)
 
     # Associer l'alerte de batterie par défaut à la nouvelle cellule
     alerts_service.associate_cell_to_default_battery_alert(db, cell.id)
