@@ -31,3 +31,10 @@ class ConnectResponse(BaseModel):
     success: bool
     message: str
     ssid: Optional[str] = None
+
+
+class TailscaleAuthStatus(BaseModel):
+    """État d’auth Tailscale via LocalAPI (/localapi/v0/status)."""
+
+    auth_url: Optional[str] = None
+    backend_state: Optional[str] = None

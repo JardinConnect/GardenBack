@@ -1,8 +1,20 @@
 from fastapi import APIRouter, HTTPException, status
 
 from services.network import service
-from services.network.schemas import CurrentNetwork, NetworkInfo, ConnectRequest, ConnectResponse
-from services.network.errors import ConnectFailedError, NetworkUnavailableError
+from services.network import tailscale_local
+from services.network.schemas import (
+    CurrentNetwork,
+    NetworkInfo,
+    ConnectRequest,
+    ConnectResponse,
+    TailscaleAuthStatus,
+)
+from services.network.errors import (
+    ConnectFailedError,
+    NetworkUnavailableError,
+    TailscaleBadResponseError,
+    TailscaleUnavailableError,
+)
 
 router = APIRouter()
 
@@ -35,3 +47,13 @@ def connect_network(body: ConnectRequest) -> ConnectResponse:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=e.message)
     except NetworkUnavailableError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
+
+
+@router.get("/tailscale", response_model=TailscaleAuthStatus)
+def get_tailscale_status() -> TailscaleAuthStatus:
+    try:
+        return tailscale_local.get_tailscale_auth_status()
+    except TailscaleUnavailableError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
+    except TailscaleBadResponseError as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=e.message)

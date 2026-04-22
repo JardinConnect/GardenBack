@@ -38,6 +38,13 @@ class Settings():
 
     NETWORK_PROVIDER: str = "linux"
 
+    # Tailscale LocalAPI (socket Unix sur Linux / Raspberry Pi OS)
+    TAILSCALE_SOCKET: str = os.environ.get(
+        "TAILSCALE_SOCKET", "/var/run/tailscale/tailscaled.sock"
+    )
+    _mock_tailscale_str: str = os.environ.get("MOCK_TAILSCALE", "False")
+    MOCK_TAILSCALE: bool = _mock_tailscale_str.lower() in ("true", "1", "yes")
+
     _retention = os.environ.get("ACTION_LOGS_RETENTION_DAYS")
     ACTION_LOGS_RETENTION_DAYS: Optional[int] = (
         int(_retention) if _retention and str(_retention).isdigit() else None
