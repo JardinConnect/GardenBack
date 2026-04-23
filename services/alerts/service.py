@@ -552,6 +552,9 @@ async def alert_events_stream() -> AsyncGenerator[dict, None]:
                 yield _event("ping", "ping", "")
                 continue
 
+            alert_id = payload.get("alertId") or payload.get("alert_id")
+            print(f"[SSE] alert_events_stream: payload reçu depuis la file (alertId={alert_id}).")
+
             yield {
                 "event": "alert_event",
                 "data": json.dumps(

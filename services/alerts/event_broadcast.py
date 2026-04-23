@@ -12,6 +12,8 @@ import asyncio
 import threading
 from typing import Any, Dict, List, Optional, Set
 
+from services.async_loop import get_app_loop
+
 MAX_SSE_SUBSCRIBERS = 64
 ALERT_EVENT_QUEUE_MAXSIZE = 32
 
@@ -55,15 +57,32 @@ def notify_alert_event(payload: Dict[str, Any]) -> None:
     """
     with _lock:
         targets: List[asyncio.Queue] = list(_subscribers)
+        subscriber_count = len(targets)
     if not targets:
+        print("[SSE][broadcast] notify_alert_event: aucun abonné actif, événement ignoré.")
         return
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
+    loop = get_app_loop()
+    if loop is None:
+        print(
+            "[SSE][broadcast] notify_alert_event: boucle application non enregistrée "
+            f"(abonnés={subscriber_count}), événement ignoré."
+        )
+        return
+    if loop.is_closed():
+        print(
+            "[SSE][broadcast] notify_alert_event: boucle application fermée "
+            f"(abonnés={subscriber_count}), événement ignoré."
+        )
         return
     frozen = dict(payload)
+    scheduled = 0
     for q in targets:
         try:
             loop.call_soon_threadsafe(_put_payload, q, frozen)
-        except RuntimeError:
-            pass
+            scheduled += 1
+        except RuntimeError as exc:
+            print(f"[SSE][broadcast] notify_alert_event: call_soon_threadsafe échoué: {exc}")
+    print(
+        f"[SSE][broadcast] notify_alert_event: {scheduled}/{subscriber_count} "
+        f"files planifiées sur la boucle application."
+    )
