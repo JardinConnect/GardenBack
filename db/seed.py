@@ -85,9 +85,9 @@ def seed():
 def seed_users(db: Session):
     print("\n📋 Seeding Utilisateurs...")
     users_data = [
-        {"first_name": "Fanny", "last_name": "Lerou", "email": "fanny@yahoo.com", "password": "admin1234", "role": RoleEnum.SUPERADMIN},
-        {"first_name": "Florian", "last_name": "Confit", "email": "florianconfit@gmail.com", "password": "user1234", "role": RoleEnum.ADMIN},
-        {"first_name": "Guillaume", "last_name": "Lacha", "email": "lachaguillaume@gmail.com", "password": "saiso1234", "role": RoleEnum.EMPLOYEES},
+        {"first_name": "Fanny", "last_name": "Lerou", "email": "fanny@yahoo.com", "phone_number": "0600000000", "password": "admin1234", "role": RoleEnum.SUPERADMIN},
+        {"first_name": "Florian", "last_name": "Confit", "email": "florianconfit@gmail.com", "phone_number": "0600000000", "password": "user1234", "role": RoleEnum.ADMIN},
+        {"first_name": "Guillaume", "last_name": "Lacha", "email": "lachaguillaume@gmail.com", "phone_number": "0600000000", "password": "saiso1234", "role": RoleEnum.EMPLOYEES},
     ]
 
     for user_data in users_data:
