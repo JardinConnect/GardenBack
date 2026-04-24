@@ -17,6 +17,8 @@ Usage :
 import asyncio
 from typing import Any, Dict, Optional
 
+from services.async_loop import get_app_loop
+
 
 _pending: Dict[str, Dict[str, Any]] = {}
 # Structure : { ack_id: { "event": asyncio.Event, "result": dict | None } }
@@ -43,11 +45,18 @@ def resolve_ack(ack_id: str, result: dict) -> bool:
 
     entry["result"] = result
 
-    try:
-        loop = asyncio.get_event_loop()
-        loop.call_soon_threadsafe(entry["event"].set)
-    except RuntimeError:
-        # Pas de boucle asyncio active — fallback direct
+    loop = get_app_loop()
+    if loop is not None and not loop.is_closed():
+        try:
+            loop.call_soon_threadsafe(entry["event"].set)
+        except RuntimeError as exc:
+            print(f"[pending_acks] resolve_ack: call_soon_threadsafe échoué ({exc}), set direct.")
+            entry["event"].set()
+    else:
+        print(
+            "[pending_acks] resolve_ack: boucle application absente ou fermée, "
+            "set direct sur l'Event (hors boucle)."
+        )
         entry["event"].set()
 
     return True

@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Depends
@@ -18,11 +19,13 @@ from services.network.router import router as network_router
 from services.system.router import router as system_router
 from services.mqtt.client import connect_mqtt, register_handler
 from services.mqtt.handlers import handle_sensor_data, handle_config_ack, handle_alert_trigger, handle_pairing_ack, handle_refresh_ack
+from services.async_loop import set_app_loop
 from settings import settings
 from fastapi.middleware.cors import CORSMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    set_app_loop(asyncio.get_running_loop())
     print("[FASTAPI] Démarrage de l'application...")
     if not settings.MOCK_MQTT:
         register_handler(settings.MQTT_TOPIC_ANALYTICS, handle_sensor_data)
