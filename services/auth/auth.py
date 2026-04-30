@@ -46,7 +46,7 @@ def sign_jwt(db: Session, user: User) -> Dict[str, Any]:
     payload = {
         "user_id": user.email,
         "role": user.role.value,
-        "expires": time.time() + 600  # 10 minutes
+        "expires": ((time.time() + 600) * 6) *24 # 10 minutes * 6 * 24 = 1 day
     }
 
     access_token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
