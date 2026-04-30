@@ -4,7 +4,7 @@ import uuid
 from db.database import SessionLocal
 from services.analytics.repository import create_analytic as create_analytic_repo
 from services.analytics.schemas import AnalyticCreate
-from db.models import Sensor, Alert, AlertEvent, Cell, SeverityEnum
+from db.models import Sensor, Alert, AlertEvent, Cell, SeverityEnum, AnalyticType
 from services.mqtt.pending_acks import resolve_ack
 from services.area.service import get_full_location_path_for_cell
 from services.alerts.schemas import AlertEventResponseSchema
@@ -205,7 +205,11 @@ def handle_alert_trigger(topic: str, raw_payload: str):
 
     alert_id = message.get("alert_id")
     cell_uid = message.get("cell_uid")
-    sensor_type = message.get("sensor_type")
+    sensor_type_raw = message.get("sensor_type")
+    try:
+        sensor_type = AnalyticType.from_prefix(sensor_type_raw).value if sensor_type_raw else None
+    except ValueError:
+        sensor_type = sensor_type_raw
     sensor_index = message.get("sensor_index")
     value = message.get("value")
     trigger_type = message.get("trigger_type")
